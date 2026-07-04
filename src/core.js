@@ -759,7 +759,7 @@ STRIPE_WEBHOOK_SECRET=whsec_replace_me
 STRIPE_PRICE_ID=price_replace_me
 
 # Optional product URL used by checkout redirects
-MORPH_APP_URL=http://localhost:4177
+MORPH_APP_URL=http://localhost:3000
 `;
 }
 

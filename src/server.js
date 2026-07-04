@@ -10,26 +10,126 @@ import {
   repairProject,
   storeRun
 } from "./core.js";
+import {
+  AuthError,
+  createAuthManager,
+  loadEnvFile
+} from "./auth.js";
 
 export async function serveMorph(config, options = {}) {
+  if (options.loadEnv !== false) {
+    await loadEnvFile(options.cwd ?? process.cwd());
+  }
   const host = options.host ?? config.server?.host ?? "127.0.0.1";
   const port = Number(options.port ?? config.server?.port ?? 4177);
+  const runtimeAuth = {
+    githubClientId: process.env.GITHUB_CLIENT_ID?.trim() || null,
+    githubClientSecret: process.env.GITHUB_CLIENT_SECRET?.trim() || null
+  };
+  const auth = createAuthManager(config, runtimeAuth);
 
   const server = createServer(async (request, response) => {
+    let url;
     try {
       if (!request.url) return sendJson(response, 400, { error: "missing_url" });
-      const url = new URL(request.url, `http://${host}:${port}`);
+      url = new URL(request.url, `http://${host}:${port}`);
+      const session = auth.getSession(request);
+      const appUrl = auth.getAppUrl(request, host, port);
+
+      if (auth.isAuthRequired() && !session && !auth.isPublicRoute(url.pathname, request.method)) {
+        if (url.pathname.startsWith("/api/")) {
+          return sendJson(response, 401, { error: "unauthorized", message: "Sign in required." });
+        }
+        const returnTo = encodeURIComponent(`${url.pathname}${url.search}`);
+        return redirect(response, `/login?returnTo=${returnTo}`);
+      }
+
+      if (request.method === "GET" && url.pathname === "/login") {
+        if (session) return redirect(response, sanitizeReturnTo(url.searchParams.get("returnTo")));
+        return sendHtml(response, auth.loginHtml({
+          error: url.searchParams.get("error"),
+          providers: auth.getProviders(),
+          returnTo: sanitizeReturnTo(url.searchParams.get("returnTo"))
+        }));
+      }
+
+      if (request.method === "GET" && (url.pathname === "/auth/google" || url.pathname === "/auth/github")) {
+        const provider = url.pathname === "/auth/google" ? "google" : "github";
+        const location = auth.startOAuth(provider, url.searchParams.get("returnTo"), appUrl);
+        return redirect(response, location);
+      }
+
+      if (request.method === "GET" && url.pathname === "/auth/google/callback") {
+        const result = await auth.handleOAuthCallback("google", url, appUrl);
+        auth.setSession(response, result.user);
+        return redirect(response, result.returnTo);
+      }
+
+      if (request.method === "GET" && url.pathname === "/auth/github/callback") {
+        const result = await auth.handleOAuthCallback("github", url, appUrl);
+        auth.setSession(response, result.user);
+        return redirect(response, result.returnTo);
+      }
+
+      if (request.method === "GET" && url.pathname === "/auth/logout") {
+        auth.clearSession(response);
+        return redirect(response, "/login");
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/auth/session") {
+        return sendJson(response, 200, {
+          authenticated: Boolean(session),
+          user: session ? publicUser(session) : null,
+          authMode: auth.getAuthMode(),
+          providers: auth.getProviders()
+        });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/auth/providers") {
+        return sendJson(response, 200, { providers: auth.getProviders() });
+      }
 
       if (request.method === "GET" && url.pathname === "/") {
-        return sendHtml(response, dashboardHtml(config));
+        return sendHtml(response, dashboardHtml(config, session));
       }
 
       if (request.method === "GET" && url.pathname === "/api/health") {
+        const github = getGithubCredentials(runtimeAuth);
         return sendJson(response, 200, {
           ok: true,
           product: "Morph",
-          authMode: config.auth?.mode ?? process.env.MORPH_AUTH_MODE ?? "dev",
-          billingMode: config.billing?.mode ?? "stub"
+          authMode: auth.getAuthMode(),
+          authenticated: Boolean(session),
+          user: session ? publicUser(session) : null,
+          billingMode: config.billing?.mode ?? "stub",
+          providers: auth.getProviders(),
+          github: {
+            configured: isGithubConfigured(runtimeAuth),
+            clientId: maskClientId(github.clientId)
+          }
+        });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/auth/github") {
+        if (!session) throw new HttpError(401, "unauthorized", "Sign in required.");
+        const body = await readJson(request);
+        const clientId = String(body.clientId ?? "").trim();
+        const clientSecret = String(body.clientSecret ?? "").trim();
+        if (!clientId || !clientSecret) {
+          throw new HttpError(400, "missing_credentials", "GitHub client ID and client secret are required.");
+        }
+        runtimeAuth.githubClientId = clientId;
+        runtimeAuth.githubClientSecret = clientSecret;
+        process.env.GITHUB_CLIENT_ID = clientId;
+        process.env.GITHUB_CLIENT_SECRET = clientSecret;
+        return sendJson(response, 200, {
+          ok: true,
+          authMode: auth.getAuthMode(),
+          providers: auth.getProviders(),
+          github: {
+            configured: true,
+            clientId: maskClientId(clientId)
+          }
         });
       }
 
@@ -105,11 +205,15 @@ export async function serveMorph(config, options = {}) {
       }
 
       if (request.method === "GET" && url.pathname === "/api/config") {
-        return sendJson(response, 200, publicConfig(config));
+        return sendJson(response, 200, publicConfig(config, runtimeAuth));
       }
 
       return sendJson(response, 404, { error: "not_found" });
     } catch (error) {
+      if (error instanceof AuthError && url && !url.pathname.startsWith("/api/")) {
+        const returnTo = encodeURIComponent(sanitizeReturnTo(url.searchParams.get("returnTo")));
+        return redirect(response, `/login?error=${encodeURIComponent(error.message)}&returnTo=${returnTo}`);
+      }
       return sendJson(response, error.statusCode ?? 500, {
         error: error.code ?? "server_error",
         message: error.message
@@ -208,12 +312,33 @@ function sendJson(response, status, payload) {
   response.end(`${JSON.stringify(payload, null, 2)}\n`);
 }
 
-function sendHtml(response, html) {
-  response.writeHead(200, {
+function sendHtml(response, html, status = 200, headers = {}) {
+  response.writeHead(status, {
     "content-type": "text/html; charset=utf-8",
-    "cache-control": "no-store"
+    "cache-control": "no-store",
+    ...headers
   });
   response.end(html);
+}
+
+function redirect(response, location, status = 302) {
+  response.writeHead(status, { location, "cache-control": "no-store" });
+  response.end();
+}
+
+function sanitizeReturnTo(value) {
+  const returnTo = String(value ?? "/").trim();
+  if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return "/";
+  return returnTo;
+}
+
+function publicUser(session) {
+  return {
+    email: session.email,
+    name: session.name,
+    picture: session.picture,
+    provider: session.provider
+  };
 }
 
 class HttpError extends Error {
@@ -224,14 +349,43 @@ class HttpError extends Error {
   }
 }
 
-function publicConfig(config) {
+function getGithubCredentials(runtimeAuth) {
+  return {
+    clientId: runtimeAuth.githubClientId || process.env.GITHUB_CLIENT_ID?.trim() || "",
+    clientSecret: runtimeAuth.githubClientSecret || process.env.GITHUB_CLIENT_SECRET?.trim() || ""
+  };
+}
+
+function isGithubConfigured(runtimeAuth) {
+  const { clientId, clientSecret } = getGithubCredentials(runtimeAuth);
+  return Boolean(clientId && clientSecret);
+}
+
+function maskClientId(clientId) {
+  const value = String(clientId ?? "").trim();
+  if (!value) return null;
+  if (value.length <= 8) return value;
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
+function publicConfig(config, runtimeAuth) {
+  const github = getGithubCredentials(runtimeAuth);
   return {
     projectName: config.projectName,
     projectId: config.projectId ?? slugify(config.projectName),
     workspace: config.workspace,
     auth: {
       mode: config.auth?.mode ?? process.env.MORPH_AUTH_MODE ?? "dev",
-      providers: ["github", "google", "email"]
+      providers: ["github", "google", "email"],
+      github: {
+        configured: isGithubConfigured(runtimeAuth),
+        clientId: maskClientId(github.clientId)
+      },
+      google: {
+        configured: Boolean(
+          process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim()
+        )
+      }
     },
     billing: {
       provider: "stripe",
@@ -241,8 +395,13 @@ function publicConfig(config) {
   };
 }
 
-function dashboardHtml(config) {
-  const projectName = escapeHtml(config.projectName);
+function dashboardHtml(config, session) {
+  const userLabel = session
+    ? `${escapeHtml(session.name || session.email)} · ${escapeHtml(session.provider)}`
+    : "Signed out";
+  const userBlock = session
+    ? `<span class="pill user-pill">${userLabel}</span><a class="logout" href="/auth/logout">Sign out</a>`
+    : "";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -292,6 +451,13 @@ function dashboardHtml(config) {
       justify-content: space-between;
       gap: 16px;
     }
+    .bar-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
     .brand {
       display: flex;
       align-items: center;
@@ -316,6 +482,14 @@ function dashboardHtml(config) {
       background: var(--surface);
       font-size: 13px;
     }
+    .user-pill { color: var(--ink); }
+    .logout {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .logout:hover { text-decoration: underline; }
     main { padding: 24px 0 48px; }
     .hero {
       display: grid;
@@ -401,6 +575,38 @@ function dashboardHtml(config) {
       color: #fff;
     }
     button.primary:hover { background: var(--accent-dark); }
+    .auth-panel form {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .auth-panel label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .auth-panel input {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 12px;
+      font: inherit;
+      font-weight: 400;
+      color: var(--ink);
+      background: #fff;
+    }
+    .auth-panel input:focus {
+      outline: 2px solid rgba(31, 94, 255, 0.18);
+      border-color: var(--accent);
+    }
+    .auth-status {
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .auth-status.ready { color: var(--ok); }
+    .auth-status.pending { color: var(--warn); }
     .metrics {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -554,7 +760,10 @@ function dashboardHtml(config) {
   <header>
     <div class="bar">
       <div class="brand"><span class="mark">M</span><span>Morph Studio</span></div>
-      <span class="pill">Interactive PR review for AI-generated frontend</span>
+      <div class="bar-actions">
+        <span class="pill">Interactive PR review for AI-generated frontend</span>
+        ${userBlock}
+      </div>
     </div>
   </header>
   <main>
@@ -576,61 +785,17 @@ function dashboardHtml(config) {
           <div class="step"><strong>4. Human decides</strong><span>The reviewer sees the before, after, score, and JSON proof in one place.</span></div>
         </div>
       </div>
-      <div class="panel">
-        <div class="pill">Active review</div>
-        <h2>${projectName}</h2>
-        <p>The current demo models a real day-to-day workflow: a developer reviewing a Cursor-generated settings screen before it reaches a teammate’s PR queue.</p>
-        <div class="metrics">
-          <div class="metric"><strong id="score">71</strong><span>Score</span></div>
-          <div class="metric"><strong id="runs">--</strong><span>Runs</span></div>
-          <div class="metric"><strong id="gate">FAIL</strong><span>Gate</span></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="stage" aria-label="Morph before and after review">
-      <div class="stage-head">
-        <div>
-          <h2>Before and after the Morph review</h2>
-          <p>The same feature, first as an unchecked agent output, then after Morph applies the product grammar.</p>
-        </div>
-        <span class="pill" id="reviewState">Ready</span>
-      </div>
-      <div class="compare">
-        <div class="preview">
-          <div class="preview-title"><span>Unchecked agent output</span><span class="status-fail">FAIL 71</span></div>
-          <div class="mini-app">
-            <div class="mini-shell before">
-              <div class="mini-copy">
-                <div>
-                  <div class="mini-label">Scale plan</div>
-                  <p>The generated card works, but it quietly drifts away from Acme’s design grammar.</p>
-                </div>
-                <button class="bad-button">Update plan</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="preview">
-          <div class="preview-title"><span>After Morph repair</span><span class="status-pass">PASS 100</span></div>
-          <div class="mini-app">
-            <div class="mini-shell after">
-              <div class="mini-copy">
-                <div>
-                  <div class="mini-label">Scale plan</div>
-                  <p>The card now uses product spacing, radius, color, elevation, component, focus, and responsive rules.</p>
-                </div>
-                <button class="good-button">Update plan</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="issue-list">
-        <div class="issue-chip"><strong>Hardcoded color</strong>One-off purple bypassed semantic product tokens.</div>
-        <div class="issue-chip"><strong>Raw component</strong>The agent rebuilt a button instead of using the shared Button.</div>
-        <div class="issue-chip"><strong>Focus regression</strong>Keyboard focus was removed without a visible replacement.</div>
-        <div class="issue-chip"><strong>Mobile overflow</strong>A fixed minimum width could break settings screens on phones.</div>
+      <div class="panel auth-panel">
+        <h2>GitHub OAuth</h2>
+        <p>Enter your GitHub OAuth app credentials. Morph uses these at runtime instead of static <code>.env</code> values.</p>
+        <form id="githubAuthForm">
+          <label for="githubClientId">GitHub client ID</label>
+          <input id="githubClientId" name="clientId" type="text" required autocomplete="off" placeholder="Ov23li...">
+          <label for="githubClientSecret">GitHub client secret</label>
+          <input id="githubClientSecret" name="clientSecret" type="password" required autocomplete="off" placeholder="ghp_...">
+          <button type="submit" class="primary">Save credentials</button>
+          <p id="authStatus" class="auth-status pending">Credentials required before GitHub sign-in is enabled.</p>
+        </form>
       </div>
     </section>
 
@@ -651,8 +816,48 @@ function dashboardHtml(config) {
     const runs = document.querySelector("#runs");
     const gate = document.querySelector("#gate");
     const reviewState = document.querySelector("#reviewState");
+    const githubAuthForm = document.querySelector("#githubAuthForm");
+    const githubClientId = document.querySelector("#githubClientId");
+    const githubClientSecret = document.querySelector("#githubClientSecret");
+    const authStatus = document.querySelector("#authStatus");
+    const GITHUB_AUTH_KEY = "morph.github.oauth";
 
     const narration = "Morph Studio reviews a Cursor generated billing screen before it reaches a teammate. The first version compiles, but it introduces hardcoded color, rogue radius, raw button markup, missing focus state, and mobile overflow risk. Morph creates file-level receipts, applies deterministic repairs, and returns a passing merge gate.";
+
+    function readStoredGithubAuth() {
+      try {
+        return JSON.parse(localStorage.getItem(GITHUB_AUTH_KEY) || "null");
+      } catch {
+        return null;
+      }
+    }
+
+    function storeGithubAuth(clientId, clientSecret) {
+      localStorage.setItem(GITHUB_AUTH_KEY, JSON.stringify({ clientId, clientSecret }));
+    }
+
+    function renderAuthStatus(configured, clientId) {
+      if (!authStatus) return;
+      if (configured) {
+        authStatus.textContent = clientId
+          ? "GitHub OAuth ready (" + clientId + ")."
+          : "GitHub OAuth ready.";
+        authStatus.className = "auth-status ready";
+      } else {
+        authStatus.textContent = "Credentials required before GitHub sign-in is enabled.";
+        authStatus.className = "auth-status pending";
+      }
+    }
+
+    async function saveGithubAuth(clientId, clientSecret) {
+      const payload = await api("/api/auth/github", {
+        method: "POST",
+        body: JSON.stringify({ clientId, clientSecret })
+      });
+      storeGithubAuth(clientId, clientSecret);
+      renderAuthStatus(true, payload.github?.clientId);
+      return payload;
+    }
 
     async function api(path, options) {
       const response = await fetch(path, {
@@ -719,8 +924,38 @@ function dashboardHtml(config) {
       }
     });
 
+    githubAuthForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const clientId = githubClientId.value.trim();
+      const clientSecret = githubClientSecret.value.trim();
+      if (!clientId || !clientSecret) {
+        renderAuthStatus(false);
+        return;
+      }
+      authStatus.textContent = "Saving GitHub credentials...";
+      authStatus.className = "auth-status pending";
+      try {
+        const payload = await saveGithubAuth(clientId, clientSecret);
+        output.textContent = JSON.stringify(payload, null, 2);
+      } catch (error) {
+        renderAuthStatus(false);
+        output.textContent = error.stack || error.message;
+      }
+    });
+
     refreshRuns().then(async () => {
+      const stored = readStoredGithubAuth();
+      if (stored?.clientId && stored?.clientSecret) {
+        githubClientId.value = stored.clientId;
+        githubClientSecret.value = stored.clientSecret;
+        try {
+          await saveGithubAuth(stored.clientId, stored.clientSecret);
+        } catch {
+          renderAuthStatus(false);
+        }
+      }
       const health = await api("/api/health");
+      renderAuthStatus(Boolean(health.github?.configured), health.github?.clientId);
       output.textContent = JSON.stringify(health, null, 2);
     });
   </script>
