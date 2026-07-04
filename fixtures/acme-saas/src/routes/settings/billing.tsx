@@ -17,6 +17,10 @@ export function BillingSettings() {
             </p>
           </div>
 
+          <button>
+            <svg viewBox="0 0 20 20"><path d="M4 4l12 12M16 4L4 16" /></svg>
+          </button>
+
           <button
             className="rounded-[28px] bg-[#7c3aed] px-[21px] py-[11px] text-sm font-semibold text-[#faf5ff] focus:outline-none"
           >

@@ -778,6 +778,12 @@ function dashboardHtml(config, session) {
           <button data-action="studio-review">Apply fix</button>
           <button data-speak="true">Narrate review</button>
         </div>
+        <div class="bar-actions" style="justify-content: flex-start; margin: 14px 0 0;">
+          <span class="pill">Score: <strong id="score">–</strong></span>
+          <span class="pill">Gate: <strong id="gate">–</strong></span>
+          <span class="pill">Runs stored: <strong id="runs">0</strong></span>
+          <span class="pill">State: <strong id="reviewState">Idle</strong></span>
+        </div>
         <div class="journey">
           <div class="step"><strong>1. Agent ships</strong><span>A generated billing card compiles, but breaks the product grammar.</span></div>
           <div class="step"><strong>2. Morph reviews</strong><span>Token drift, component reuse, focus states, and mobile risk become receipts.</span></div>

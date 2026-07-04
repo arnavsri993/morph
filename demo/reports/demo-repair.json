@@ -1,11 +1,11 @@
 {
   "schemaVersion": "morph.repair.v1",
-  "runId": "repair-applied-20260704161106-4ee055",
-  "generatedAt": "2026-07-04T16:11:06.442Z",
+  "runId": "repair-applied-20260704195418-8ff50c",
+  "generatedAt": "2026-07-04T19:54:18.361Z",
   "project": "Acme Control Plane Demo Copy",
   "applied": true,
-  "basedOnScore": 71,
-  "basedOnRunId": "repair-base-20260704161106-f8151e",
+  "basedOnScore": 68,
+  "basedOnRunId": "repair-base-20260704195418-039c34",
   "patches": [
     {
       "file": "src/routes/settings/billing.tsx",
@@ -41,17 +41,21 @@
         {
           "find": "p-[29px]",
           "replace": "p-[var(--space-4)]"
+        },
+        {
+          "find": "<button>",
+          "replace": "<button aria-label=\"Action\">"
         }
       ]
     }
   ],
-  "replacements": 8,
+  "replacements": 9,
   "risk": "deterministic_replacements_only",
   "instructions": "Patch applied. Re-run morph verify before merge.",
   "after": {
     "schemaVersion": "morph.report.v1",
-    "runId": "verify-20260704161106-7801a2",
-    "generatedAt": "2026-07-04T16:11:06.442Z",
+    "runId": "verify-20260704195418-85bcd5",
+    "generatedAt": "2026-07-04T19:54:18.361Z",
     "durationMs": 1,
     "workspace": {
       "id": "raise-demo-workspace",

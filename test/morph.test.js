@@ -25,6 +25,16 @@ test("verify catches seeded design-system drift with agent-readable patches", as
   assert.equal(report.issues.every((issue) => issue.patch?.replacements?.length), true);
 });
 
+test("verify flags icon-only buttons missing an accessible label", async () => {
+  const config = await loadConfig("morph.config.json", repoRoot);
+  const report = await createReport(config);
+
+  const a11yIssue = report.issues.find((issue) => issue.id === "icon-button-missing-label");
+  assert.ok(a11yIssue, "expected icon-button-missing-label finding");
+  assert.equal(a11yIssue.type, "interaction_drift");
+  assert.equal(a11yIssue.patch.replacements[0].replace.includes("aria-label"), true);
+});
+
 test("repair applies deterministic fixes and verify passes on a temp project", async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-test-"));
   const fixtureRoot = path.join(tempRoot, "acme-saas");

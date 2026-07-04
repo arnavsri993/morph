@@ -1,7 +1,7 @@
 {
   "schemaVersion": "morph.report.v1",
-  "runId": "verify-20260704161106-f24e6b",
-  "generatedAt": "2026-07-04T16:11:06.440Z",
+  "runId": "verify-20260704195418-7f47b2",
+  "generatedAt": "2026-07-04T19:54:18.358Z",
   "durationMs": 2,
   "workspace": {
     "id": "raise-demo-workspace",
@@ -11,11 +11,11 @@
   "projectId": "acme-control-plane-demo",
   "project": "Acme Control Plane Demo Copy",
   "verdict": "fail",
-  "score": 71,
+  "score": 68,
   "summary": {
-    "total": 8,
+    "total": 9,
     "high": 3,
-    "medium": 3,
+    "medium": 4,
     "low": 2
   },
   "gate": {
@@ -23,7 +23,7 @@
     "passed": false,
     "mergePolicy": "block_on_any_drift"
   },
-  "ciSummary": "FAIL: score 71/100. 3 high, 3 medium, 2 low finding(s). Block merge until Morph repair or explicit grammar approval.",
+  "ciSummary": "FAIL: score 68/100. 3 high, 4 medium, 2 low finding(s). Block merge until Morph repair or explicit grammar approval.",
   "grammar": {
     "tokenFiles": [
       "design-system/tokens.css"
@@ -72,7 +72,7 @@
       "type": "design_drift",
       "severity": "high",
       "file": "src/routes/settings/billing.tsx",
-      "line": 21,
+      "line": 25,
       "reason": "Found hardcoded color(s) #7c3aed, #faf5ff outside the product token set.",
       "suggestedFix": "Replace one-off colors with semantic color tokens.",
       "evidence": "#7c3aed] px-[21px] py-[11px] text-sm font-semibold text-[#faf5ff] focus:outline-none\"",
@@ -172,7 +172,7 @@
       "type": "component_drift",
       "severity": "high",
       "file": "src/routes/settings/billing.tsx",
-      "line": 20,
+      "line": 24,
       "reason": "Raw button markup bypasses the product Button component and its states.",
       "suggestedFix": "Use the shared Button component so hierarchy, focus, and disabled states stay consistent.",
       "evidence": "<button",
@@ -197,7 +197,7 @@
       "type": "interaction_drift",
       "severity": "medium",
       "file": "src/routes/settings/billing.tsx",
-      "line": 21,
+      "line": 25,
       "reason": "Focus outline was removed without a product focus-visible replacement.",
       "suggestedFix": "Use the shared focus-visible ring token.",
       "evidence": "focus:outline-none\"",
@@ -254,6 +254,27 @@
           }
         ]
       }
+    },
+    {
+      "id": "icon-button-missing-label",
+      "type": "interaction_drift",
+      "severity": "medium",
+      "file": "src/routes/settings/billing.tsx",
+      "line": 20,
+      "reason": "Icon-only button has no accessible name for screen readers.",
+      "suggestedFix": "Add an aria-label describing the button's action.",
+      "evidence": "<button>",
+      "classification": "accidental_drift",
+      "intent": "agent_shipped_icon_button_without_accessible_name",
+      "patch": {
+        "file": "src/routes/settings/billing.tsx",
+        "replacements": [
+          {
+            "find": "<button>",
+            "replace": "<button aria-label=\"Action\">"
+          }
+        ]
+      }
     }
   ],
   "remediation": {
@@ -269,7 +290,8 @@
           "component-fragmentation",
           "focus-state-regression",
           "mobile-overflow-risk",
-          "elevation-drift"
+          "elevation-drift",
+          "icon-button-missing-label"
         ],
         "replacements": [
           {
@@ -323,6 +345,10 @@
           {
             "find": "shadow-2xl",
             "replace": "shadow-[var(--shadow-card)]"
+          },
+          {
+            "find": "<button>",
+            "replace": "<button aria-label=\"Action\">"
           }
         ]
       }
@@ -333,5 +359,5 @@
     "Re-run morph verify until the report passes.",
     "Promote intentional new patterns into tokens instead of merging one-off UI."
   ],
-  "humanReport": "Acme Control Plane Demo Copy: FAIL (71/100)\nFAIL: score 71/100. 3 high, 3 medium, 2 low finding(s). Block merge until Morph repair or explicit grammar approval.\n- [high] hardcoded-color src/routes/settings/billing.tsx:21\n  Found hardcoded color(s) #7c3aed, #faf5ff outside the product token set.\n  Intent: agent_added_visual_style_without_design_system_backing\n  Fix: Replace one-off colors with semantic color tokens.\n- [medium] off-scale-spacing src/routes/settings/billing.tsx:5\n  gap-[18px] and related arbitrary spacing values are not on the product spacing scale.\n  Intent: agent_used_pixel_perfect_local_guess_instead_of_spacing_scale\n  Fix: Snap spacing to the nearest design-system token.\n- [high] radius-drift src/routes/settings/billing.tsx:11\n  rounded-[28px] introduces a radius not used by the design system.\n  Intent: agent_changed_shape_language\n  Fix: Use the product card radius token.\n- [low] type-scale-drift src/routes/settings/billing.tsx:14\n  text-[15.5px] bypasses the product type scale.\n  Intent: agent_created_one_off_typography\n  Fix: Use a named text size from the system.\n- [high] component-fragmentation src/routes/settings/billing.tsx:20\n  Raw button markup bypasses the product Button component and its states.\n  Intent: agent_reimplemented_existing_component\n  Fix: Use the shared Button component so hierarchy, focus, and disabled states stay consistent.\n- [medium] focus-state-regression src/routes/settings/billing.tsx:21\n  Focus outline was removed without a product focus-visible replacement.\n  Intent: agent_removed_accessibility_state\n  Fix: Use the shared focus-visible ring token.\n- [medium] mobile-overflow-risk src/routes/settings/billing.tsx:11\n  min-w-[840px] can force overflow on mobile settings screens.\n  Intent: agent_optimized_for_desktop_snapshot_only\n  Fix: Use min-w-0 so the layout can shrink inside responsive containers.\n- [low] elevation-drift src/routes/settings/billing.tsx:11\n  shadow-2xl is heavier than the product card elevation.\n  Intent: agent_added_unapproved_elevation\n  Fix: Use the system card shadow token."
+  "humanReport": "Acme Control Plane Demo Copy: FAIL (68/100)\nFAIL: score 68/100. 3 high, 4 medium, 2 low finding(s). Block merge until Morph repair or explicit grammar approval.\n- [high] hardcoded-color src/routes/settings/billing.tsx:25\n  Found hardcoded color(s) #7c3aed, #faf5ff outside the product token set.\n  Intent: agent_added_visual_style_without_design_system_backing\n  Fix: Replace one-off colors with semantic color tokens.\n- [medium] off-scale-spacing src/routes/settings/billing.tsx:5\n  gap-[18px] and related arbitrary spacing values are not on the product spacing scale.\n  Intent: agent_used_pixel_perfect_local_guess_instead_of_spacing_scale\n  Fix: Snap spacing to the nearest design-system token.\n- [high] radius-drift src/routes/settings/billing.tsx:11\n  rounded-[28px] introduces a radius not used by the design system.\n  Intent: agent_changed_shape_language\n  Fix: Use the product card radius token.\n- [low] type-scale-drift src/routes/settings/billing.tsx:14\n  text-[15.5px] bypasses the product type scale.\n  Intent: agent_created_one_off_typography\n  Fix: Use a named text size from the system.\n- [high] component-fragmentation src/routes/settings/billing.tsx:24\n  Raw button markup bypasses the product Button component and its states.\n  Intent: agent_reimplemented_existing_component\n  Fix: Use the shared Button component so hierarchy, focus, and disabled states stay consistent.\n- [medium] focus-state-regression src/routes/settings/billing.tsx:25\n  Focus outline was removed without a product focus-visible replacement.\n  Intent: agent_removed_accessibility_state\n  Fix: Use the shared focus-visible ring token.\n- [medium] mobile-overflow-risk src/routes/settings/billing.tsx:11\n  min-w-[840px] can force overflow on mobile settings screens.\n  Intent: agent_optimized_for_desktop_snapshot_only\n  Fix: Use min-w-0 so the layout can shrink inside responsive containers.\n- [low] elevation-drift src/routes/settings/billing.tsx:11\n  shadow-2xl is heavier than the product card elevation.\n  Intent: agent_added_unapproved_elevation\n  Fix: Use the system card shadow token.\n- [medium] icon-button-missing-label src/routes/settings/billing.tsx:20\n  Icon-only button has no accessible name for screen readers.\n  Intent: agent_shipped_icon_button_without_accessible_name\n  Fix: Add an aria-label describing the button's action."
 }

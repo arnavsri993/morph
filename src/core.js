@@ -356,6 +356,7 @@ function scanSource(file, source, grammar) {
   issues.push(...detectFocusRegression(file, source));
   issues.push(...detectResponsiveRisk(file, source));
   issues.push(...detectShadowDrift(file, source));
+  issues.push(...detectIconButtonMissingLabel(file, source));
   return issues;
 }
 
@@ -475,15 +476,14 @@ function detectType(file, source, grammar) {
 
 function detectRawButtons(file, source) {
   if (file === "src/components/Button.tsx") return [];
-  if (!/<button\b/.test(source)) return [];
-  const buttonBlock = source.match(/<button\b[\s\S]*?<\/button>/)?.[0];
+  const blocks = [...source.matchAll(/<button\b[\s\S]*?<\/button>/g)];
+  const buttonBlock = blocks.find((match) => !/<svg\b/.test(match[0]))?.[0];
+  if (!buttonBlock) return [];
   const replacements = [];
-  if (buttonBlock) {
-    replacements.push({
-      find: buttonBlock,
-      replace: '<Button variant="primary">Update plan</Button>'
-    });
-  }
+  replacements.push({
+    find: buttonBlock,
+    replace: '<Button variant="primary">Update plan</Button>'
+  });
   if (!source.includes("components/Button")) {
     replacements.push({
       find: "import React from \"react\";\n",
@@ -497,7 +497,7 @@ function detectRawButtons(file, source) {
       severity: "high",
       file,
       source,
-      index: source.indexOf("<button"),
+      index: source.indexOf(buttonBlock),
       reason: "Raw button markup bypasses the product Button component and its states.",
       suggestedFix: "Use the shared Button component so hierarchy, focus, and disabled states stay consistent.",
       intent: "agent_reimplemented_existing_component",
@@ -569,6 +569,29 @@ function detectShadowDrift(file, source) {
       ]
     })
   ];
+}
+
+function detectIconButtonMissingLabel(file, source) {
+  const issues = [];
+  for (const match of source.matchAll(/<button\b[^>]*>\s*(<svg\b[\s\S]*?<\/svg>)\s*<\/button>/g)) {
+    const openTag = match[0].slice(0, match[0].indexOf(">") + 1);
+    if (/\baria-label=/.test(openTag)) continue;
+    issues.push(issue({
+      id: "icon-button-missing-label",
+      type: "interaction_drift",
+      severity: "medium",
+      file,
+      source,
+      index: match.index,
+      reason: "Icon-only button has no accessible name for screen readers.",
+      suggestedFix: "Add an aria-label describing the button's action.",
+      intent: "agent_shipped_icon_button_without_accessible_name",
+      replacements: [
+        { find: openTag, replace: openTag.replace(/<button\b/, '<button aria-label="Action"') }
+      ]
+    }));
+  }
+  return issues;
 }
 
 function issue(input) {

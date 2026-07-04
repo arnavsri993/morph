@@ -30,7 +30,7 @@ and proves the branch is safe to review.
    npm run verify -- --no-fail
    ```
 
-   Expected signal: `FAIL (71/100)` with 8 findings across color, spacing, radius, components, focus, responsiveness, elevation, and type.
+   Expected signal: `FAIL (68/100)` with 9 findings across color, spacing, radius, components, focus, accessibility, responsiveness, elevation, and type.
 
 3. Show the repair loop:
 
@@ -41,8 +41,8 @@ and proves the branch is safe to review.
    Expected output:
 
    ```text
-   Before: fail (71/100), 8 issue(s)
-   Repair: 8 replacement(s) across 1 file(s)
+   Before: fail (68/100), 9 issue(s)
+   Repair: 9 replacement(s) across 1 file(s)
    After: pass (100/100), 0 issue(s)
    ```
 
