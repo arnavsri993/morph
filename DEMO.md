@@ -13,7 +13,7 @@ and proves the branch is safe to review.
 
 - Problem: developers increasingly review AI-generated frontend that compiles but is inconsistent, inaccessible, or off-brand.
 - User journey: inspect the agent output, understand the product-design issues, apply the fix, and see a passing merge gate.
-- Interactive solution: Morph Studio combines before/after UI, issue timeline, voice narration, JSON receipts, and a repair loop.
+- Interactive solution: Morph Studio combines before/after UI, issue timeline, voice narration, JSON receipts, and a repair loop that runs on an isolated review copy so the demo can be repeated safely.
 
 ## One-Minute Video
 
@@ -52,7 +52,7 @@ and proves the branch is safe to review.
    npm run serve
    ```
 
-   Open `http://127.0.0.1:4177`, click `Narrate review`, then `Run full review`.
+   Open `http://127.0.0.1:4177`, click `Narrate review`, then `Run full review`. The full review repairs `.studio-run/project`, not the seeded fixture.
 
 5. Show the machine-readable receipt:
 

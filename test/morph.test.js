@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -140,6 +140,52 @@ test("server exposes health, run storage, and invalid JSON errors", async () => 
     assert.equal(invalidResponse.status, 400);
     const invalidPayload = await invalidResponse.json();
     assert.equal(invalidPayload.error, "invalid_json");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("studio review repairs an isolated copy without mutating source fixture", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-"));
+  const fixtureRoot = path.join(tempRoot, "acme-saas");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
+
+  const configPath = path.join(tempRoot, "morph.config.json");
+  await writeFile(configPath, `${JSON.stringify({
+    projectName: "Acme Studio",
+    projectId: "acme-studio",
+    projectRoot: "acme-saas",
+    morphDir: ".morph",
+    tokenFiles: ["design-system/tokens.css"],
+    scan: ["src/**/*.tsx"],
+    componentImports: {
+      Button: "src/components/Button.tsx"
+    },
+    gate: {
+      minScore: 95
+    }
+  }, null, 2)}\n`);
+
+  const driftedFile = path.join(fixtureRoot, "src/routes/settings/billing.tsx");
+  const sourceBefore = await readFile(driftedFile, "utf8");
+  const config = await loadConfig(configPath, tempRoot);
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0 });
+
+  try {
+    const response = await fetch(`${url}/api/studio/review`, { method: "POST" });
+    assert.equal(response.status, 201);
+    const payload = await response.json();
+
+    assert.equal(payload.run.kind, "studio-review");
+    assert.equal(payload.run.payload.before.verdict, "fail");
+    assert.equal(payload.run.payload.finalVerdict, "pass");
+    assert.equal(payload.run.payload.isolated, true);
+
+    const sourceAfter = await readFile(driftedFile, "utf8");
+    assert.equal(sourceAfter, sourceBefore);
+
+    const sourceReport = await createReport(config);
+    assert.equal(sourceReport.verdict, "fail");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
