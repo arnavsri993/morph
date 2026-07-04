@@ -117,7 +117,7 @@ test("server exposes health, run storage, and invalid JSON errors", async () => 
   }, null, 2)}\n`);
 
   const config = await loadConfig(configPath, tempRoot);
-  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0 });
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
 
   try {
     const health = await fetchJson(`${url}/api/health`);
