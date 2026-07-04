@@ -1,8 +1,8 @@
 {
   "schemaVersion": "morph.report.v1",
-  "runId": "verify-20260704155907-a608ba",
-  "generatedAt": "2026-07-04T15:59:07.459Z",
-  "durationMs": 2,
+  "runId": "verify-20260704160747-06fd82",
+  "generatedAt": "2026-07-04T16:07:47.260Z",
+  "durationMs": 3,
   "workspace": {
     "id": "raise-demo-workspace",
     "name": "RAISE Summit Demo Workspace",

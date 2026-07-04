@@ -1,12 +1,12 @@
 # Morph
 
-Morph is CI for agent-written frontend. It scans generated UI for design-system drift, explains why the drift matters, and emits machine-readable repair patches an agent can apply before a human reviews the PR.
+Morph Studio is an interactive review experience for agent-written frontend. It scans generated UI for design-system drift, shows a before/after product review, explains why the drift matters, and emits machine-readable repair patches an agent can apply before a human reviews the PR.
 
-This repo is a RAISE Summit Hackathon demo for the Cursor track: a local product fixture, seeded agent drift, verifier, repair loop, JSON receipts, stored runs, a small product API, an auth/billing-ready app shell, CI, and tests.
+This repo is a RAISE Summit Hackathon demo for the Cursor track: a local product fixture, seeded agent drift, verifier, repair loop, JSON receipts, stored runs, an interactive Morph Studio app, a small product API, an auth/billing-ready app shell, CI, and tests.
 
 ## Why this exists
 
-Coding agents can make UI that works but does not belong in the product. Morph gives those agents a consistency layer:
+Coding agents can make UI that works but does not belong in the product. Morph improves the review journey for a real daily workflow: a developer receiving AI-generated frontend and needing to decide whether it is safe, polished, accessible, and consistent enough to merge. Morph gives those teams a consistency layer:
 
 1. Read product tokens and component grammar.
 2. Scan generated frontend files.
@@ -28,7 +28,7 @@ npm run serve
 
 `npm run verify` intentionally fails without `--no-fail`, because the fixture contains seeded drift.
 
-Open the local product shell at `http://127.0.0.1:4177` after `npm run serve`.
+Open Morph Studio at `http://127.0.0.1:4177` after `npm run serve`.
 
 For the exact one-minute video and live judge flow, use `DEMO.md`.
 
@@ -48,7 +48,7 @@ morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 - `repair` generates deterministic replacements and can apply them.
 - `loop` runs verify, repair, verify again, then returns a final CI gate.
 - `demo` copies the seeded fixture, repairs the copy, and writes judge receipts.
-- `serve` starts a local dashboard and API backed by `.morph/runs`.
+- `serve` starts Morph Studio and the API backed by `.morph/runs`.
 
 ## Demo flow
 
@@ -144,10 +144,10 @@ See `docs/product-architecture.md` for the workspace/project/run model and deplo
 
 ## Hackathon positioning
 
-Morph is not a generic dashboard and not a screenshot upload tool. It is a machine-readable verification loop for coding agents:
+Morph is not a generic dashboard and not a screenshot upload tool. It is an interactive review journey plus a machine-readable verification loop for coding agents:
 
 ```text
-Cursor/agent changes frontend -> Morph verify -> JSON findings + patches -> Morph repair -> verify again -> safe to merge
+Cursor changes frontend -> Morph Studio review -> JSON findings + patches -> Morph repair -> verify again -> safe to merge
 ```
 
 The public repo and collaborator invite checklist is in `docs/github-prep.md`.

@@ -182,19 +182,22 @@ function dashboardHtml(config) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Morph Control Plane</title>
+  <title>Morph Studio</title>
   <style>
     :root {
       color-scheme: light;
-      --bg: #f7f8fb;
-      --ink: #111827;
-      --muted: #5b6475;
-      --line: #d9dee8;
+      --bg: #f5f7fb;
+      --ink: #101828;
+      --muted: #667085;
+      --line: #d0d8e6;
       --surface: #ffffff;
-      --accent: #2563eb;
-      --ok: #0f766e;
+      --surface-soft: #eef4ff;
+      --accent: #1f5eff;
+      --accent-dark: #1746bf;
+      --ok: #08746f;
       --bad: #b42318;
       --warn: #b45309;
+      --shadow: 0 16px 40px rgba(16, 24, 40, 0.10);
     }
     * { box-sizing: border-box; }
     body {
@@ -206,7 +209,7 @@ function dashboardHtml(config) {
     }
     header {
       border-bottom: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.86);
+      background: rgba(255, 255, 255, 0.92);
       position: sticky;
       top: 0;
       backdrop-filter: blur(14px);
@@ -230,8 +233,8 @@ function dashboardHtml(config) {
       font-weight: 700;
     }
     .mark {
-      width: 28px;
-      height: 28px;
+      width: 30px;
+      height: 30px;
       border-radius: 7px;
       background: var(--ink);
       color: white;
@@ -247,25 +250,67 @@ function dashboardHtml(config) {
       background: var(--surface);
       font-size: 13px;
     }
-    main { padding: 28px 0 48px; }
+    main { padding: 24px 0 48px; }
     .hero {
       display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      grid-template-columns: minmax(0, 1.06fr) minmax(320px, 0.94fr);
       gap: 20px;
       align-items: stretch;
     }
     h1 {
-      font-size: clamp(30px, 4vw, 54px);
-      line-height: 1;
+      font-size: 44px;
+      line-height: 1.02;
       margin: 0 0 16px;
       max-width: 780px;
     }
-    p { color: var(--muted); line-height: 1.55; }
+    h2 { margin: 0 0 10px; font-size: 18px; }
+    h3 { margin: 0 0 8px; font-size: 14px; }
+    p { color: var(--muted); line-height: 1.55; margin: 0; }
     .panel {
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 18px;
+      box-shadow: 0 1px 0 rgba(16, 24, 40, 0.02);
+    }
+    .stage {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .stage-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcff;
+    }
+    .journey {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 10px;
+      min-height: 86px;
+    }
+    .step strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    .step span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      display: block;
     }
     .actions {
       display: flex;
@@ -283,11 +328,13 @@ function dashboardHtml(config) {
       font-weight: 650;
       cursor: pointer;
     }
+    button:hover { border-color: #98a9c8; }
     button.primary {
       background: var(--accent);
       border-color: var(--accent);
       color: #fff;
     }
+    button.primary:hover { background: var(--accent-dark); }
     .metrics {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -305,19 +352,116 @@ function dashboardHtml(config) {
       font-size: 24px;
       margin-bottom: 4px;
     }
+    .compare {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 14px;
+      padding: 16px;
+    }
+    .preview {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+    .preview-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .mini-app {
+      min-height: 268px;
+      padding: 18px;
+    }
+    .mini-shell {
+      border: 1px solid #d6dee8;
+      background: #ffffff;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+    .mini-shell.before {
+      min-width: 460px;
+      border-radius: 28px;
+      padding: 29px;
+      box-shadow: 0 25px 50px rgba(15, 23, 42, 0.25);
+    }
+    .mini-shell.after {
+      min-width: 0;
+      border-radius: 8px;
+    }
+    .mini-copy {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .mini-copy p {
+      max-width: 280px;
+      font-size: 13px;
+    }
+    .mini-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .bad-button {
+      border: 0;
+      border-radius: 28px;
+      background: #7c3aed;
+      color: #faf5ff;
+      padding: 11px 21px;
+      box-shadow: none;
+      white-space: nowrap;
+    }
+    .good-button {
+      border: 0;
+      border-radius: 6px;
+      background: #2563eb;
+      color: #ffffff;
+      padding: 10px 16px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+      white-space: nowrap;
+    }
+    .issue-list {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      padding: 0 16px 16px;
+    }
+    .issue-chip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .issue-chip strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
     .grid {
       display: grid;
-      grid-template-columns: 260px minmax(0, 1fr);
+      grid-template-columns: 300px minmax(0, 1fr);
       gap: 18px;
       margin-top: 22px;
     }
     .run {
       border-bottom: 1px solid var(--line);
       padding: 12px 0;
+      cursor: pointer;
     }
     .run:last-child { border-bottom: 0; }
     .status-pass { color: var(--ok); }
     .status-fail { color: var(--bad); }
+    .status-stored { color: var(--muted); }
     pre {
       overflow: auto;
       margin: 0;
@@ -332,45 +476,101 @@ function dashboardHtml(config) {
       line-height: 1.5;
     }
     @media (max-width: 820px) {
-      .hero, .grid { grid-template-columns: 1fr; }
-      .metrics { grid-template-columns: 1fr; }
+      h1 { font-size: 34px; }
+      .hero, .grid, .compare, .journey, .issue-list { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: 1fr 1fr 1fr; }
+      .mini-shell.before { min-width: 0; }
+      .mini-copy { flex-direction: column; }
     }
   </style>
 </head>
 <body>
   <header>
     <div class="bar">
-      <div class="brand"><span class="mark">M</span><span>Morph</span></div>
-      <span class="pill">Auth-ready · Stripe-ready · CI gate</span>
+      <div class="brand"><span class="mark">M</span><span>Morph Studio</span></div>
+      <span class="pill">Interactive PR review for AI-generated frontend</span>
     </div>
   </header>
   <main>
     <section class="hero">
       <div>
-        <h1>Design-system CI for agent-written frontend.</h1>
-        <p>Morph watches AI-generated UI for token drift, component fragmentation, interaction regressions, and responsive risk. It produces receipts a reviewer can trust and patches an agent can apply.</p>
+        <h1>Review AI-generated UI before it wastes your team’s time.</h1>
+        <p>Cursor can ship a billing screen in seconds. The hard part is knowing whether that screen belongs in your product. Morph turns frontend review into an interactive journey: inspect the agent output, hear the design critique, apply the repair, and ship the branch with receipts.</p>
         <div class="actions">
-          <button class="primary" data-action="verify">Run verify</button>
-          <button data-action="loop">Run loop</button>
-          <button data-action="repair">Plan repair</button>
-          <button data-action="repair" data-apply="true">Apply repair</button>
-          <button data-action="checkout">Checkout stub</button>
+          <button class="primary" data-action="loop">Run full review</button>
+          <button data-action="verify">Inspect agent UI</button>
+          <button data-action="repair">Generate fix plan</button>
+          <button data-action="repair" data-apply="true">Apply fix</button>
+          <button data-speak="true">Narrate review</button>
+        </div>
+        <div class="journey">
+          <div class="step"><strong>1. Agent ships</strong><span>A generated billing card compiles, but breaks the product grammar.</span></div>
+          <div class="step"><strong>2. Morph reviews</strong><span>Token drift, component reuse, focus states, and mobile risk become receipts.</span></div>
+          <div class="step"><strong>3. Repair applies</strong><span>Deterministic patches snap the UI back into the system.</span></div>
+          <div class="step"><strong>4. Human decides</strong><span>The reviewer sees the before, after, score, and JSON proof in one place.</span></div>
         </div>
       </div>
       <div class="panel">
-        <div class="pill">Project</div>
+        <div class="pill">Active review</div>
         <h2>${projectName}</h2>
-        <p>Workspace and billing APIs are exposed as product boundaries, while deterministic local scanning keeps the hackathon demo reliable offline.</p>
+        <p>The current demo models a real day-to-day workflow: a developer reviewing a Cursor-generated settings screen before it reaches a teammate’s PR queue.</p>
         <div class="metrics">
-          <div class="metric"><strong id="score">--</strong><span>Score</span></div>
+          <div class="metric"><strong id="score">71</strong><span>Score</span></div>
           <div class="metric"><strong id="runs">--</strong><span>Runs</span></div>
-          <div class="metric"><strong id="gate">--</strong><span>Gate</span></div>
+          <div class="metric"><strong id="gate">FAIL</strong><span>Gate</span></div>
         </div>
       </div>
     </section>
+
+    <section class="stage" aria-label="Morph before and after review">
+      <div class="stage-head">
+        <div>
+          <h2>Before and after the Morph review</h2>
+          <p>The same feature, first as an unchecked agent output, then after Morph applies the product grammar.</p>
+        </div>
+        <span class="pill" id="reviewState">Ready</span>
+      </div>
+      <div class="compare">
+        <div class="preview">
+          <div class="preview-title"><span>Unchecked agent output</span><span class="status-fail">FAIL 71</span></div>
+          <div class="mini-app">
+            <div class="mini-shell before">
+              <div class="mini-copy">
+                <div>
+                  <div class="mini-label">Scale plan</div>
+                  <p>The generated card works, but it quietly drifts away from Acme’s design grammar.</p>
+                </div>
+                <button class="bad-button">Update plan</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="preview">
+          <div class="preview-title"><span>After Morph repair</span><span class="status-pass">PASS 100</span></div>
+          <div class="mini-app">
+            <div class="mini-shell after">
+              <div class="mini-copy">
+                <div>
+                  <div class="mini-label">Scale plan</div>
+                  <p>The card now uses product spacing, radius, color, elevation, component, focus, and responsive rules.</p>
+                </div>
+                <button class="good-button">Update plan</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="issue-list">
+        <div class="issue-chip"><strong>Hardcoded color</strong>One-off purple bypassed semantic product tokens.</div>
+        <div class="issue-chip"><strong>Raw component</strong>The agent rebuilt a button instead of using the shared Button.</div>
+        <div class="issue-chip"><strong>Focus regression</strong>Keyboard focus was removed without a visible replacement.</div>
+        <div class="issue-chip"><strong>Mobile overflow</strong>A fixed minimum width could break settings screens on phones.</div>
+      </div>
+    </section>
+
     <section class="grid">
       <div class="panel">
-        <h2>Runs</h2>
+        <h2>Review history</h2>
         <div id="runList">Loading...</div>
       </div>
       <div>
@@ -384,6 +584,9 @@ function dashboardHtml(config) {
     const score = document.querySelector("#score");
     const runs = document.querySelector("#runs");
     const gate = document.querySelector("#gate");
+    const reviewState = document.querySelector("#reviewState");
+
+    const narration = "Morph Studio reviews a Cursor generated billing screen before it reaches a teammate. The first version compiles, but it introduces hardcoded color, rogue radius, raw button markup, missing focus state, and mobile overflow risk. Morph creates file-level receipts, applies deterministic repairs, and returns a passing merge gate.";
 
     async function api(path, options) {
       const response = await fetch(path, {
@@ -398,8 +601,11 @@ function dashboardHtml(config) {
     function renderPayload(payload) {
       output.textContent = JSON.stringify(payload, null, 2);
       const report = payload.run?.payload?.after || payload.run?.payload;
+      const loop = payload.run?.payload;
       if (report?.score !== undefined) score.textContent = report.score;
       if (report?.verdict) gate.textContent = report.verdict.toUpperCase();
+      if (loop?.finalVerdict) gate.textContent = loop.finalVerdict.toUpperCase();
+      reviewState.textContent = gate.textContent === "PASS" ? "Repaired" : "Needs review";
     }
 
     async function refreshRuns() {
@@ -417,9 +623,20 @@ function dashboardHtml(config) {
     }
 
     document.addEventListener("click", async (event) => {
+      if (event.target?.dataset?.speak) {
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(narration));
+        } else {
+          output.textContent = narration;
+        }
+        return;
+      }
+
       const action = event.target?.dataset?.action;
       if (!action) return;
       output.textContent = "Running " + action + "...";
+      reviewState.textContent = "Running";
       try {
         const route = action === "checkout" ? "/api/billing/checkout" : "/api/runs/" + action;
         const shouldApply = action === "loop" || event.target?.dataset?.apply === "true";

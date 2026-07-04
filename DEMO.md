@@ -3,18 +3,25 @@
 Morph's judge story is simple:
 
 ```text
-An AI coding agent writes a billing screen that works but drifts from the product.
-Morph catches the drift, explains it with file-level receipts, emits deterministic patches,
-applies the repair, and proves the branch is safe to review.
+A developer gets a Cursor-generated billing screen that works but drifts from the product.
+Morph Studio turns that stressful code-review moment into an interactive before/after review:
+it catches drift, narrates the critique, emits deterministic patches, applies the repair,
+and proves the branch is safe to review.
 ```
+
+## Cursor Prompt Fit
+
+- Problem: developers increasingly review AI-generated frontend that compiles but is inconsistent, inaccessible, or off-brand.
+- User journey: inspect the agent output, understand the product-design issues, apply the fix, and see a passing merge gate.
+- Interactive solution: Morph Studio combines before/after UI, issue timeline, voice narration, JSON receipts, and a repair loop.
 
 ## One-Minute Video
 
 1. Open with the broken contract:
 
    ```text
-   Coding agents can ship UI that compiles, but quietly breaks product taste.
-   Morph is CI for agent-written frontend.
+   Cursor can ship UI in seconds, but developers still have to review whether it belongs in the product.
+   Morph Studio is an interactive review flow for agent-written frontend.
    ```
 
 2. Show the seeded fail:
@@ -39,17 +46,25 @@ applies the repair, and proves the branch is safe to review.
    After: pass (100/100), 0 issue(s)
    ```
 
-4. Show the machine-readable receipt:
+4. Show Morph Studio:
+
+   ```bash
+   npm run serve
+   ```
+
+   Open `http://127.0.0.1:4177`, click `Narrate review`, then `Run full review`.
+
+5. Show the machine-readable receipt:
 
    ```bash
    open demo/reports/demo-repair.json
    ```
 
-5. Close with:
+6. Close with:
 
    ```text
-   Most hackathon projects generate more code. Morph is the verification layer
-   that keeps generated frontend safe to merge.
+   Most hackathon projects generate more code. Morph improves the human review journey
+   by making generated frontend understandable, repairable, and safe to merge.
    ```
 
 ## Live Demo
@@ -65,10 +80,11 @@ Then open `http://127.0.0.1:4177`.
 
 Use the web control plane in this order:
 
-1. `Run verify`
-2. `Plan repair`
-3. `Run loop`
-4. Click a stored run and show the JSON payload
+1. `Narrate review`
+2. `Inspect agent UI`
+3. `Generate fix plan`
+4. `Run full review`
+5. Click a stored run and show the JSON payload
 
 ## What To Point At
 
