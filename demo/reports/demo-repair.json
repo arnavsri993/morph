@@ -1,11 +1,11 @@
 {
   "schemaVersion": "morph.repair.v1",
-  "runId": "repair-applied-20260704154921-fb3d35",
-  "generatedAt": "2026-07-04T15:49:21.230Z",
+  "runId": "repair-applied-20260704155907-88b954",
+  "generatedAt": "2026-07-04T15:59:07.461Z",
   "project": "Acme Control Plane Demo Copy",
   "applied": true,
   "basedOnScore": 71,
-  "basedOnRunId": "repair-base-20260704154921-502129",
+  "basedOnRunId": "repair-base-20260704155907-b79060",
   "patches": [
     {
       "file": "src/routes/settings/billing.tsx",
@@ -50,9 +50,9 @@
   "instructions": "Patch applied. Re-run morph verify before merge.",
   "after": {
     "schemaVersion": "morph.report.v1",
-    "runId": "verify-20260704154921-58dfea",
-    "generatedAt": "2026-07-04T15:49:21.230Z",
-    "durationMs": 1,
+    "runId": "verify-20260704155907-2c8910",
+    "generatedAt": "2026-07-04T15:59:07.461Z",
+    "durationMs": 0,
     "workspace": {
       "id": "raise-demo-workspace",
       "name": "RAISE Summit Demo Workspace",
