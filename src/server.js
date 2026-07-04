@@ -15,6 +15,14 @@ import {
   createAuthManager,
   loadEnvFile
 } from "./auth.js";
+import {
+  BillingError,
+  createBillingManager,
+  maskSecret,
+  readBillingState,
+  writeBillingState
+} from "./billing.js";
+import { landingHtml } from "./landing.js";
 
 export async function serveMorph(config, options = {}) {
   if (options.loadEnv !== false) {
@@ -24,9 +32,17 @@ export async function serveMorph(config, options = {}) {
   const port = Number(options.port ?? config.server?.port ?? 4177);
   const runtimeAuth = {
     githubClientId: process.env.GITHUB_CLIENT_ID?.trim() || null,
-    githubClientSecret: process.env.GITHUB_CLIENT_SECRET?.trim() || null
+    githubClientSecret: process.env.GITHUB_CLIENT_SECRET?.trim() || null,
+    googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || null,
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || null
+  };
+  const runtimeBilling = {
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || null,
+    stripePriceId: process.env.STRIPE_PRICE_ID?.trim() || null,
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || null
   };
   const auth = createAuthManager(config, runtimeAuth);
+  const billing = createBillingManager(config, runtimeBilling);
 
   const server = createServer(async (request, response) => {
     let url;
@@ -90,28 +106,42 @@ export async function serveMorph(config, options = {}) {
       }
 
       if (request.method === "GET" && url.pathname === "/") {
+        return sendHtml(response, landingHtml(config, session));
+      }
+
+      if (request.method === "GET" && (url.pathname === "/studio" || url.pathname === "/studio/")) {
         return sendHtml(response, dashboardHtml(config, session));
       }
 
       if (request.method === "GET" && url.pathname === "/api/health") {
         const github = getGithubCredentials(runtimeAuth);
+        const google = getGoogleCredentials(runtimeAuth);
         return sendJson(response, 200, {
           ok: true,
           product: "Morph",
           authMode: auth.getAuthMode(),
           authenticated: Boolean(session),
           user: session ? publicUser(session) : null,
-          billingMode: config.billing?.mode ?? "stub",
+          billingMode: billing.getBillingMode(),
           providers: auth.getProviders(),
           github: {
             configured: isGithubConfigured(runtimeAuth),
             clientId: maskClientId(github.clientId)
+          },
+          google: {
+            configured: isGoogleConfigured(runtimeAuth),
+            clientId: maskClientId(google.clientId)
+          },
+          stripe: {
+            checkoutConfigured: billing.isCheckoutConfigured(),
+            webhookConfigured: billing.isWebhookConfigured(),
+            priceId: maskSecret(billing.getStripeCredentials().priceId)
           }
         });
       }
 
       if (request.method === "POST" && url.pathname === "/api/auth/github") {
-        if (!session) throw new HttpError(401, "unauthorized", "Sign in required.");
+        if (auth.isAuthRequired() && !session) throw new HttpError(401, "unauthorized", "Sign in required.");
         const body = await readJson(request);
         const clientId = String(body.clientId ?? "").trim();
         const clientSecret = String(body.clientSecret ?? "").trim();
@@ -130,6 +160,68 @@ export async function serveMorph(config, options = {}) {
             configured: true,
             clientId: maskClientId(clientId)
           }
+        });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/auth/google") {
+        if (auth.isAuthRequired() && !session) throw new HttpError(401, "unauthorized", "Sign in required.");
+        const body = await readJson(request);
+        const clientId = String(body.clientId ?? "").trim();
+        const clientSecret = String(body.clientSecret ?? "").trim();
+        if (!clientId || !clientSecret) {
+          throw new HttpError(400, "missing_credentials", "Google client ID and client secret are required.");
+        }
+        runtimeAuth.googleClientId = clientId;
+        runtimeAuth.googleClientSecret = clientSecret;
+        process.env.GOOGLE_CLIENT_ID = clientId;
+        process.env.GOOGLE_CLIENT_SECRET = clientSecret;
+        return sendJson(response, 200, {
+          ok: true,
+          authMode: auth.getAuthMode(),
+          providers: auth.getProviders(),
+          google: {
+            configured: true,
+            clientId: maskClientId(clientId)
+          }
+        });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/billing/stripe") {
+        if (auth.isAuthRequired() && !session) throw new HttpError(401, "unauthorized", "Sign in required.");
+        const body = await readJson(request);
+        const secretKey = String(body.secretKey ?? "").trim();
+        const priceId = String(body.priceId ?? "").trim();
+        const webhookSecret = String(body.webhookSecret ?? "").trim();
+        if (!secretKey || !priceId) {
+          throw new HttpError(400, "missing_credentials", "Stripe secret key and price ID are required.");
+        }
+        runtimeBilling.stripeSecretKey = secretKey;
+        runtimeBilling.stripePriceId = priceId;
+        process.env.STRIPE_SECRET_KEY = secretKey;
+        process.env.STRIPE_PRICE_ID = priceId;
+        if (webhookSecret) {
+          runtimeBilling.stripeWebhookSecret = webhookSecret;
+          process.env.STRIPE_WEBHOOK_SECRET = webhookSecret;
+        }
+        return sendJson(response, 200, {
+          ok: true,
+          billingMode: billing.getBillingMode(),
+          stripe: {
+            checkoutConfigured: billing.isCheckoutConfigured(),
+            webhookConfigured: billing.isWebhookConfigured(),
+            secretKey: maskSecret(secretKey),
+            priceId: maskSecret(priceId)
+          }
+        });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/billing") {
+        const state = await readBillingState(config);
+        return sendJson(response, 200, {
+          billingMode: billing.getBillingMode(),
+          checkoutConfigured: billing.isCheckoutConfigured(),
+          webhookConfigured: billing.isWebhookConfigured(),
+          subscription: state
         });
       }
 
@@ -178,21 +270,52 @@ export async function serveMorph(config, options = {}) {
       }
 
       if (request.method === "POST" && url.pathname === "/api/billing/checkout") {
+        if (!billing.isCheckoutConfigured()) {
+          return sendJson(response, 200, {
+            mode: "stub",
+            provider: "stripe",
+            message: "Checkout is stubbed until STRIPE_SECRET_KEY and STRIPE_PRICE_ID are configured. Save them in Studio or .env, then retry.",
+            envRequired: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "MORPH_APP_URL"]
+          });
+        }
+        const checkout = await billing.createCheckoutSession({
+          appUrl,
+          customerEmail: session?.email ?? null
+        });
         return sendJson(response, 200, {
-          mode: "stub",
+          mode: "live",
           provider: "stripe",
-          message: "Checkout is stubbed until STRIPE_SECRET_KEY and STRIPE_PRICE_ID are configured.",
-          envRequired: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "MORPH_APP_URL"]
+          sessionId: checkout.id,
+          url: checkout.url,
+          message: "Redirect the browser to url to complete Stripe Checkout."
         });
       }
 
       if (request.method === "POST" && url.pathname === "/api/webhooks/stripe") {
         const body = await readBody(request);
+        if (!billing.isWebhookConfigured()) {
+          return sendJson(response, 200, {
+            received: true,
+            mode: "stub",
+            bytes: Buffer.byteLength(body),
+            verification: "Set STRIPE_WEBHOOK_SECRET to enable Stripe-Signature verification."
+          });
+        }
+        billing.verifyWebhookSignature(body, request.headers["stripe-signature"]);
+        let event;
+        try {
+          event = JSON.parse(body);
+        } catch {
+          throw new HttpError(400, "invalid_json", "Webhook body must be valid JSON.");
+        }
+        const state = billing.applyWebhookEvent(await readBillingState(config), event);
+        await writeBillingState(config, state);
         return sendJson(response, 200, {
           received: true,
-          mode: "stub",
-          bytes: Buffer.byteLength(body),
-          verification: "Set STRIPE_WEBHOOK_SECRET and verify Stripe-Signature before production use."
+          mode: "live",
+          verified: true,
+          eventType: event.type ?? null,
+          subscription: state
         });
       }
 
@@ -205,7 +328,7 @@ export async function serveMorph(config, options = {}) {
       }
 
       if (request.method === "GET" && url.pathname === "/api/config") {
-        return sendJson(response, 200, publicConfig(config, runtimeAuth));
+        return sendJson(response, 200, publicConfig(config, runtimeAuth, billing));
       }
 
       return sendJson(response, 404, { error: "not_found" });
@@ -361,6 +484,18 @@ function isGithubConfigured(runtimeAuth) {
   return Boolean(clientId && clientSecret);
 }
 
+function getGoogleCredentials(runtimeAuth) {
+  return {
+    clientId: runtimeAuth.googleClientId || process.env.GOOGLE_CLIENT_ID?.trim() || "",
+    clientSecret: runtimeAuth.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET?.trim() || ""
+  };
+}
+
+function isGoogleConfigured(runtimeAuth) {
+  const { clientId, clientSecret } = getGoogleCredentials(runtimeAuth);
+  return Boolean(clientId && clientSecret);
+}
+
 function maskClientId(clientId) {
   const value = String(clientId ?? "").trim();
   if (!value) return null;
@@ -368,8 +503,9 @@ function maskClientId(clientId) {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
-function publicConfig(config, runtimeAuth) {
+function publicConfig(config, runtimeAuth, billing) {
   const github = getGithubCredentials(runtimeAuth);
+  const google = getGoogleCredentials(runtimeAuth);
   return {
     projectName: config.projectName,
     projectId: config.projectId ?? slugify(config.projectName),
@@ -382,15 +518,15 @@ function publicConfig(config, runtimeAuth) {
         clientId: maskClientId(github.clientId)
       },
       google: {
-        configured: Boolean(
-          process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim()
-        )
+        configured: isGoogleConfigured(runtimeAuth),
+        clientId: maskClientId(google.clientId)
       }
     },
     billing: {
       provider: "stripe",
-      configured: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID),
-      mode: config.billing?.mode ?? "stub"
+      configured: billing.isCheckoutConfigured(),
+      webhookConfigured: billing.isWebhookConfigured(),
+      mode: billing.getBillingMode()
     }
   };
 }
@@ -401,7 +537,7 @@ function dashboardHtml(config, session) {
     : "Signed out";
   const userBlock = session
     ? `<span class="pill user-pill">${userLabel}</span><a class="logout" href="/auth/logout">Sign out</a>`
-    : "";
+    : `<a class="logout" href="/login?returnTo=%2Fstudio">Log in</a>`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -463,7 +599,16 @@ function dashboardHtml(config, session) {
       align-items: center;
       gap: 10px;
       font-weight: 700;
+      color: inherit;
+      text-decoration: none;
     }
+    .back-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .back-link:hover { color: var(--ink); }
     .mark {
       width: 30px;
       height: 30px;
@@ -575,6 +720,55 @@ function dashboardHtml(config, session) {
       color: #fff;
     }
     button.primary:hover { background: var(--accent-dark); }
+    .panel-tabs {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 14px;
+      background: var(--surface);
+      width: fit-content;
+    }
+    .panel-tabs button {
+      min-height: 32px;
+      border: none;
+      border-radius: 0;
+      padding: 0 14px;
+      font-size: 12.5px;
+      font-weight: 650;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+    }
+    .panel-tabs button.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .panel-tabs button:hover:not(.active) { background: var(--surface-soft); }
+    .tab-pane[hidden] { display: none; }
+    .sso-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 650;
+      text-decoration: none;
+    }
+    .sso-link:hover { text-decoration: underline; }
+    .sso-link[hidden] { display: none; }
+    .plan-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
     .auth-panel form {
       display: grid;
       gap: 12px;
@@ -851,8 +1045,9 @@ function dashboardHtml(config, session) {
 <body>
   <header>
     <div class="bar">
-      <div class="brand"><span class="mark">M</span><span>Morph Studio</span></div>
+      <a class="brand" href="/" title="Back to morph.dev"><span class="mark">M</span><span>Morph Studio</span></a>
       <div class="bar-actions">
+        <a class="back-link" href="/">← Landing page</a>
         <span class="pill">Interactive PR review for AI-generated frontend</span>
         ${userBlock}
       </div>
@@ -884,16 +1079,58 @@ function dashboardHtml(config, session) {
         </div>
       </div>
       <div class="panel auth-panel">
-        <h2>GitHub OAuth</h2>
-        <p>Enter your GitHub OAuth app credentials. Morph uses these at runtime instead of static <code>.env</code> values.</p>
-        <form id="githubAuthForm">
-          <label for="githubClientId">GitHub client ID</label>
-          <input id="githubClientId" name="clientId" type="text" required autocomplete="off" placeholder="Ov23li...">
-          <label for="githubClientSecret">GitHub client secret</label>
-          <input id="githubClientSecret" name="clientSecret" type="password" required autocomplete="off" placeholder="ghp_...">
-          <button type="submit" class="primary">Save credentials</button>
-          <p id="authStatus" class="auth-status pending">Credentials required before GitHub sign-in is enabled.</p>
-        </form>
+        <div class="panel-tabs" role="tablist" aria-label="Connect providers">
+          <button type="button" class="active" data-tab="github" role="tab" aria-selected="true">GitHub</button>
+          <button type="button" data-tab="google" role="tab" aria-selected="false">Google</button>
+          <button type="button" data-tab="stripe" role="tab" aria-selected="false">Billing</button>
+        </div>
+
+        <div class="tab-pane" data-pane="github">
+          <h2>GitHub OAuth</h2>
+          <p>Enter your GitHub OAuth app credentials. Morph uses these at runtime instead of static <code>.env</code> values.</p>
+          <form id="githubAuthForm">
+            <label for="githubClientId">GitHub client ID</label>
+            <input id="githubClientId" name="clientId" type="text" required autocomplete="off" placeholder="Ov23li...">
+            <label for="githubClientSecret">GitHub client secret</label>
+            <input id="githubClientSecret" name="clientSecret" type="password" required autocomplete="off" placeholder="ghp_...">
+            <button type="submit" class="primary">Save credentials</button>
+            <p id="authStatus" class="auth-status pending">Credentials required before GitHub sign-in is enabled.</p>
+          </form>
+          <a class="sso-link" id="githubSignIn" href="/auth/github?returnTo=%2Fstudio" hidden>Sign in with GitHub →</a>
+        </div>
+
+        <div class="tab-pane" data-pane="google" hidden>
+          <h2>Google OAuth</h2>
+          <p>Enter your Google OAuth client credentials (Web application type, redirect URI <code>/auth/google/callback</code>).</p>
+          <form id="googleAuthForm">
+            <label for="googleClientId">Google client ID</label>
+            <input id="googleClientId" name="clientId" type="text" required autocomplete="off" placeholder="1234-abc.apps.googleusercontent.com">
+            <label for="googleClientSecret">Google client secret</label>
+            <input id="googleClientSecret" name="clientSecret" type="password" required autocomplete="off" placeholder="GOCSPX-...">
+            <button type="submit" class="primary">Save credentials</button>
+            <p id="googleStatus" class="auth-status pending">Credentials required before Google sign-in is enabled.</p>
+          </form>
+          <a class="sso-link" id="googleSignIn" href="/auth/google?returnTo=%2Fstudio" hidden>Sign in with Google →</a>
+        </div>
+
+        <div class="tab-pane" data-pane="stripe" hidden>
+          <h2>Stripe billing</h2>
+          <p>Save Stripe keys to switch checkout from stub to live mode. Webhooks update the workspace plan with signature verification.</p>
+          <form id="stripeForm">
+            <label for="stripeSecretKey">Secret key</label>
+            <input id="stripeSecretKey" name="secretKey" type="password" required autocomplete="off" placeholder="sk_test_...">
+            <label for="stripePriceId">Price ID</label>
+            <input id="stripePriceId" name="priceId" type="text" required autocomplete="off" placeholder="price_...">
+            <label for="stripeWebhookSecret">Webhook secret (optional)</label>
+            <input id="stripeWebhookSecret" name="webhookSecret" type="password" autocomplete="off" placeholder="whsec_...">
+            <button type="submit" class="primary">Save Stripe config</button>
+            <p id="stripeStatus" class="auth-status pending">Checkout runs in stub mode until keys are saved.</p>
+          </form>
+          <div class="plan-row">
+            <span class="pill">Plan: <strong id="planLabel">Local · free</strong></span>
+            <button class="primary" id="upgradeButton" type="button">Upgrade to Team</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -924,7 +1161,34 @@ function dashboardHtml(config, session) {
     const githubClientId = document.querySelector("#githubClientId");
     const githubClientSecret = document.querySelector("#githubClientSecret");
     const authStatus = document.querySelector("#authStatus");
+    const githubSignIn = document.querySelector("#githubSignIn");
+    const googleAuthForm = document.querySelector("#googleAuthForm");
+    const googleClientId = document.querySelector("#googleClientId");
+    const googleClientSecret = document.querySelector("#googleClientSecret");
+    const googleStatus = document.querySelector("#googleStatus");
+    const googleSignIn = document.querySelector("#googleSignIn");
+    const stripeForm = document.querySelector("#stripeForm");
+    const stripeSecretKey = document.querySelector("#stripeSecretKey");
+    const stripePriceId = document.querySelector("#stripePriceId");
+    const stripeWebhookSecret = document.querySelector("#stripeWebhookSecret");
+    const stripeStatus = document.querySelector("#stripeStatus");
+    const planLabel = document.querySelector("#planLabel");
+    const upgradeButton = document.querySelector("#upgradeButton");
     const GITHUB_AUTH_KEY = "morph.github.oauth";
+    const GOOGLE_AUTH_KEY = "morph.google.oauth";
+
+    document.querySelectorAll(".panel-tabs [data-tab]").forEach((tabButton) => {
+      tabButton.addEventListener("click", () => {
+        document.querySelectorAll(".panel-tabs [data-tab]").forEach((candidate) => {
+          const active = candidate === tabButton;
+          candidate.classList.toggle("active", active);
+          candidate.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        document.querySelectorAll(".tab-pane").forEach((pane) => {
+          pane.hidden = pane.dataset.pane !== tabButton.dataset.tab;
+        });
+      });
+    });
 
     let outputMode = "json";
     let lastPayload = null;
@@ -1132,29 +1396,58 @@ function dashboardHtml(config, session) {
 
     const narration = "Morph Studio reviews a Cursor generated billing screen before it reaches a teammate. The first version compiles, but it introduces hardcoded color, rogue radius, raw button markup, missing focus state, and mobile overflow risk. Morph creates file-level receipts, applies deterministic repairs, and returns a passing merge gate.";
 
-    function readStoredGithubAuth() {
+    function readStoredAuth(key) {
       try {
-        return JSON.parse(localStorage.getItem(GITHUB_AUTH_KEY) || "null");
+        return JSON.parse(localStorage.getItem(key) || "null");
       } catch {
         return null;
       }
     }
 
-    function storeGithubAuth(clientId, clientSecret) {
-      localStorage.setItem(GITHUB_AUTH_KEY, JSON.stringify({ clientId, clientSecret }));
+    function storeAuth(key, clientId, clientSecret) {
+      localStorage.setItem(key, JSON.stringify({ clientId, clientSecret }));
+    }
+
+    function renderProviderStatus(statusElement, signInElement, providerLabel, configured, clientId) {
+      if (!statusElement) return;
+      if (configured) {
+        statusElement.textContent = clientId
+          ? providerLabel + " OAuth ready (" + clientId + ")."
+          : providerLabel + " OAuth ready.";
+        statusElement.className = "auth-status ready";
+        if (signInElement) signInElement.hidden = false;
+      } else {
+        statusElement.textContent = "Credentials required before " + providerLabel + " sign-in is enabled.";
+        statusElement.className = "auth-status pending";
+        if (signInElement) signInElement.hidden = true;
+      }
     }
 
     function renderAuthStatus(configured, clientId) {
-      if (!authStatus) return;
-      if (configured) {
-        authStatus.textContent = clientId
-          ? "GitHub OAuth ready (" + clientId + ")."
-          : "GitHub OAuth ready.";
-        authStatus.className = "auth-status ready";
+      renderProviderStatus(authStatus, githubSignIn, "GitHub", configured, clientId);
+    }
+
+    function renderGoogleStatus(configured, clientId) {
+      renderProviderStatus(googleStatus, googleSignIn, "Google", configured, clientId);
+    }
+
+    function renderStripeStatus(checkoutConfigured, webhookConfigured) {
+      if (!stripeStatus) return;
+      if (checkoutConfigured) {
+        stripeStatus.textContent = webhookConfigured
+          ? "Stripe live: checkout + verified webhooks enabled."
+          : "Stripe live: checkout enabled. Add a webhook secret to sync plan state.";
+        stripeStatus.className = "auth-status ready";
       } else {
-        authStatus.textContent = "Credentials required before GitHub sign-in is enabled.";
-        authStatus.className = "auth-status pending";
+        stripeStatus.textContent = "Checkout runs in stub mode until keys are saved.";
+        stripeStatus.className = "auth-status pending";
       }
+    }
+
+    function renderPlan(subscription) {
+      if (!planLabel || !subscription) return;
+      const plan = subscription.plan === "team" ? "Team" : "Local";
+      planLabel.textContent = plan + " · " + (subscription.status || "free");
     }
 
     async function saveGithubAuth(clientId, clientSecret) {
@@ -1162,9 +1455,30 @@ function dashboardHtml(config, session) {
         method: "POST",
         body: JSON.stringify({ clientId, clientSecret })
       });
-      storeGithubAuth(clientId, clientSecret);
+      storeAuth(GITHUB_AUTH_KEY, clientId, clientSecret);
       renderAuthStatus(true, payload.github?.clientId);
       return payload;
+    }
+
+    async function saveGoogleAuth(clientId, clientSecret) {
+      const payload = await api("/api/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ clientId, clientSecret })
+      });
+      storeAuth(GOOGLE_AUTH_KEY, clientId, clientSecret);
+      renderGoogleStatus(true, payload.google?.clientId);
+      return payload;
+    }
+
+    async function refreshBilling() {
+      try {
+        const payload = await api("/api/billing");
+        renderStripeStatus(payload.checkoutConfigured, payload.webhookConfigured);
+        renderPlan(payload.subscription);
+        return payload;
+      } catch {
+        return null;
+      }
     }
 
     async function api(path, options) {
@@ -1264,20 +1578,111 @@ function dashboardHtml(config, session) {
       }
     });
 
+    googleAuthForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const clientId = googleClientId.value.trim();
+      const clientSecret = googleClientSecret.value.trim();
+      if (!clientId || !clientSecret) {
+        renderGoogleStatus(false);
+        return;
+      }
+      googleStatus.textContent = "Saving Google credentials...";
+      googleStatus.className = "auth-status pending";
+      try {
+        const payload = await saveGoogleAuth(clientId, clientSecret);
+        renderPayload(payload);
+      } catch (error) {
+        renderGoogleStatus(false);
+        lastPayload = null;
+        output.style.display = "";
+        outputReadable.style.display = "none";
+        output.textContent = error.stack || error.message;
+      }
+    });
+
+    stripeForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const secretKey = stripeSecretKey.value.trim();
+      const priceId = stripePriceId.value.trim();
+      const webhookSecret = stripeWebhookSecret.value.trim();
+      if (!secretKey || !priceId) {
+        renderStripeStatus(false, false);
+        return;
+      }
+      stripeStatus.textContent = "Saving Stripe configuration...";
+      stripeStatus.className = "auth-status pending";
+      try {
+        const payload = await api("/api/billing/stripe", {
+          method: "POST",
+          body: JSON.stringify({ secretKey, priceId, webhookSecret })
+        });
+        renderStripeStatus(Boolean(payload.stripe?.checkoutConfigured), Boolean(payload.stripe?.webhookConfigured));
+        renderPayload(payload);
+      } catch (error) {
+        renderStripeStatus(false, false);
+        lastPayload = null;
+        output.style.display = "";
+        outputReadable.style.display = "none";
+        output.textContent = error.stack || error.message;
+      }
+    });
+
+    upgradeButton?.addEventListener("click", async () => {
+      upgradeButton.disabled = true;
+      upgradeButton.textContent = "Starting checkout...";
+      try {
+        const payload = await api("/api/billing/checkout", { method: "POST", body: "{}" });
+        if (payload.mode === "live" && payload.url) {
+          window.location.href = payload.url;
+          return;
+        }
+        renderPayload(payload);
+      } catch (error) {
+        lastPayload = null;
+        output.style.display = "";
+        outputReadable.style.display = "none";
+        output.textContent = error.stack || error.message;
+      } finally {
+        upgradeButton.disabled = false;
+        upgradeButton.textContent = "Upgrade to Team";
+      }
+    });
+
     refreshRuns().then(async () => {
-      const stored = readStoredGithubAuth();
-      if (stored?.clientId && stored?.clientSecret) {
-        githubClientId.value = stored.clientId;
-        githubClientSecret.value = stored.clientSecret;
+      const storedGithub = readStoredAuth(GITHUB_AUTH_KEY);
+      if (storedGithub?.clientId && storedGithub?.clientSecret) {
+        githubClientId.value = storedGithub.clientId;
+        githubClientSecret.value = storedGithub.clientSecret;
         try {
-          await saveGithubAuth(stored.clientId, stored.clientSecret);
+          await saveGithubAuth(storedGithub.clientId, storedGithub.clientSecret);
         } catch {
           renderAuthStatus(false);
         }
       }
+      const storedGoogle = readStoredAuth(GOOGLE_AUTH_KEY);
+      if (storedGoogle?.clientId && storedGoogle?.clientSecret) {
+        googleClientId.value = storedGoogle.clientId;
+        googleClientSecret.value = storedGoogle.clientSecret;
+        try {
+          await saveGoogleAuth(storedGoogle.clientId, storedGoogle.clientSecret);
+        } catch {
+          renderGoogleStatus(false);
+        }
+      }
       const health = await api("/api/health");
       renderAuthStatus(Boolean(health.github?.configured), health.github?.clientId);
-      renderPayload(health);
+      renderGoogleStatus(Boolean(health.google?.configured), health.google?.clientId);
+      await refreshBilling();
+
+      const billingResult = new URLSearchParams(window.location.search).get("billing");
+      if (billingResult === "success") {
+        reviewState.textContent = "Plan updated";
+        renderPayload({ billing: "Stripe checkout completed. Webhook will confirm the subscription shortly." });
+      } else if (billingResult === "cancelled") {
+        renderPayload({ billing: "Stripe checkout was cancelled. No changes made." });
+      } else {
+        renderPayload(health);
+      }
     });
   </script>
 </body>

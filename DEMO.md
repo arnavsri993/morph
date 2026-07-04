@@ -52,7 +52,7 @@ and proves the branch is safe to review.
    npm run serve
    ```
 
-   Open `http://127.0.0.1:4177`, click `Narrate review`, then `Run full review`. The full review repairs `.studio-run/project`, not the seeded fixture.
+   Open `http://127.0.0.1:4177` — the cinematic landing page makes the pitch in one screen. Click `Launch Studio` in the header to enter the dashboard at `/studio`, then click `Narrate review` and `Run full review`. The full review repairs `.studio-run/project`, not the seeded fixture.
 
 5. Show the machine-readable receipt:
 
@@ -78,13 +78,15 @@ npm run serve
 
 Then open `http://127.0.0.1:4177`.
 
-Use the web control plane in this order:
+Use the web app in this order:
 
-1. `Narrate review`
-2. `Inspect agent UI`
-3. `Generate fix plan`
-4. `Run full review`
-5. Click a stored run and show the JSON payload
+1. Land on `/` — the product story reads in under 3 seconds, with the animated CLI review in the hero
+2. Click `Launch Studio` (header CTA) to enter `/studio`
+3. `Narrate review`
+4. `Inspect agent UI`
+5. `Generate fix plan`
+6. `Run full review`
+7. Click a stored run and show the JSON payload
 
 ## What To Point At
 

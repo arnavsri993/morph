@@ -28,7 +28,11 @@ npm run serve
 
 `npm run verify` intentionally fails without `--no-fail`, because the fixture contains seeded drift.
 
-Open Morph Studio at `http://127.0.0.1:4177` after `npm run serve`.
+After `npm run serve`, open `http://127.0.0.1:4177`:
+
+- `/` is the public product landing page (hero, live CLI demo, pricing, docs).
+- `/studio` is the interactive Morph Studio review dashboard. The `Launch Studio` button on the landing page routes there.
+- `/login` is the auth entry point: SSO buttons when OAuth is configured, a polished dev-mode state when it is not.
 
 For the exact one-minute video and live judge flow, use `DEMO.md`.
 
@@ -48,7 +52,7 @@ morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 - `repair` generates deterministic replacements and can apply them.
 - `loop` runs verify, repair, verify again, then returns a final CI gate.
 - `demo` copies the seeded fixture, repairs the copy, and writes judge receipts.
-- `serve` starts Morph Studio and the API backed by `.morph/runs`. Studio full reviews run on `.studio-run/project` so the seeded fixture stays reusable.
+- `serve` starts the Morph web app: the landing page at `/`, Morph Studio at `/studio`, and the API backed by `.morph/runs`. Studio full reviews run on `.studio-run/project` so the seeded fixture stays reusable.
 
 ## Demo flow
 
@@ -83,19 +87,34 @@ The source fixture remains seeded so judges can see the catch.
 
 `morph serve` starts a dependency-free Node HTTP server with:
 
+- `GET /` (landing page)
+- `GET /studio` (Morph Studio dashboard)
+- `GET /login` (auth entry)
 - `GET /api/health`
 - `GET /api/projects`
 - `GET /api/runs`
 - `GET /api/runs/:id`
+- `GET /api/billing`
 - `POST /api/runs/verify`
 - `POST /api/runs/repair`
 - `POST /api/runs/loop`
-- `POST /api/billing/checkout`
-- `POST /api/webhooks/stripe`
+- `POST /api/studio/review`
+- `POST /api/auth/github` (save GitHub OAuth credentials at runtime)
+- `POST /api/auth/google` (save Google OAuth credentials at runtime)
+- `POST /api/billing/stripe` (save Stripe keys at runtime)
+- `POST /api/billing/checkout` (live Stripe Checkout session, or stub guidance until configured)
+- `POST /api/webhooks/stripe` (signature-verified when `STRIPE_WEBHOOK_SECRET` is set)
 
-Runs are stored as JSON under `.morph/runs`. The API is intentionally auth-ready rather than auth-fake: development mode is explicit, production secrets live in environment variables, and Stripe endpoints return stubbed setup guidance until configured.
+Runs are stored as JSON under `.morph/runs`. The API is auth-ready rather than auth-fake: development mode is explicit and production secrets live in environment variables.
 
 ## Auth and billing setup
+
+Google and GitHub sign-in are fully wired. Add credentials either through `.env` or live from the Studio `Connect` panel (GitHub / Google / Billing tabs) — saved credentials enable the SSO buttons on `/login` immediately, no restart needed. Set `MORPH_AUTH_MODE=oauth` to require a signed session for Studio and the API.
+
+Stripe billing has two modes:
+
+- **Stub mode** (default): `POST /api/billing/checkout` returns setup guidance, webhooks acknowledge without verification. No fake charges.
+- **Live mode**: once `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID` are set (via `.env` or the Studio Billing tab), `Upgrade to Team` creates a real Stripe Checkout session and redirects the browser. With `STRIPE_WEBHOOK_SECRET` set, `POST /api/webhooks/stripe` verifies the `Stripe-Signature` header (HMAC, timestamp tolerance) and updates the workspace plan in `.morph/billing.json`.
 
 Copy `.env.example` to `.env` for local product-shell work. Do not commit real secrets.
 

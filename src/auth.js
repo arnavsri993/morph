@@ -35,8 +35,8 @@ export function createAuthManager(config, runtimeAuth) {
 
   function getGoogleCredentials() {
     return {
-      clientId: process.env.GOOGLE_CLIENT_ID?.trim() || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || ""
+      clientId: runtimeAuth.googleClientId || process.env.GOOGLE_CLIENT_ID?.trim() || "",
+      clientSecret: runtimeAuth.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET?.trim() || ""
     };
   }
 
@@ -76,6 +76,7 @@ export function createAuthManager(config, runtimeAuth) {
   }
 
   function isPublicRoute(pathname, method) {
+    if (pathname === "/") return true;
     if (pathname === "/login") return true;
     if (pathname.startsWith("/auth/")) return true;
     if (pathname === "/api/health") return true;
@@ -370,39 +371,63 @@ function sanitizeReturnTo(value) {
 }
 
 function loginHtml({ error, providers, returnTo }) {
-  const safeReturnTo = escapeHtml(returnTo || "/");
+  const target = !returnTo || returnTo === "/" ? "/studio" : returnTo;
+  const safeReturnTo = escapeHtml(target);
+  const encodedReturnTo = encodeURIComponent(target);
   const errorBlock = error
-    ? `<p class="error">${escapeHtml(error)}</p>`
+    ? `<p class="error" role="alert">${escapeHtml(error)}</p>`
     : "";
+  const hasProviders = Boolean(providers.google || providers.github);
   const buttons = [];
 
-  if (providers.google) {
-    buttons.push(`<a class="provider google" href="/auth/google?returnTo=${encodeURIComponent(returnTo || "/")}">Continue with Google</a>`);
-  }
   if (providers.github) {
-    buttons.push(`<a class="provider github" href="/auth/github?returnTo=${encodeURIComponent(returnTo || "/")}">Continue with GitHub</a>`);
+    buttons.push(`<a class="provider github" href="/auth/github?returnTo=${encodedReturnTo}">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.72.5.1.68-.22.68-.49v-1.7c-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.9-.64.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.7 0 0 .84-.28 2.75 1.05a9.4 9.4 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.4.2 2.44.1 2.7.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9v2.82c0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2z"/></svg>
+        Continue with GitHub</a>`);
   }
-  if (!buttons.length) {
-    buttons.push(`<p class="error">No SSO providers are configured. Add Google or GitHub OAuth credentials to <code>.env</code>.</p>`);
+  if (providers.google) {
+    buttons.push(`<a class="provider google" href="/auth/google?returnTo=${encodedReturnTo}">
+        <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.39 3.62v3h3.86c2.26-2.09 3.58-5.16 3.58-8.81z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.86-3c-1.07.72-2.44 1.14-4.08 1.14-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.27 14.27a7.2 7.2 0 0 1 0-4.54V6.64H1.29a12 12 0 0 0 0 10.72l3.98-3.09z"/><path fill="#EA4335" d="M12 4.77c1.76 0 3.35.61 4.6 1.8l3.42-3.42A11.96 11.96 0 0 0 12 0 12 12 0 0 0 1.29 6.64l3.98 3.09C6.22 6.88 8.87 4.77 12 4.77z"/></svg>
+        Continue with Google</a>`);
   }
+
+  const providerSection = hasProviders
+    ? `<div class="providers">${buttons.join("\n      ")}</div>
+    <p class="footnote">After sign-in you will return to <code>${safeReturnTo}</code>.</p>`
+    : `<div class="setup">
+      <div class="setup-head"><span class="setup-dot"></span> Auth-ready · running in dev mode</div>
+      <p class="setup-copy">SSO is wired but no OAuth provider is configured yet, so Studio is open locally. To enable sign-in, add credentials to <code>.env</code>:</p>
+      <pre class="setup-env">GITHUB_CLIENT_ID=…
+GITHUB_CLIENT_SECRET=…
+GOOGLE_CLIENT_ID=…
+GOOGLE_CLIENT_SECRET=…
+MORPH_AUTH_MODE=oauth</pre>
+    </div>
+    <a class="provider continue" href="${safeReturnTo}">Continue to Studio
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>`;
 
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign in · Morph Studio</title>
+  <title>Log in · Morph</title>
+  <meta name="theme-color" content="#04060c">
   <style>
     :root {
-      color-scheme: light;
-      --bg: #f5f7fb;
-      --ink: #101828;
-      --muted: #667085;
-      --line: #d0d8e6;
-      --surface: #ffffff;
-      --accent: #1f5eff;
-      --bad: #b42318;
-      --shadow: 0 16px 40px rgba(16, 24, 40, 0.10);
+      color-scheme: dark;
+      --bg: #04060c;
+      --ink: #e9effd;
+      --muted: #97a3c0;
+      --faint: #67738f;
+      --line: rgba(151, 163, 192, 0.16);
+      --line-strong: rgba(151, 163, 192, 0.3);
+      --surface: rgba(13, 19, 34, 0.72);
+      --accent: #5b8cff;
+      --accent-2: #22d3ee;
+      --ok: #34d399;
+      --bad: #fb7185;
+      --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
     }
     * { box-sizing: border-box; }
     body {
@@ -414,88 +439,167 @@ function loginHtml({ error, providers, returnTo }) {
       color: var(--ink);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       padding: 24px;
+      overflow-x: hidden;
     }
+    :focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 4px; }
+    .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+    .grid-bg {
+      position: absolute; inset: -2px;
+      background-image:
+        linear-gradient(rgba(151, 163, 192, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(151, 163, 192, 0.05) 1px, transparent 1px);
+      background-size: 44px 44px;
+      -webkit-mask-image: radial-gradient(ellipse 100% 70% at 50% 30%, black 30%, transparent 75%);
+      mask-image: radial-gradient(ellipse 100% 70% at 50% 30%, black 30%, transparent 75%);
+    }
+    .orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.45; }
+    .orb-a { width: 520px; height: 520px; left: -160px; top: -180px; background: radial-gradient(circle at 35% 35%, rgba(91, 140, 255, 0.5), transparent 65%); }
+    .orb-b { width: 460px; height: 460px; right: -170px; bottom: -160px; background: radial-gradient(circle at 60% 40%, rgba(139, 92, 246, 0.38), transparent 65%); }
     .card {
-      width: min(420px, 100%);
+      width: min(430px, 100%);
       background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 28px;
-      box-shadow: var(--shadow);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--line-strong);
+      border-radius: 18px;
+      padding: 30px;
+      box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.85), 0 0 120px -50px rgba(91, 140, 255, 0.5);
     }
     .brand {
       display: flex;
       align-items: center;
       gap: 10px;
       font-weight: 700;
-      margin-bottom: 18px;
+      margin-bottom: 22px;
+      color: inherit;
+      text-decoration: none;
+      width: fit-content;
     }
     .mark {
-      width: 30px;
-      height: 30px;
-      border-radius: 7px;
-      background: var(--ink);
-      color: white;
+      width: 32px; height: 32px;
+      border-radius: 9px;
       display: grid;
       place-items: center;
-      font-size: 14px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      background: linear-gradient(135deg, #5b8cff 0%, #7c5cff 55%, #22d3ee 130%);
+      box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.4), 0 6px 20px -6px rgba(91, 140, 255, 0.7);
     }
-    h1 {
-      margin: 0 0 8px;
-      font-size: 28px;
-      line-height: 1.1;
+    .brand-tag {
+      color: var(--faint);
+      font-weight: 500;
+      font-size: 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 9px;
     }
-    p {
-      margin: 0 0 18px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-    .providers {
-      display: grid;
-      gap: 10px;
-    }
+    h1 { margin: 0 0 8px; font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; }
+    .sub { margin: 0 0 22px; color: var(--muted); line-height: 1.55; font-size: 14.5px; }
+    .providers { display: grid; gap: 10px; }
     .provider {
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 44px;
-      border-radius: 8px;
-      border: 1px solid var(--line);
-      background: #fff;
+      gap: 10px;
+      min-height: 46px;
+      border-radius: 10px;
+      border: 1px solid var(--line-strong);
+      background: rgba(151, 163, 192, 0.06);
       color: var(--ink);
       text-decoration: none;
       font-weight: 650;
+      font-size: 14.5px;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
     }
-    .provider:hover { border-color: #98a9c8; }
-    .provider.google { background: #fff; }
-    .provider.github { background: #24292f; border-color: #24292f; color: #fff; }
-    .error {
-      margin: 0 0 14px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      background: #fef3f2;
-      border: 1px solid #fecdca;
-      color: var(--bad);
-      font-size: 14px;
-    }
-    .footnote {
+    .provider:hover { border-color: rgba(151, 163, 192, 0.55); background: rgba(151, 163, 192, 0.11); transform: translateY(-1px); }
+    .provider.github { background: #191d24; border-color: #2c333d; }
+    .provider.github:hover { background: #21262e; }
+    .provider.google { background: #f5f7fb; border-color: #f5f7fb; color: #101828; }
+    .provider.google:hover { background: #fff; }
+    .provider.continue {
+      color: #fff;
+      background: linear-gradient(135deg, #5b8cff, #7c5cff);
+      border: 0;
+      box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.45) inset, 0 14px 34px -12px rgba(91, 140, 255, 0.65);
       margin-top: 16px;
-      font-size: 12px;
-      color: var(--muted);
     }
+    .provider.continue:hover { box-shadow: 0 0 0 1px rgba(140, 160, 255, 0.6) inset, 0 18px 42px -12px rgba(91, 140, 255, 0.8); }
+    .error {
+      margin: 0 0 16px;
+      padding: 10px 13px;
+      border-radius: 10px;
+      background: rgba(251, 113, 133, 0.08);
+      border: 1px solid rgba(251, 113, 133, 0.4);
+      color: var(--bad);
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+    .setup {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(4, 6, 12, 0.55);
+      padding: 16px;
+    }
+    .setup-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ok);
+      margin-bottom: 8px;
+    }
+    .setup-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.8);
+    }
+    .setup-copy { margin: 0 0 12px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .setup-copy code { font-family: var(--mono); font-size: 12px; color: var(--accent-2); }
+    .setup-env {
+      margin: 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--muted);
+      background: rgba(151, 163, 192, 0.05);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 13px;
+      overflow-x: auto;
+    }
+    .footnote { margin: 16px 0 0; font-size: 12.5px; color: var(--faint); }
+    .footnote code { font-family: var(--mono); font-size: 11.5px; }
+    .back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 20px;
+      color: var(--faint);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: color 0.15s ease;
+    }
+    .back:hover { color: var(--ink); }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="brand"><span class="mark">M</span><span>Morph Studio</span></div>
-    <h1>Sign in</h1>
-    <p>Use your workspace SSO provider to access the Morph review control plane.</p>
-    ${errorBlock}
-    <div class="providers">
-      ${buttons.join("\n      ")}
-    </div>
-    <p class="footnote">After sign-in you will return to <code>${safeReturnTo}</code>.</p>
+  <div class="backdrop" aria-hidden="true">
+    <div class="grid-bg"></div>
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
   </div>
+  <main class="card">
+    <a class="brand" href="/"><span class="mark">M</span><span>Morph</span><span class="brand-tag">Studio</span></a>
+    <h1>Log in</h1>
+    <p class="sub">Access the Morph review control plane — before/after reviews, repair loops, and stored receipts.</p>
+    ${errorBlock}
+    ${providerSection}
+    <a class="back" href="/">← Back to morph landing page</a>
+  </main>
 </body>
 </html>`;
 }

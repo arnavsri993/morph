@@ -26,6 +26,9 @@ Morph is the verification layer between AI coding agents and frontend merges. Th
 
 The built-in server stores run records under `.morph/runs` and exposes:
 
+- `GET /` (public landing page — always reachable, even in oauth mode)
+- `GET /studio` (Morph Studio dashboard — session-gated when `MORPH_AUTH_MODE=oauth`)
+- `GET /login` (SSO buttons when OAuth is configured, a dev-mode explainer when it is not)
 - `GET /api/health`
 - `GET /api/projects`
 - `GET /api/runs`
@@ -33,10 +36,14 @@ The built-in server stores run records under `.morph/runs` and exposes:
 - `POST /api/runs/verify`
 - `POST /api/runs/repair`
 - `POST /api/runs/loop`
+- `POST /api/studio/review`
+- `GET /api/billing`
+- `POST /api/auth/github` / `POST /api/auth/google` (runtime OAuth credential entry)
+- `POST /api/billing/stripe` (runtime Stripe key entry)
 - `POST /api/billing/checkout`
 - `POST /api/webhooks/stripe`
 
-The billing endpoints are stubs by design. Production code should verify Stripe signatures with `STRIPE_WEBHOOK_SECRET`, create checkout sessions with `STRIPE_SECRET_KEY`, and store subscription state in the workspace record.
+Billing degrades gracefully. Without Stripe keys, checkout returns stub guidance and webhooks acknowledge without verification. With `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID`, checkout creates a real Stripe Checkout session (subscription mode, success/cancel URLs back to `/studio`). With `STRIPE_WEBHOOK_SECRET`, webhook payloads are verified against the `Stripe-Signature` header — HMAC-SHA256 over `timestamp.body`, constant-time comparison, five-minute timestamp tolerance — and `checkout.session.completed` / `customer.subscription.*` events update the workspace plan stored in `.morph/billing.json`.
 
 ## Auth And Billing Readiness
 
