@@ -1,0 +1,47 @@
+{
+  "projectName": "Acme Control Plane",
+  "projectId": "acme-control-plane",
+  "projectRoot": "fixtures/acme-saas",
+  "morphDir": ".morph",
+  "workspace": {
+    "id": "raise-demo-workspace",
+    "name": "RAISE Summit Demo Workspace",
+    "authMode": "dev"
+  },
+  "tokenFiles": [
+    "design-system/tokens.css"
+  ],
+  "scan": [
+    "src/**/*.tsx"
+  ],
+  "componentImports": {
+    "Button": "src/components/Button.tsx"
+  },
+  "allowedRawHtml": [],
+  "gate": {
+    "minScore": 95,
+    "mergePolicy": "block_on_any_drift"
+  },
+  "report": {
+    "defaultOutput": "demo/reports/seeded-drift.json"
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 4177
+  },
+  "auth": {
+    "mode": "dev",
+    "sessionCookieName": "morph_session"
+  },
+  "billing": {
+    "provider": "stripe",
+    "mode": "stub",
+    "plans": [
+      {
+        "id": "team",
+        "name": "Team",
+        "stripePriceEnv": "STRIPE_PRICE_ID"
+      }
+    ]
+  }
+}

@@ -1,0 +1,337 @@
+{
+  "schemaVersion": "morph.report.v1",
+  "runId": "verify-20260704120930-86cb90",
+  "generatedAt": "2026-07-04T12:09:30.696Z",
+  "durationMs": 2,
+  "workspace": {
+    "id": "raise-demo-workspace",
+    "name": "RAISE Summit Demo Workspace",
+    "authMode": "dev"
+  },
+  "projectId": "acme-control-plane",
+  "project": "Acme Control Plane",
+  "verdict": "fail",
+  "score": 71,
+  "summary": {
+    "total": 8,
+    "high": 3,
+    "medium": 3,
+    "low": 2
+  },
+  "gate": {
+    "threshold": 95,
+    "passed": false,
+    "mergePolicy": "block_on_any_drift"
+  },
+  "ciSummary": "FAIL: score 71/100. 3 high, 3 medium, 2 low finding(s). Block merge until Morph repair or explicit grammar approval.",
+  "grammar": {
+    "tokenFiles": [
+      "design-system/tokens.css"
+    ],
+    "colors": {
+      "--color-background": "#f8fafc",
+      "--color-surface": "#ffffff",
+      "--color-text": "#111827",
+      "--color-muted": "#64748b",
+      "--color-border": "#d6dee8",
+      "--color-primary": "#2563eb",
+      "--color-primary-hover": "#1d4ed8",
+      "--color-primary-foreground": "#ffffff",
+      "--color-focus": "#60a5fa"
+    },
+    "spacing": {
+      "--space-1": "4px",
+      "--space-2": "8px",
+      "--space-3": "12px",
+      "--space-4": "16px",
+      "--space-6": "24px"
+    },
+    "radius": {
+      "--radius-button": "6px",
+      "--radius-card": "8px",
+      "--radius-panel": "12px"
+    },
+    "fontSize": {
+      "--font-size-sm": "14px",
+      "--font-size-md": "16px",
+      "--font-size-lg": "20px"
+    },
+    "components": [
+      "Button"
+    ]
+  },
+  "scan": {
+    "filesScanned": 2,
+    "globs": [
+      "src/**/*.tsx"
+    ]
+  },
+  "issues": [
+    {
+      "id": "hardcoded-color",
+      "type": "design_drift",
+      "severity": "high",
+      "file": "src/routes/settings/billing.tsx",
+      "line": 21,
+      "reason": "Found hardcoded color(s) #7c3aed, #faf5ff outside the product token set.",
+      "suggestedFix": "Replace one-off colors with semantic color tokens.",
+      "evidence": "#7c3aed] px-[21px] py-[11px] text-sm font-semibold text-[#faf5ff] focus:outline-none\"",
+      "classification": "accidental_drift",
+      "intent": "agent_added_visual_style_without_design_system_backing",
+      "patch": {
+        "file": "src/routes/settings/billing.tsx",
+        "replacements": [
+          {
+            "find": "bg-[#7c3aed]",
+            "replace": "bg-[var(--color-primary)]"
+          },
+          {
+            "find": "text-[#faf5ff]",
+            "replace": "text-[var(--color-primary-foreground)]"
+          }
+        ]
+      }
+    },
+    {
+      "id": "off-scale-spacing",
+      "type": "design_drift",
+      "severity": "medium",
+      "file": "src/routes/settings/billing.tsx",
+      "line": 5,
+      "reason": "gap-[18px] and related arbitrary spacing values are not on the product spacing scale.",
+      "suggestedFix": "Snap spacing to the nearest design-system token.",
+      "evidence": "gap-[18px] text-[var(--color-text)]\">",
+      "classification": "accidental_drift",
+      "intent": "agent_used_pixel_perfect_local_guess_instead_of_spacing_scale",
+      "patch": {
+        "file": "src/routes/settings/billing.tsx",
+        "replacements": [
+          {
+            "find": "gap-[18px]",
+            "replace": "gap-[var(--space-4)]"
+          },
+          {
+            "find": "p-[29px]",
+            "replace": "p-[var(--space-4)]"
+          },
+          {
+            "find": "px-[21px]",
+            "replace": "px-[var(--space-4)]"
+          },
+          {
+            "find": "py-[11px]",
+            "replace": "py-[var(--space-4)]"
+          }
+        ]
+      }
+    },
+    {
+      "id": "radius-drift",
+      "type": "design_drift",
+      "severity": "high",
+      "file": "src/routes/settings/billing.tsx",
+      "line": 11,
+      "reason": "rounded-[28px] introduces a radius not used by the design system.",
+      "suggestedFix": "Use the product card radius token.",
+      "evidence": "rounded-[28px] border border-[var(--color-border)] bg-[var(--color-surface)] p-[29px] shadow-2xl",
+      "classification": "accidental_drift",
+      "intent": "agent_changed_shape_language",
+      "patch": {
+        "file": "src/routes/settings/billing.tsx",
+        "replacements": [
+          {
+            "find": "rounded-[28px]",
+            "replace": "rounded-[var(--radius-card)]"
+          }
+        ]
+      }
+    },
+    {
+      "id": "type-scale-drift",
+      "type": "design_drift",
+      "severity": "low",
+      "file": "src/routes/settings/billing.tsx",
+      "line": 14,
+      "reason": "text-[15.5px] bypasses the product type scale.",
+      "suggestedFix": "Use a named text size from the system.",
+      "evidence": "text-[15.5px] font-medium\">Scale plan</p>",
+      "classification": "accidental_drift",
+      "intent": "agent_created_one_off_typography",
+      "patch": {
+        "file": "src/routes/settings/billing.tsx",
+        "replacements": [
+          {
+            "find": "text-[15.5px]",
+            "replace": "text-sm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "component-fragmentation",
+      "type": "component_drift",
+      "severity": "high",
+      "file": "src/routes/settings/billing.tsx",
+      "line": 20,
+      "reason": "Raw button markup bypasses the product Button component and its states.",
+      "suggestedFix": "Use the shared Button component so hierarchy, focus, and disabled states stay consistent.",
+      "evidence": "<button",
+      "classification": "accidental_drift",
+      "intent": "agent_reimplemented_existing_component",
+      "patch": {
+        "file": "src/routes/settings/billing.tsx",
+        "replacements": [
+          {
+            "find": "<button\n            className=\"rounded-[28px] bg-[#7c3aed] px-[21px] py-[11px] text-sm font-semibold text-[#faf5ff] focus:outline-none\"\n          >\n            Update plan\n          </button>",
+            "replace": "<Button variant=\"primary\">Update plan</Button>"
+          },
+          {
+            "find": "import React from \"react\";\n",
+            "replace": "import React from \"react\";\nimport { Button } from \"../../components/Button\";\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "focus-state-regression",
+      "type": "interaction_drift",
+      "severity": "medium",
+      "file": "src/routes/settings/billing.tsx",
+      "line": 21,
+      "reason": "Focus outline was removed without a product focus-visible replacement.",
+      "suggestedFix": "Use the shared focus-visible ring token.",
+      "evidence": "focus:outline-none\"",
+      "classification": "accidental_drift",
+      "intent": "agent_removed_accessibility_state",
+      "patch": {
+        "file": "src/routes/settings/billing.tsx",
+        "replacements": [
+          {
+            "find": "focus:outline-none",
+            "replace": "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mobile-overflow-risk",
+      "type": "responsive_drift",
+      "severity": "medium",
+      "file": "src/routes/settings/billing.tsx",
+      "line": 11,
+      "reason": "min-w-[840px] can force overflow on mobile settings screens.",
+      "suggestedFix": "Use min-w-0 so the layout can shrink inside responsive containers.",
+      "evidence": "min-w-[840px] rounded-[28px] border border-[var(--color-border)] bg-[var(--color-surface)] p-[29",
+      "classification": "accidental_drift",
+      "intent": "agent_optimized_for_desktop_snapshot_only",
+      "patch": {
+        "file": "src/routes/settings/billing.tsx",
+        "replacements": [
+          {
+            "find": "min-w-[840px]",
+            "replace": "min-w-0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "elevation-drift",
+      "type": "design_drift",
+      "severity": "low",
+      "file": "src/routes/settings/billing.tsx",
+      "line": 11,
+      "reason": "shadow-2xl is heavier than the product card elevation.",
+      "suggestedFix": "Use the system card shadow token.",
+      "evidence": "shadow-2xl\">",
+      "classification": "accidental_drift",
+      "intent": "agent_added_unapproved_elevation",
+      "patch": {
+        "file": "src/routes/settings/billing.tsx",
+        "replacements": [
+          {
+            "find": "shadow-2xl",
+            "replace": "shadow-[var(--shadow-card)]"
+          }
+        ]
+      }
+    }
+  ],
+  "remediation": {
+    "canAutoRepair": true,
+    "files": [
+      {
+        "file": "src/routes/settings/billing.tsx",
+        "issues": [
+          "hardcoded-color",
+          "off-scale-spacing",
+          "radius-drift",
+          "type-scale-drift",
+          "component-fragmentation",
+          "focus-state-regression",
+          "mobile-overflow-risk",
+          "elevation-drift"
+        ],
+        "replacements": [
+          {
+            "find": "bg-[#7c3aed]",
+            "replace": "bg-[var(--color-primary)]"
+          },
+          {
+            "find": "text-[#faf5ff]",
+            "replace": "text-[var(--color-primary-foreground)]"
+          },
+          {
+            "find": "gap-[18px]",
+            "replace": "gap-[var(--space-4)]"
+          },
+          {
+            "find": "p-[29px]",
+            "replace": "p-[var(--space-4)]"
+          },
+          {
+            "find": "px-[21px]",
+            "replace": "px-[var(--space-4)]"
+          },
+          {
+            "find": "py-[11px]",
+            "replace": "py-[var(--space-4)]"
+          },
+          {
+            "find": "rounded-[28px]",
+            "replace": "rounded-[var(--radius-card)]"
+          },
+          {
+            "find": "text-[15.5px]",
+            "replace": "text-sm"
+          },
+          {
+            "find": "<button\n            className=\"rounded-[28px] bg-[#7c3aed] px-[21px] py-[11px] text-sm font-semibold text-[#faf5ff] focus:outline-none\"\n          >\n            Update plan\n          </button>",
+            "replace": "<Button variant=\"primary\">Update plan</Button>"
+          },
+          {
+            "find": "import React from \"react\";\n",
+            "replace": "import React from \"react\";\nimport { Button } from \"../../components/Button\";\n"
+          },
+          {
+            "find": "focus:outline-none",
+            "replace": "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
+          },
+          {
+            "find": "min-w-[840px]",
+            "replace": "min-w-0"
+          },
+          {
+            "find": "shadow-2xl",
+            "replace": "shadow-[var(--shadow-card)]"
+          }
+        ]
+      }
+    ]
+  },
+  "nextActions": [
+    "Run morph repair --apply on an agent branch.",
+    "Re-run morph verify until the report passes.",
+    "Promote intentional new patterns into tokens instead of merging one-off UI."
+  ],
+  "humanReport": "Acme Control Plane: FAIL (71/100)\nFAIL: score 71/100. 3 high, 3 medium, 2 low finding(s). Block merge until Morph repair or explicit grammar approval.\n- [high] hardcoded-color src/routes/settings/billing.tsx:21\n  Found hardcoded color(s) #7c3aed, #faf5ff outside the product token set.\n  Intent: agent_added_visual_style_without_design_system_backing\n  Fix: Replace one-off colors with semantic color tokens.\n- [medium] off-scale-spacing src/routes/settings/billing.tsx:5\n  gap-[18px] and related arbitrary spacing values are not on the product spacing scale.\n  Intent: agent_used_pixel_perfect_local_guess_instead_of_spacing_scale\n  Fix: Snap spacing to the nearest design-system token.\n- [high] radius-drift src/routes/settings/billing.tsx:11\n  rounded-[28px] introduces a radius not used by the design system.\n  Intent: agent_changed_shape_language\n  Fix: Use the product card radius token.\n- [low] type-scale-drift src/routes/settings/billing.tsx:14\n  text-[15.5px] bypasses the product type scale.\n  Intent: agent_created_one_off_typography\n  Fix: Use a named text size from the system.\n- [high] component-fragmentation src/routes/settings/billing.tsx:20\n  Raw button markup bypasses the product Button component and its states.\n  Intent: agent_reimplemented_existing_component\n  Fix: Use the shared Button component so hierarchy, focus, and disabled states stay consistent.\n- [medium] focus-state-regression src/routes/settings/billing.tsx:21\n  Focus outline was removed without a product focus-visible replacement.\n  Intent: agent_removed_accessibility_state\n  Fix: Use the shared focus-visible ring token.\n- [medium] mobile-overflow-risk src/routes/settings/billing.tsx:11\n  min-w-[840px] can force overflow on mobile settings screens.\n  Intent: agent_optimized_for_desktop_snapshot_only\n  Fix: Use min-w-0 so the layout can shrink inside responsive containers.\n- [low] elevation-drift src/routes/settings/billing.tsx:11\n  shadow-2xl is heavier than the product card elevation.\n  Intent: agent_added_unapproved_elevation\n  Fix: Use the system card shadow token."
+}

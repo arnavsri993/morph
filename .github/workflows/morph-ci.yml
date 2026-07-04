@@ -1,0 +1,28 @@
+name: Morph CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Test deterministic scanner
+        run: npm test
+
+      - name: Generate seeded report for receipts
+        run: npm run verify -- --json --no-fail --output demo/reports/seeded-drift.json
+
+      - name: Prove repair loop on demo fixture
+        run: npm run demo

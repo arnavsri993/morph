@@ -1,0 +1,28 @@
+$ npm test
+✔ verify catches seeded design-system drift with agent-readable patches
+✔ repair applies deterministic fixes and verify passes on a temp project
+✔ loop returns a final pass gate after applying deterministic repairs
+✔ init creates product config, env sample, and run store
+
+$ npm run verify -- --json --no-fail --output demo/reports/seeded-drift.json
+Acme Control Plane: FAIL (71/100)
+FAIL: score 71/100. 3 high, 3 medium, 2 low finding(s). Block merge until Morph repair or explicit grammar approval.
+
+$ npm run demo
+Morph demo complete.
+Before: fail (71/100), 8 issue(s)
+Repair: 8 replacement(s) across 1 file(s)
+After: pass (100/100), 0 issue(s)
+Reports written to demo/reports/.
+
+$ npm run serve -- --port 4188
+Morph control plane: http://127.0.0.1:4188
+Press Ctrl+C to stop.
+
+$ curl -s http://127.0.0.1:4188/api/health
+{
+  "ok": true,
+  "product": "Morph",
+  "authMode": "dev",
+  "billingMode": "stub"
+}
