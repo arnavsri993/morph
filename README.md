@@ -30,6 +30,8 @@ npm run serve
 
 Open the local product shell at `http://127.0.0.1:4177` after `npm run serve`.
 
+For the exact one-minute video and live judge flow, use `DEMO.md`.
+
 ## Commands
 
 ```bash

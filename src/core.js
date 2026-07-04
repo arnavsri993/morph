@@ -658,18 +658,46 @@ function buildCiSummary(score, issues) {
 }
 
 function matchesScanGlob(relativeFile, glob) {
-  const normalized = glob.replace(/\\/g, "/");
-  if (normalized === relativeFile) return true;
-  if (normalized.includes("**")) {
-    const [prefix, suffix] = normalized.split("**");
-    const suffixPattern = suffix.replace(/^\//, "").replace("*", "");
-    return relativeFile.startsWith(prefix) && relativeFile.endsWith(suffixPattern);
+  return globToRegExp(glob.replace(/\\/g, "/")).test(relativeFile);
+}
+
+function globToRegExp(glob) {
+  let pattern = "";
+  for (let i = 0; i < glob.length; i += 1) {
+    const char = glob[i];
+    const next = glob[i + 1];
+    const afterNext = glob[i + 2];
+
+    if (char === "*" && next === "*" && afterNext === "/") {
+      pattern += "(?:.*/)?";
+      i += 2;
+    } else if (char === "*" && next === "*") {
+      pattern += ".*";
+      i += 1;
+    } else if (char === "*") {
+      pattern += "[^/]*";
+    } else if (char === "{") {
+      const close = glob.indexOf("}", i + 1);
+      if (close === -1) {
+        pattern += "\\{";
+      } else {
+        const choices = glob
+          .slice(i + 1, close)
+          .split(",")
+          .map(escapeRegExp)
+          .join("|");
+        pattern += `(${choices})`;
+        i = close;
+      }
+    } else {
+      pattern += escapeRegExp(char);
+    }
   }
-  if (normalized.includes("*")) {
-    const [prefix, suffix] = normalized.split("*");
-    return relativeFile.startsWith(prefix) && relativeFile.endsWith(suffix);
-  }
-  return relativeFile.startsWith(normalized.replace(/\/$/, ""));
+  return new RegExp(`^${pattern}$`);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function defaultConfig(projectName) {

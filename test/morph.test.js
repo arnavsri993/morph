@@ -11,6 +11,7 @@ import {
   loopProject,
   repairProject
 } from "../src/core.js";
+import { serveMorph } from "../src/server.js";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
@@ -81,3 +82,71 @@ test("init creates product config, env sample, and run store", async () => {
   assert.equal(result.created.includes(".env.example"), true);
   assert.equal(result.created.includes(path.join(".morph", "runs")), true);
 });
+
+test("default brace scan globs include frontend files", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-glob-"));
+  const fixtureRoot = path.join(tempRoot, "acme-saas");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
+
+  const configPath = path.join(tempRoot, "morph.config.json");
+  await writeFile(configPath, `${JSON.stringify({
+    projectName: "Acme Glob",
+    projectRoot: "acme-saas",
+    tokenFiles: ["design-system/tokens.css"]
+  }, null, 2)}\n`);
+
+  const config = await loadConfig(configPath, tempRoot);
+  const report = await createReport(config);
+
+  assert.equal(report.scan.filesScanned > 0, true);
+  assert.equal(report.issues.some((issue) => issue.file === "src/routes/settings/billing.tsx"), true);
+});
+
+test("server exposes health, run storage, and invalid JSON errors", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-server-"));
+  const fixtureRoot = path.join(tempRoot, "acme-saas");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
+
+  const configPath = path.join(tempRoot, "morph.config.json");
+  await writeFile(configPath, `${JSON.stringify({
+    projectName: "Acme Server",
+    projectRoot: "acme-saas",
+    morphDir: ".morph",
+    tokenFiles: ["design-system/tokens.css"],
+    scan: ["src/**/*.tsx"]
+  }, null, 2)}\n`);
+
+  const config = await loadConfig(configPath, tempRoot);
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0 });
+
+  try {
+    const health = await fetchJson(`${url}/api/health`);
+    assert.equal(health.ok, true);
+
+    const verifyResponse = await fetch(`${url}/api/runs/verify`, { method: "POST" });
+    assert.equal(verifyResponse.status, 201);
+    const verifyPayload = await verifyResponse.json();
+    assert.equal(verifyPayload.run.kind, "verify");
+    assert.equal(verifyPayload.run.payload.verdict, "fail");
+
+    const runs = await fetchJson(`${url}/api/runs`);
+    assert.equal(runs.runs.length, 1);
+
+    const invalidResponse = await fetch(`${url}/api/runs/repair`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{"
+    });
+    assert.equal(invalidResponse.status, 400);
+    const invalidPayload = await invalidResponse.json();
+    assert.equal(invalidPayload.error, "invalid_json");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+async function fetchJson(url) {
+  const response = await fetch(url);
+  assert.equal(response.ok, true);
+  return response.json();
+}

@@ -13,7 +13,7 @@ import { serveMorph } from "../src/server.js";
 
 function parseArgs(argv) {
   const args = {
-    command: argv[2] ?? "help",
+    command: argv[2] === "--help" || argv[2] === "-h" ? "help" : argv[2] ?? "help",
     config: "morph.config.json",
     output: null,
     json: false,
@@ -48,10 +48,10 @@ function printHelp() {
   console.log(`Morph
 
 Usage:
-  morph init [--project-name "Acme"] [--force]
-  morph verify --config morph.config.json [--json] [--output report.json] [--no-fail]
-  morph repair --config morph.config.json [--apply] [--json]
-  morph loop --config morph.config.json [--apply] [--json] [--store]
+  morph init [--project-name "Acme"] [--force] [--json]
+  morph verify --config morph.config.json [--json] [--output report.json] [--store] [--no-fail]
+  morph repair --config morph.config.json [--apply] [--json] [--store]
+  morph loop --config morph.config.json [--apply] [--json] [--store] [--no-fail]
   morph demo
   morph serve --config morph.config.json [--host 127.0.0.1] [--port 4177]
 

@@ -102,24 +102,30 @@ export async function serveMorph(config, options = {}) {
 
       return sendJson(response, 404, { error: "not_found" });
     } catch (error) {
-      return sendJson(response, 500, {
-        error: "server_error",
+      return sendJson(response, error.statusCode ?? 500, {
+        error: error.code ?? "server_error",
         message: error.message
       });
     }
   });
 
   await new Promise((resolve) => server.listen(port, host, resolve));
+  const address = server.address();
+  const actualPort = typeof address === "object" && address ? address.port : port;
   return {
     server,
-    url: `http://${host}:${port}`
+    url: `http://${host}:${actualPort}`
   };
 }
 
 async function readJson(request) {
   const body = await readBody(request);
   if (!body.trim()) return {};
-  return JSON.parse(body);
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new HttpError(400, "invalid_json", "Request body must be valid JSON.");
+  }
 }
 
 async function readBody(request) {
@@ -142,6 +148,14 @@ function sendHtml(response, html) {
     "cache-control": "no-store"
   });
   response.end(html);
+}
+
+class HttpError extends Error {
+  constructor(statusCode, code, message) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+  }
 }
 
 function publicConfig(config) {
@@ -339,6 +353,7 @@ function dashboardHtml(config) {
           <button class="primary" data-action="verify">Run verify</button>
           <button data-action="loop">Run loop</button>
           <button data-action="repair">Plan repair</button>
+          <button data-action="repair" data-apply="true">Apply repair</button>
           <button data-action="checkout">Checkout stub</button>
         </div>
       </div>
@@ -407,7 +422,8 @@ function dashboardHtml(config) {
       output.textContent = "Running " + action + "...";
       try {
         const route = action === "checkout" ? "/api/billing/checkout" : "/api/runs/" + action;
-        const body = action === "loop" ? JSON.stringify({ apply: true }) : JSON.stringify({ apply: false });
+        const shouldApply = action === "loop" || event.target?.dataset?.apply === "true";
+        const body = JSON.stringify({ apply: shouldApply });
         const payload = await api(route, { method: "POST", body });
         renderPayload(payload);
         await refreshRuns();
