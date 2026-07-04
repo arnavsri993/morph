@@ -747,6 +747,98 @@ function dashboardHtml(config, session) {
       font-size: 12px;
       line-height: 1.5;
     }
+    .output-wrap { display: flex; flex-direction: column; gap: 0; }
+    .output-toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      overflow: hidden;
+      width: fit-content;
+      background: var(--surface);
+    }
+    .output-toggle button {
+      min-height: 30px;
+      border: none;
+      border-radius: 0;
+      padding: 0 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+    }
+    .output-toggle button.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .output-toggle button:hover:not(.active) { background: var(--surface-soft); }
+    .output-wrap pre { border-radius: 0 8px 8px 8px; }
+    .readable {
+      overflow: auto;
+      min-height: 260px;
+      max-height: 520px;
+      border: 1px solid var(--line);
+      border-radius: 0 8px 8px 8px;
+      background: var(--surface);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .readable details { border-bottom: 1px solid var(--line); }
+    .readable details:last-child { border-bottom: none; }
+    .readable summary {
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+      list-style: none;
+    }
+    .readable summary::-webkit-details-marker { display: none; }
+    .readable summary::before { content: "▶"; font-size: 10px; color: var(--muted); transition: transform 0.15s; }
+    .readable details[open] > summary::before { transform: rotate(90deg); }
+    .readable summary .preview { color: var(--muted); font-weight: 400; font-size: 12px; }
+    .readable .detail-body { padding: 0 14px 12px 28px; }
+    .r-badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .r-badge.pass { background: #dcfce7; color: var(--ok); }
+    .r-badge.fail { background: #fee2e2; color: var(--bad); }
+    .r-badge.high { background: #fee2e2; color: var(--bad); }
+    .r-badge.medium { background: #fef3c7; color: var(--warn); }
+    .r-badge.low { background: #f1f5f9; color: var(--muted); }
+    .score-bar-wrap { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+    .score-bar { height: 8px; border-radius: 999px; background: var(--line); flex: 1; overflow: hidden; }
+    .score-bar-fill { height: 100%; border-radius: 999px; }
+    .score-bar-fill.good { background: var(--ok); }
+    .score-bar-fill.warn { background: var(--warn); }
+    .score-bar-fill.bad { background: var(--bad); }
+    .r-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .r-chip { border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; font-size: 12px; }
+    .r-kv { display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; }
+    .r-kv dt { color: var(--muted); font-size: 12px; }
+    .r-kv dd { margin: 0; font-size: 12px; }
+    .r-issue {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      background: var(--surface);
+    }
+    .r-issue:last-child { margin-bottom: 0; }
+    .r-issue-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; font-size: 13px; }
+    .r-issue dl { margin: 0; }
+    .r-list { padding-left: 18px; margin: 0; }
+    .r-list li { margin-bottom: 4px; font-size: 12px; }
+    .r-text { font-size: 12px; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
     @media (max-width: 820px) {
       h1 { font-size: 34px; }
       .hero, .grid, .compare, .journey, .issue-list { grid-template-columns: 1fr; }
@@ -810,13 +902,19 @@ function dashboardHtml(config, session) {
         <h2>Review history</h2>
         <div id="runList">Loading...</div>
       </div>
-      <div>
+      <div class="output-wrap">
+        <div class="output-toggle">
+          <button id="toggleJson" class="active" data-mode="json">JSON</button>
+          <button id="toggleReadable" data-mode="readable">Readable</button>
+        </div>
         <pre id="output">Loading Morph control plane...</pre>
+        <div id="outputReadable" class="readable" style="display:none"></div>
       </div>
     </section>
   </main>
   <script>
     const output = document.querySelector("#output");
+    const outputReadable = document.querySelector("#outputReadable");
     const runList = document.querySelector("#runList");
     const score = document.querySelector("#score");
     const runs = document.querySelector("#runs");
@@ -827,6 +925,210 @@ function dashboardHtml(config, session) {
     const githubClientSecret = document.querySelector("#githubClientSecret");
     const authStatus = document.querySelector("#authStatus");
     const GITHUB_AUTH_KEY = "morph.github.oauth";
+
+    let outputMode = "json";
+    let lastPayload = null;
+
+    document.querySelector("#toggleJson").addEventListener("click", () => setOutputMode("json"));
+    document.querySelector("#toggleReadable").addEventListener("click", () => setOutputMode("readable"));
+
+    function setOutputMode(mode) {
+      outputMode = mode;
+      document.querySelector("#toggleJson").className = mode === "json" ? "active" : "";
+      document.querySelector("#toggleReadable").className = mode === "readable" ? "active" : "";
+      if (lastPayload !== null) {
+        applyOutputMode(lastPayload);
+      }
+    }
+
+    function applyOutputMode(payload) {
+      if (outputMode === "readable") {
+        output.style.display = "none";
+        outputReadable.style.display = "";
+        outputReadable.innerHTML = renderReadable(payload);
+      } else {
+        outputReadable.style.display = "none";
+        output.style.display = "";
+        output.textContent = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+      }
+    }
+
+    function badge(text, cls) {
+      return '<span class="r-badge ' + cls + '">' + esc(String(text)) + '</span>';
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    function renderReadable(payload) {
+      if (typeof payload !== "object" || payload === null) {
+        return '<div style="padding:14px"><span class="r-text">' + esc(String(payload)) + '</span></div>';
+      }
+      const run = payload?.run;
+      const rp = run?.payload;
+      if (rp?.schemaVersion === "morph.studio-review.v1") return renderStudioReview(run, rp);
+      if (rp) return renderReportBody(rp);
+      // Fallback: generic sections for health-check / other flat payloads
+      let html = "";
+      for (const [key, val] of Object.entries(payload)) html += renderSection(key, val);
+      return html;
+    }
+
+    // ── Studio-review renderer ────────────────────────────────────────────────
+
+    function renderStudioReview(run, p) {
+      const before = p.before;
+      const after  = p.after;
+      const repair = p.repair;
+      const vCls   = p.finalVerdict === "pass" ? "pass" : "fail";
+
+      let html = '<div style="padding:14px 14px 10px;border-bottom:1px solid var(--line)">';
+      // Overall verdict + summary line
+      html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+      html += badge(p.finalVerdict || "unknown", vCls);
+      html += '<span style="color:var(--muted);font-size:12px">' + esc(p.ciSummary || "") + '</span>';
+      html += '</div>';
+      // Pipeline strip: Before → Repair → After
+      html += '<div style="display:flex;gap:8px;align-items:center;font-size:12px;flex-wrap:wrap">';
+      html += pipelineStep("Before", before?.verdict, before?.score);
+      html += '<span style="color:var(--muted)">→</span>';
+      html += '<span style="color:var(--muted)">' + esc(String(repair?.replacements ?? 0)) + ' fixes applied</span>';
+      html += '<span style="color:var(--muted)">→</span>';
+      html += pipelineStep("After", after?.verdict, after?.score);
+      html += '</div>';
+      html += '</div>';
+
+      // Before section (open by default when there are issues)
+      const hasIssues = Array.isArray(before?.issues) && before.issues.length > 0;
+      html += '<details' + (hasIssues ? " open" : "") + '>';
+      html += '<summary>Before review <span class="preview">' + badge(before?.verdict || "?", before?.verdict === "pass" ? "pass" : "fail") + ' &nbsp;' + esc(String(before?.score ?? "?")) + '/100</span></summary>';
+      html += '<div class="detail-body">' + renderReportBody(before) + '</div></details>';
+
+      // Repair section
+      html += '<details><summary>Repair <span class="preview">' + esc(String(repair?.replacements ?? 0)) + ' replacements applied</span></summary>';
+      html += '<div class="detail-body">' + renderRepairBody(repair) + '</div></details>';
+
+      // After section
+      html += '<details><summary>After repair <span class="preview">' + badge(after?.verdict || "?", after?.verdict === "pass" ? "pass" : "fail") + ' &nbsp;' + esc(String(after?.score ?? "?")) + '/100</span></summary>';
+      html += '<div class="detail-body">' + renderReportBody(after) + '</div></details>';
+
+      // User journey
+      if (Array.isArray(p.userJourney) && p.userJourney.length) {
+        html += '<details><summary>User journey <span class="preview">' + p.userJourney.length + ' steps</span></summary>';
+        html += '<div class="detail-body"><ul class="r-list">' + p.userJourney.map(s => '<li>' + esc(s) + '</li>').join("") + '</ul></div></details>';
+      }
+
+      return html;
+    }
+
+    function pipelineStep(label, verdict, score) {
+      const cls = verdict === "pass" ? "pass" : "fail";
+      return '<span>' + esc(label) + ': ' + badge(verdict || "?", cls) + ' <strong>' + esc(String(score ?? "?")) + '</strong>/100</span>';
+    }
+
+    // ── Report body (shared by before/after and plain verify runs) ────────────
+
+    function renderReportBody(report) {
+      if (!report) return '<span class="r-text">No data.</span>';
+      let html = '';
+
+      // Score bar
+      const n = Number(report.score);
+      const sc = n >= 95 ? "good" : n >= 70 ? "warn" : "bad";
+      html += '<div class="score-bar-wrap" style="margin-bottom:10px">';
+      html += '<strong>' + esc(String(report.score ?? "?")) + ' / 100</strong>';
+      html += '<div class="score-bar"><div class="score-bar-fill ' + sc + '" style="width:' + Math.max(0, Math.min(100, n)) + '%"></div></div>';
+      html += '</div>';
+
+      // Summary chips
+      if (report.summary) {
+        const s = report.summary;
+        html += '<div class="r-chips" style="margin-bottom:10px">';
+        if (s.high)   html += '<span class="r-chip"><span style="color:var(--bad)">●</span> ' + s.high + ' high</span>';
+        if (s.medium) html += '<span class="r-chip"><span style="color:var(--warn)">●</span> ' + s.medium + ' medium</span>';
+        if (s.low)    html += '<span class="r-chip"><span style="color:var(--muted)">●</span> ' + s.low + ' low</span>';
+        if (!s.high && !s.medium && !s.low) html += '<span class="r-chip" style="color:var(--ok)">No issues</span>';
+        html += '</div>';
+      }
+
+      // Gate
+      if (report.gate) {
+        const g = report.gate;
+        html += '<div style="margin-bottom:10px;font-size:12px">';
+        html += 'Merge gate: ' + badge(g.passed ? "passed" : "blocked", g.passed ? "pass" : "fail");
+        html += ' &nbsp;threshold ' + esc(String(g.threshold)) + '/100';
+        html += '</div>';
+      }
+
+      // Issues
+      if (Array.isArray(report.issues) && report.issues.length > 0) {
+        html += report.issues.map(issue => {
+          const sev = String(issue.severity || "low").toLowerCase();
+          return '<div class="r-issue">' +
+            '<div class="r-issue-head">' + badge(issue.severity, sev) + ' <span>' + esc(issue.id || "") + '</span></div>' +
+            '<dl class="r-kv">' +
+            (issue.file ? '<dt>File</dt><dd>' + esc(issue.file) + (issue.line ? ':' + issue.line : '') + '</dd>' : '') +
+            (issue.reason ? '<dt>Reason</dt><dd>' + esc(issue.reason) + '</dd>' : '') +
+            (issue.suggestedFix ? '<dt>Fix</dt><dd>' + esc(issue.suggestedFix) + '</dd>' : '') +
+            '</dl>' +
+            '</div>';
+        }).join("");
+      } else if (Array.isArray(report.issues)) {
+        html += '<span class="r-text" style="color:var(--ok)">✓ No issues found.</span>';
+      }
+
+      // Next actions
+      if (Array.isArray(report.nextActions) && report.nextActions.length) {
+        html += '<ul class="r-list" style="margin-top:10px">' + report.nextActions.map(a => '<li>' + esc(a) + '</li>').join("") + '</ul>';
+      }
+
+      return html;
+    }
+
+    // ── Repair body ───────────────────────────────────────────────────────────
+
+    function renderRepairBody(repair) {
+      if (!repair) return '<span class="r-text">No repair data.</span>';
+      let html = '<dl class="r-kv" style="margin-bottom:10px">';
+      html += '<dt>Applied</dt><dd>' + (repair.applied ? '<span style="color:var(--ok)">Yes</span>' : '<span style="color:var(--bad)">No</span>') + '</dd>';
+      html += '<dt>Replacements</dt><dd>' + esc(String(repair.replacements)) + '</dd>';
+      html += '<dt>Risk</dt><dd>' + esc(repair.risk || "unknown") + '</dd>';
+      html += '</dl>';
+      if (Array.isArray(repair.patches) && repair.patches.length) {
+        html += '<strong style="font-size:12px;display:block;margin-bottom:4px">Patched files</strong>';
+        html += '<ul class="r-list">' + repair.patches.map(p => '<li>' + esc(p.file) + ' (' + (p.replacements?.length || 0) + ' replacements)</li>').join("") + '</ul>';
+      }
+      return html;
+    }
+
+    // ── Generic section renderer (fallback for health-check / unknown shapes) ─
+
+    function renderSection(key, val) {
+      let preview = "", body = "";
+      if (key === "verdict") {
+        const cls = String(val).toLowerCase() === "pass" ? "pass" : "fail";
+        preview = badge(val, cls); body = badge(val, cls);
+      } else if (key === "score") {
+        const n = Number(val), cls = n >= 95 ? "good" : n >= 70 ? "warn" : "bad";
+        preview = '<span class="preview">' + esc(String(val)) + '/100</span>';
+        body = '<div class="score-bar-wrap"><strong>' + esc(String(val)) + ' / 100</strong><div class="score-bar"><div class="score-bar-fill ' + cls + '" style="width:' + Math.max(0,Math.min(100,n)) + '%"></div></div></div>';
+      } else if (typeof val === "boolean") {
+        preview = '<span class="preview">' + val + '</span>';
+        body = val ? '<span style="color:var(--ok)">true</span>' : '<span style="color:var(--bad)">false</span>';
+      } else if (Array.isArray(val)) {
+        preview = '<span class="preview">[' + val.length + ']</span>';
+        body = '<ul class="r-list">' + val.map(v => '<li>' + esc(typeof v === "object" ? JSON.stringify(v) : String(v)) + '</li>').join("") + '</ul>';
+      } else if (typeof val === "object" && val !== null) {
+        const entries = Object.entries(val);
+        preview = '<span class="preview">' + entries.length + ' keys</span>';
+        body = '<dl class="r-kv">' + entries.map(([k,v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(typeof v === "object" ? JSON.stringify(v) : String(v)) + '</dd>').join("") + '</dl>';
+      } else {
+        const s = String(val); preview = '<span class="preview">' + esc(s.slice(0,60)) + (s.length > 60 ? "…" : "") + '</span>';
+        body = '<span class="r-text">' + esc(s) + '</span>';
+      }
+      return '<details><summary>' + esc(key) + ' ' + preview + '</summary><div class="detail-body">' + body + '</div></details>';
+    }
 
     const narration = "Morph Studio reviews a Cursor generated billing screen before it reaches a teammate. The first version compiles, but it introduces hardcoded color, rogue radius, raw button markup, missing focus state, and mobile overflow risk. Morph creates file-level receipts, applies deterministic repairs, and returns a passing merge gate.";
 
@@ -876,7 +1178,8 @@ function dashboardHtml(config, session) {
     }
 
     function renderPayload(payload) {
-      output.textContent = JSON.stringify(payload, null, 2);
+      lastPayload = payload;
+      applyOutputMode(payload);
       const report = payload.run?.payload?.after || payload.run?.payload;
       const loop = payload.run?.payload;
       if (report?.score !== undefined) score.textContent = report.score;
@@ -905,6 +1208,9 @@ function dashboardHtml(config, session) {
           window.speechSynthesis.cancel();
           window.speechSynthesis.speak(new SpeechSynthesisUtterance(narration));
         } else {
+          lastPayload = null;
+          output.style.display = "";
+          outputReadable.style.display = "none";
           output.textContent = narration;
         }
         return;
@@ -912,6 +1218,9 @@ function dashboardHtml(config, session) {
 
       const action = event.target?.dataset?.action;
       if (!action) return;
+      lastPayload = null;
+      output.style.display = "";
+      outputReadable.style.display = "none";
       output.textContent = "Running " + action + "...";
       reviewState.textContent = "Running";
       try {
@@ -926,6 +1235,9 @@ function dashboardHtml(config, session) {
         renderPayload(payload);
         await refreshRuns();
       } catch (error) {
+        lastPayload = null;
+        output.style.display = "";
+        outputReadable.style.display = "none";
         output.textContent = error.stack || error.message;
       }
     });
@@ -942,9 +1254,12 @@ function dashboardHtml(config, session) {
       authStatus.className = "auth-status pending";
       try {
         const payload = await saveGithubAuth(clientId, clientSecret);
-        output.textContent = JSON.stringify(payload, null, 2);
+        renderPayload(payload);
       } catch (error) {
         renderAuthStatus(false);
+        lastPayload = null;
+        output.style.display = "";
+        outputReadable.style.display = "none";
         output.textContent = error.stack || error.message;
       }
     });
@@ -962,7 +1277,7 @@ function dashboardHtml(config, session) {
       }
       const health = await api("/api/health");
       renderAuthStatus(Boolean(health.github?.configured), health.github?.clientId);
-      output.textContent = JSON.stringify(health, null, 2);
+      renderPayload(health);
     });
   </script>
 </body>
