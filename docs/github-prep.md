@@ -36,3 +36,21 @@ gh api -X PUT repos/:owner/morph/collaborators/Akshaj.kommepalli@gmail.com -f pe
 gh api -X PUT repos/:owner/morph/collaborators/Harshankrishna30@gmail.com -f permission=push
 gh api -X PUT repos/:owner/morph/collaborators/Arnavsri993@gmail.com -f permission=push
 ```
+
+## 2026-07-04 invite attempt
+
+Repo created and pushed:
+
+- `https://github.com/arnavsri993/morph`
+
+GitHub user search for the provided emails returned no resolvable usernames. Direct collaborator API calls using the email strings failed for every requested email with:
+
+```json
+{
+  "message": "Not Found",
+  "documentation_url": "https://docs.github.com/rest/collaborators/collaborators#add-a-repository-collaborator",
+  "status": "404"
+}
+```
+
+`Arnavsri993` resolves to the owner account `arnavsri993`, which already owns the repo. Required action: invite the remaining collaborators through GitHub's web UI by email, or provide their GitHub usernames for API invites.
