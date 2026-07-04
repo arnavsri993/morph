@@ -1,9 +1,11 @@
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  copyFixtureForDemo,
   createReport,
   listRuns,
+  loadConfig,
   loopProject,
   repairProject,
   storeRun
@@ -69,6 +71,12 @@ export async function serveMorph(config, options = {}) {
         return sendJson(response, 201, { run: stored });
       }
 
+      if (request.method === "POST" && url.pathname === "/api/studio/review") {
+        const review = await runStudioReview(config);
+        const stored = await storeRun(config, "studio-review", review);
+        return sendJson(response, 201, { run: stored });
+      }
+
       if (request.method === "POST" && url.pathname === "/api/billing/checkout") {
         return sendJson(response, 200, {
           mode: "stub",
@@ -115,6 +123,64 @@ export async function serveMorph(config, options = {}) {
   return {
     server,
     url: `http://${host}:${actualPort}`
+  };
+}
+
+async function runStudioReview(config) {
+  const studioRoot = path.join(config.configDir, ".studio-run");
+  const studioProjectRoot = path.join(studioRoot, "project");
+  const studioConfigPath = path.join(studioRoot, "morph.config.json");
+
+  await mkdir(studioRoot, { recursive: true });
+  await copyFixtureForDemo(config.projectRoot, studioProjectRoot);
+  await writeFile(studioConfigPath, `${JSON.stringify({
+    projectName: `${config.projectName} Studio Review`,
+    projectId: `${config.projectId ?? slugify(config.projectName)}-studio`,
+    projectRoot: "project",
+    morphDir: ".morph",
+    workspace: config.workspace,
+    tokenFiles: config.tokenFiles,
+    scan: config.scan,
+    componentImports: config.componentImports,
+    gate: config.gate,
+    report: config.report,
+    auth: config.auth,
+    billing: config.billing
+  }, null, 2)}\n`);
+
+  const studioConfig = await loadConfig(studioConfigPath, studioRoot);
+  const before = await createReport(studioConfig);
+  const repair = await repairProject(studioConfig, { apply: true });
+  const after = repair.after ?? await createReport(studioConfig);
+
+  return {
+    schemaVersion: "morph.studio-review.v1",
+    generatedAt: new Date().toISOString(),
+    project: config.projectName,
+    isolated: true,
+    sourceProjectRoot: path.relative(config.configDir, config.projectRoot),
+    studioProjectRoot: path.relative(config.configDir, studioProjectRoot),
+    userJourney: [
+      "Inspect the Cursor-generated UI.",
+      "Explain the drift in human language.",
+      "Generate deterministic repair patches.",
+      "Apply the repair on an isolated review copy.",
+      "Return a passing merge gate with JSON receipts."
+    ],
+    before,
+    repair: {
+      runId: repair.runId,
+      applied: repair.applied,
+      replacements: repair.replacements,
+      patches: repair.patches,
+      risk: repair.risk
+    },
+    after,
+    finalVerdict: after.verdict,
+    passed: after.verdict === "pass",
+    ciSummary: after.verdict === "pass"
+      ? "Morph Studio review passed on an isolated copy. Source fixture remains seeded for repeat demos."
+      : "Morph Studio review still fails. Escalate remaining issues before merge."
   };
 }
 
@@ -497,10 +563,10 @@ function dashboardHtml(config) {
         <h1>Review AI-generated UI before it wastes your team’s time.</h1>
         <p>Cursor can ship a billing screen in seconds. The hard part is knowing whether that screen belongs in your product. Morph turns frontend review into an interactive journey: inspect the agent output, hear the design critique, apply the repair, and ship the branch with receipts.</p>
         <div class="actions">
-          <button class="primary" data-action="loop">Run full review</button>
+          <button class="primary" data-action="studio-review">Run full review</button>
           <button data-action="verify">Inspect agent UI</button>
           <button data-action="repair">Generate fix plan</button>
-          <button data-action="repair" data-apply="true">Apply fix</button>
+          <button data-action="studio-review">Apply fix</button>
           <button data-speak="true">Narrate review</button>
         </div>
         <div class="journey">
@@ -638,7 +704,11 @@ function dashboardHtml(config) {
       output.textContent = "Running " + action + "...";
       reviewState.textContent = "Running";
       try {
-        const route = action === "checkout" ? "/api/billing/checkout" : "/api/runs/" + action;
+        const route = action === "checkout"
+          ? "/api/billing/checkout"
+          : action === "studio-review"
+            ? "/api/studio/review"
+            : "/api/runs/" + action;
         const shouldApply = action === "loop" || event.target?.dataset?.apply === "true";
         const body = JSON.stringify({ apply: shouldApply });
         const payload = await api(route, { method: "POST", body });

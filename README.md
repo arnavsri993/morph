@@ -2,7 +2,7 @@
 
 Morph Studio is an interactive review experience for agent-written frontend. It scans generated UI for design-system drift, shows a before/after product review, explains why the drift matters, and emits machine-readable repair patches an agent can apply before a human reviews the PR.
 
-This repo is a RAISE Summit Hackathon demo for the Cursor track: a local product fixture, seeded agent drift, verifier, repair loop, JSON receipts, stored runs, an interactive Morph Studio app, a small product API, an auth/billing-ready app shell, CI, and tests.
+This repo is a RAISE Summit Hackathon demo for the Cursor track: a local product fixture, seeded agent drift, verifier, isolated Studio review loop, JSON receipts, stored runs, an interactive Morph Studio app, a small product API, an auth/billing-ready app shell, CI, and tests.
 
 ## Why this exists
 
@@ -48,7 +48,7 @@ morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 - `repair` generates deterministic replacements and can apply them.
 - `loop` runs verify, repair, verify again, then returns a final CI gate.
 - `demo` copies the seeded fixture, repairs the copy, and writes judge receipts.
-- `serve` starts Morph Studio and the API backed by `.morph/runs`.
+- `serve` starts Morph Studio and the API backed by `.morph/runs`. Studio full reviews run on `.studio-run/project` so the seeded fixture stays reusable.
 
 ## Demo flow
 
