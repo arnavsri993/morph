@@ -12,6 +12,9 @@ export const SPONSOR_IDS = [
   "suse"
 ];
 
+const AI_FETCH_TIMEOUT_MS = 20_000;
+const SPONSOR_ENRICHMENT_TIMEOUT_MS = 25_000;
+
 const PROVIDER_DEFS = {
   openrouter: {
     sponsor: "openrouter",
@@ -254,7 +257,13 @@ export async function runSponsorEnrichment(options = {}) {
     tasks.push(runTaggedTask("cloudflare", prompt, PROVIDER_DEFS.cloudflare.defaultModel));
   }
 
-  const settled = await Promise.allSettled(tasks);
+  const enrichment = await Promise.race([
+    Promise.allSettled(tasks).then((results) => ({ results })),
+    new Promise((resolve) => {
+      setTimeout(() => resolve({ results: [] }), SPONSOR_ENRICHMENT_TIMEOUT_MS);
+    })
+  ]);
+  const settled = enrichment.results;
   const results = {};
   for (const entry of settled) {
     if (entry.status !== "fulfilled" || !entry.value) continue;
@@ -350,7 +359,8 @@ async function openAiCompatibleChat(providerId, options) {
   const response = await fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(AI_FETCH_TIMEOUT_MS)
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -386,7 +396,8 @@ async function cloudflareChat(options) {
         model,
         messages: options.messages,
         max_tokens: options.maxTokens ?? 500
-      })
+      }),
+      signal: AbortSignal.timeout(AI_FETCH_TIMEOUT_MS)
     }
   );
   const payload = await response.json().catch(() => ({}));

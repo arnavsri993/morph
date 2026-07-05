@@ -39,6 +39,10 @@ function parsePreviewUrl(url) {
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+const PLAYWRIGHT_GOTO_TIMEOUT_MS = 30_000;
+const PLAYWRIGHT_CSS_TIMEOUT_MS = 12_000;
+const REMOTE_FETCH_TIMEOUT_MS = 12_000;
+
 export function assessCaptureQuality(html) {
   const source = String(html ?? "");
   const linkCount = (source.match(/<a\b/gi) ?? []).length;
@@ -152,7 +156,7 @@ async function captureWithPlaywright(parsed, options = {}) {
     const page = await context.newPage();
     await page.goto(parsed.href, {
       waitUntil: options.waitUntil ?? "domcontentloaded",
-      timeout: options.timeout ?? 45_000
+      timeout: options.timeout ?? PLAYWRIGHT_GOTO_TIMEOUT_MS
     });
     const title = await page.title();
     const html = await page.content();
@@ -169,20 +173,29 @@ async function captureWithPlaywright(parsed, options = {}) {
       throw error;
     }
     const css = await page.evaluate(async () => {
+      const fetchStylesheet = (href) => new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(""), 4000);
+        fetch(href)
+          .then((response) => (response.ok ? response.text() : ""))
+          .then((text) => {
+            clearTimeout(timer);
+            resolve(text || "");
+          })
+          .catch(() => {
+            clearTimeout(timer);
+            resolve("");
+          });
+      });
       const chunks = [];
       for (const style of document.querySelectorAll("style")) {
         if (style.textContent?.trim()) chunks.push(style.textContent);
       }
       for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
-        try {
-          const response = await fetch(link.href);
-          if (response.ok) chunks.push(await response.text());
-        } catch {
-          // unreadable remote stylesheet
-        }
+        const text = await fetchStylesheet(link.href);
+        if (text.trim()) chunks.push(text);
       }
       return chunks.join("\n");
-    });
+    }, { timeout: PLAYWRIGHT_CSS_TIMEOUT_MS });
     const screenshotBase64 = options.screenshot === false
       ? null
       : (await page.screenshot({ type: "png" })).toString("base64");
@@ -253,7 +266,7 @@ async function collectRemoteCss(html, baseUrl) {
     }
     if (!/^https?:/i.test(resolved)) continue;
     try {
-      const response = await fetch(resolved);
+      const response = await fetch(resolved, { signal: AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS) });
       if (response.ok) chunks.push(await response.text());
     } catch {
       // unreadable remote stylesheet
@@ -361,7 +374,7 @@ export async function fetchPageForTransform(url, outputDir) {
   }
 
   try {
-    const capture = await captureWithPlaywright(parsed, { waitUntil: "networkidle" });
+    const capture = await captureWithPlaywright(parsed, { waitUntil: "domcontentloaded" });
     const html = injectCapturedCss(capture.html, capture.css);
     await mkdir(outputDir, { recursive: true });
     const entryPath = path.join(outputDir, "index.html");

@@ -2705,15 +2705,26 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       updateNarrateButton();
     }
 
-    async function api(path, options) {
+    async function api(path, options, requestOptions) {
+      const timeoutMs = requestOptions?.timeoutMs ?? 0;
+      const controller = timeoutMs > 0 ? new AbortController() : null;
+      const timer = timeoutMs > 0
+        ? setTimeout(() => controller.abort(), timeoutMs)
+        : null;
       let response;
       try {
         response = await fetch(path, {
           headers: { "content-type": "application/json" },
-          ...options
+          ...options,
+          signal: controller?.signal
         });
-      } catch {
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          throw new Error("Review timed out after " + Math.round(timeoutMs / 1000) + " seconds. Try the demo site or a simpler URL.");
+        }
         throw new Error("Could not reach morph. Start the server with npm run serve, then try again.");
+      } finally {
+        if (timer) clearTimeout(timer);
       }
       const raw = await response.text();
       let payload = null;
@@ -2868,6 +2879,23 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       updateNarrateButton();
     }
 
+    let reviewProgressTimer = null;
+
+    function startReviewProgress() {
+      stopReviewProgress();
+      const started = Date.now();
+      reviewProgressTimer = setInterval(() => {
+        const seconds = Math.max(1, Math.floor((Date.now() - started) / 1000));
+        setRunStatus("Running full review… " + seconds + "s elapsed (usually 30–90s).", "pending");
+      }, 2000);
+    }
+
+    function stopReviewProgress() {
+      if (!reviewProgressTimer) return;
+      clearInterval(reviewProgressTimer);
+      reviewProgressTimer = null;
+    }
+
     document.addEventListener("click", async (event) => {
       const trigger = event.target instanceof Element ? event.target.closest("[data-action]") : null;
       if (!trigger) return;
@@ -2885,6 +2913,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       }
       if (action === "studio-review") setRunBusy(true);
       else trigger.disabled = true;
+      if (action === "studio-review") startReviewProgress();
       try {
         const route = action === "studio-review"
           ? "/api/studio/review"
@@ -2892,7 +2921,9 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         const shouldApply = action === "loop" || trigger.dataset.apply === "true";
         const reviewBody = action === "studio-review" ? buildReviewRequest() : { apply: shouldApply };
         const body = JSON.stringify(reviewBody);
-        const payload = await api(route, { method: "POST", body });
+        const payload = await api(route, { method: "POST", body }, {
+          timeoutMs: action === "studio-review" ? 180_000 : 0
+        });
         selectedRunId = payload.run?.id ?? null;
         renderPayload(payload);
         await refreshRuns();
@@ -2912,6 +2943,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
             : ""
         });
       } finally {
+        if (action === "studio-review") stopReviewProgress();
         if (action === "studio-review") setRunBusy(false);
         else trigger.disabled = false;
       }
