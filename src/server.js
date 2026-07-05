@@ -17,6 +17,9 @@ import {
 } from "./auth.js";
 import {
   BillingError,
+  billingPageHtml,
+  billingPanelHtml,
+  billingStyles,
   createBillingManager,
   maskSecret,
   readBillingState,
@@ -113,7 +116,17 @@ export async function serveMorph(config, options = {}) {
       }
 
       if (request.method === "GET" && (url.pathname === "/studio" || url.pathname === "/studio/")) {
-        return sendHtml(response, await dashboardHtml(config, session, runtimeAuth, auth.getAppUrl(request, host, port)));
+        return sendHtml(response, await dashboardHtml(config, session, runtimeAuth, auth.getAppUrl(request, host, port), billing));
+      }
+
+      if (request.method === "GET" && url.pathname === "/billing") {
+        const billingState = await readBillingState(config);
+        return sendHtml(response, billingPageHtml({
+          subscription: billingState.subscription ?? {},
+          billingMode: billing.getBillingMode(),
+          checkoutConfigured: billing.isCheckoutConfigured(),
+          webhookConfigured: billing.isWebhookConfigured()
+        }));
       }
 
       if (request.method === "GET" && url.pathname === "/api/health") {
@@ -876,7 +889,14 @@ function renderGithubConnectBlock({ githubConnected, githubLabel, githubConfigur
           </div>`;
 }
 
-async function dashboardHtml(config, session, runtimeAuth, appUrl) {
+async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
+  const billingState = await readBillingState(config);
+  const billingBlock = billingPanelHtml({
+    subscription: billingState.subscription ?? {},
+    billingMode: billing.getBillingMode(),
+    checkoutConfigured: billing.isCheckoutConfigured(),
+    webhookConfigured: billing.isWebhookConfigured()
+  });
   const workspaceName = escapeHtml(config.workspace?.name ?? "Local Workspace");
   const projectName = escapeHtml(config.projectName ?? "Project");
   const githubConnected = session?.provider === "github";
@@ -1936,6 +1956,8 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     @media (prefers-reduced-motion: reduce) {
       * { transition-duration: 0.01ms !important; animation: none !important; }
     }
+
+    ${billingStyles()}
   </style>
 </head>
 <body>
@@ -1953,6 +1975,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       <nav class="nav-links" aria-label="Studio sections">
         <a class="nav-link active" href="#overview" aria-current="page">Overview</a>
         <a class="nav-link" href="#history">History</a>
+        <a class="nav-link" href="#billing">Billing</a>
       </nav>
     </div>
     <div class="nav-right">
@@ -2061,6 +2084,8 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
           <div id="outputReadable" class="readable"></div>
         </div>
       </section>
+
+      ${billingBlock}
 
       <p class="foot-note">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -2657,12 +2682,65 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       output.textContent = text;
     }
 
+    const billingStripeForm = document.querySelector("#billingStripeForm");
+    const billingStripeStatus = document.querySelector("#billingStripeStatus");
+    billingStripeForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const secretKey = document.querySelector("#stripeSecretKey")?.value.trim() || "";
+      const priceId = document.querySelector("#stripePriceId")?.value.trim() || "";
+      const webhookSecret = document.querySelector("#stripeWebhookSecret")?.value.trim() || "";
+      if (!secretKey || !priceId) {
+        if (billingStripeStatus) {
+          billingStripeStatus.hidden = false;
+          billingStripeStatus.textContent = "Secret key and price ID are required.";
+        }
+        return;
+      }
+      if (billingStripeStatus) {
+        billingStripeStatus.hidden = false;
+        billingStripeStatus.textContent = "Saving credentials…";
+      }
+      try {
+        await api("/api/billing/stripe", {
+          method: "POST",
+          body: JSON.stringify({ secretKey, priceId, webhookSecret: webhookSecret || undefined })
+        });
+        window.location.href = "/studio?billing=saved#billing";
+      } catch (error) {
+        if (billingStripeStatus) {
+          billingStripeStatus.textContent = error.message || "Could not save Stripe credentials.";
+        }
+      }
+    });
+
     document.addEventListener("click", async (event) => {
       const trigger = event.target instanceof Element ? event.target.closest("[data-action]") : null;
       if (!trigger) return;
 
       const action = trigger.dataset.action;
       if (!action) return;
+      if (action === "billing-checkout") {
+        trigger.disabled = true;
+        try {
+          const checkout = await api("/api/billing/checkout", { method: "POST", body: "{}" });
+          if (checkout.url) {
+            window.location.href = checkout.url;
+            return;
+          }
+          if (billingStripeStatus) {
+            billingStripeStatus.hidden = false;
+            billingStripeStatus.textContent = checkout.message || "Checkout is stubbed until Stripe credentials are saved.";
+          }
+        } catch (error) {
+          if (billingStripeStatus) {
+            billingStripeStatus.hidden = false;
+            billingStripeStatus.textContent = error.message || "Checkout failed.";
+          }
+        } finally {
+          trigger.disabled = false;
+        }
+        return;
+      }
       if (action === "studio-review") {
         outputReadable.innerHTML = '<div class="welcome"><p>Running full review…</p></div>';
         output.style.display = "none";
@@ -2704,6 +2782,10 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         await refreshRuns();
         showWelcome();
         updateSourceBadge();
+        const billingQuery = new URLSearchParams(window.location.search).get("billing");
+        if (billingQuery === "success" || billingQuery === "saved") {
+          document.querySelector("#billing")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
         setState("Ready — run full review", "ok");
       } catch (error) {
         const msg = error.message || String(error);
