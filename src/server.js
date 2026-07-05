@@ -356,7 +356,7 @@ async function runStudioReview(config, options = {}) {
 
   if (source !== "fixture") {
     const resolved = resolveStudioSource(options);
-    if (resolved.source === "github" || resolved.source === "url") {
+    if (resolved.source === "github" || resolved.source === "url" || resolved.source === "demo") {
       return runTransformReview(config, {
         runId,
         source: resolved.source,
@@ -489,6 +489,8 @@ async function runTransformReview(config, {
         throw new HttpError(422, "site_unreadable", preview.error || unreadableRepoMessage());
       }
     }
+  } else if (source === "demo" || isBundledDemoPreviewUrl(previewUrl)) {
+    preview = await loadBundledDemoCheckout(checkoutRoot);
   } else {
     preview = await fetchPageForTransform(previewUrl, checkoutRoot);
     if (preview.status !== "captured") {
@@ -526,15 +528,25 @@ async function runTransformReview(config, {
         "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
         `Possible score after redesign: ${after.score}/100. Preview at ${transformedPreviewPath}.`
       ]
-    : [
-        `Fetch live site at ${previewUrl}.`,
-        `Score the current UI: ${before.score}/100.`,
-        "Research the live site: meta, audience, navigation, sections, events, partners, and social proof.",
-        `Mapped ${transform.siteResearch?.cardCount ?? 0} content blocks and ${transform.siteResearch?.topics?.length ?? 0} key topics before redesign.`,
-        `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
-        "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
-        `Possible score after redesign: ${after.score}/100. Preview at ${transformedPreviewPath}.`
-      ];
+    : source === "demo"
+      ? [
+          "Load bundled agent landing demo fixture.",
+          `Score the current UI: ${before.score}/100.`,
+          "Research the live site: meta, audience, navigation, sections, events, partners, and social proof.",
+          `Mapped ${transform.siteResearch?.cardCount ?? 0} content blocks and ${transform.siteResearch?.topics?.length ?? 0} key topics before redesign.`,
+          `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
+          "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
+          `Possible score after redesign: ${after.score}/100. Preview at ${transformedPreviewPath}.`
+        ]
+      : [
+          `Fetch live site at ${previewUrl}.`,
+          `Score the current UI: ${before.score}/100.`,
+          "Research the live site: meta, audience, navigation, sections, events, partners, and social proof.",
+          `Mapped ${transform.siteResearch?.cardCount ?? 0} content blocks and ${transform.siteResearch?.topics?.length ?? 0} key topics before redesign.`,
+          `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
+          "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
+          `Possible score after redesign: ${after.score}/100. Preview at ${transformedPreviewPath}.`
+        ];
 
   return {
     schemaVersion: "morph.studio-review.v1",
@@ -595,6 +607,37 @@ async function assertCheckoutIsScannable(checkoutRoot) {
 
 function unreadableRepoMessage() {
   return "This repo has no scannable HTML page. Framework repos (Next.js, React, Vite) usually need a deployed preview — switch to Preview URL and paste your live site.";
+}
+
+function isBundledDemoPreviewUrl(previewUrl) {
+  const raw = String(previewUrl ?? "").trim();
+  if (!raw) return false;
+  try {
+    const parsed = new URL(normalizePreviewUrlInput(raw));
+    return parsed.pathname.replace(/\/$/, "") === "/demo/agent-landing";
+  } catch {
+    return false;
+  }
+}
+
+async function loadBundledDemoCheckout(checkoutRoot) {
+  const entrySource = path.join(DEMO_LANDING_DIR, "index.html");
+  if (!existsSync(entrySource)) {
+    throw new HttpError(422, "demo_unavailable", "Demo landing page is unavailable on this deployment.");
+  }
+  await copyFixtureForDemo(DEMO_LANDING_DIR, checkoutRoot);
+  const entryPath = path.join(checkoutRoot, "index.html");
+  const html = await readFile(entryPath, "utf8");
+  const title = html.match(/<title[^>]*>([^<]*)</i)?.[1]?.trim() || "Agent-built landing (demo)";
+  return {
+    url: "fixture://codex-landing",
+    title,
+    screenshotBase64: null,
+    capturedAt: new Date().toISOString(),
+    method: "fixture",
+    status: "captured",
+    entry: entryPath
+  };
 }
 
 async function readPackageHomepage(checkoutRoot) {
@@ -774,6 +817,10 @@ function resolveStudioSource(options) {
     }
   }
 
+  if (source === "url" && isBundledDemoPreviewUrl(previewUrl)) {
+    return { source: "demo", previewUrl: null, githubRepo: null };
+  }
+
   if (source === "github" && !previewUrl && looksLikePreviewUrl(githubRepo)) {
     return { source: "url", previewUrl: String(options.githubRepo ?? "").trim(), githubRepo: null };
   }
@@ -802,7 +849,11 @@ function resolveStudioSource(options) {
     return { source: "github", previewUrl: null, githubRepo };
   }
 
-  throw new HttpError(400, "invalid_source", "Source must be github or url.");
+  if (source === "demo") {
+    return { source: "demo", previewUrl: null, githubRepo: null };
+  }
+
+  throw new HttpError(400, "invalid_source", "Source must be github, url, or demo.");
 }
 
 async function readJson(request) {
@@ -2261,6 +2312,15 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       }
     });
 
+    function isDemoPreviewUrl(value) {
+      try {
+        const parsed = new URL(normalizeWebUrl(value));
+        return parsed.pathname.replace(/\\/$/, "") === "/demo/agent-landing";
+      } catch {
+        return false;
+      }
+    }
+
     function buildReviewRequest() {
       const instructions = agentInstructionsInput?.value.trim() || "";
       const previewUrl = normalizeWebUrl(previewUrlInput?.value.trim() || "");
@@ -2281,6 +2341,9 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
 
       if (activeSource === "url") {
         if (!previewUrl) throw new Error("Enter a web URL or switch to GitHub.");
+        if (isDemoPreviewUrl(previewUrl)) {
+          return { source: "demo", instructions };
+        }
         if (!looksLikeHttpUrl(previewUrl)) {
           throw new Error("Enter a website address like cursor.com or https://cursor.com.");
         }
@@ -2288,6 +2351,26 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       }
 
       throw new Error("Choose GitHub or Preview URL.");
+    }
+
+    function reviewFailureHint(message) {
+      const text = String(message ?? "");
+      if (text.includes("npm run serve")) {
+        return "In this repo: npm run serve — then open http://127.0.0.1:4177/studio";
+      }
+      if (/no scannable HTML|Framework repos/i.test(text)) {
+        return "Framework repos need a live preview. Switch to Preview URL and paste your deployed site (for example " + window.location.origin + ").";
+      }
+      if (/timed out|timeout/i.test(text)) {
+        return "This site took too long to scan. Click Try demo site or use a simpler URL like cursor.com.";
+      }
+      if (/blocked|unreadable|bot-check|login/i.test(text)) {
+        return "Try cursor.com, click Try demo site, or paste a public site that does not require login.";
+      }
+      if (/Enter a GitHub|Enter a web URL|Choose GitHub/i.test(text)) {
+        return "Pick Preview URL or GitHub, fill the field, then run again.";
+      }
+      return "Click Try demo site for a guaranteed walkthrough, or try cursor.com / your live preview URL.";
     }
 
     function renderPreviewCapture(preview) {
@@ -2936,11 +3019,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         }
         showFailure(error, {
           title: action === "studio-review" ? "Review failed" : "Request failed",
-          hint: action === "studio-review"
-            ? message.includes("npm run serve")
-              ? "In this repo: npm run serve — then open http://127.0.0.1:4177/studio"
-              : "No scores were generated. Try cursor.com or https://yoursite.com, or paste a GitHub repo (owner/repo)."
-            : ""
+          hint: action === "studio-review" ? reviewFailureHint(message) : ""
         });
       } finally {
         if (action === "studio-review") stopReviewProgress();

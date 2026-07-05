@@ -496,6 +496,45 @@ test("studio review scores preview url and shows current vs possible", async () 
   }
 });
 
+test("studio review demo source uses bundled fixture without network capture", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-demo-"));
+  const configPath = path.join(tempRoot, "morph.config.json");
+  await writeFile(configPath, `${JSON.stringify({
+    projectName: "Acme Studio Demo",
+    projectId: "acme-studio-demo",
+    projectRoot: "fixtures/acme-saas",
+    morphDir: ".morph",
+    tokenFiles: ["design-system/tokens.css"],
+    scan: ["src/**/*.tsx"],
+    gate: {
+      minScore: 95
+    }
+  }, null, 2)}\n`);
+
+  const config = await loadConfig(configPath, tempRoot);
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
+
+  try {
+    const response = await fetch(`${url}/api/studio/review`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ source: "demo" })
+    });
+    assert.equal(response.status, 201);
+    const payload = await response.json();
+    const review = payload.run.payload;
+    assert.equal(review.source, "demo");
+    assert.equal(review.engine, "design_db_transform");
+    assert.equal(review.preview?.method, "fixture");
+    assert.equal(review.before.score < 70, true);
+    assert.equal(review.after.score >= 80, true);
+    assert.equal(review.currentScore, review.before.score);
+    assert.equal(review.possibleScore, review.after.score);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test("studio review rejects requests without github repo or preview url", async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-missing-"));
   const fixtureRoot = path.join(tempRoot, "acme-saas");
@@ -1010,6 +1049,8 @@ test("transform re-renders an ugly site into a passing design-database page", as
   assert.equal(outputCss.includes("--primary"), true);
   assert.equal(outputCss.includes("focus-visible"), true);
   assert.equal(outputCss.includes("@media"), true);
+  assert.match(outputCss, /--space-6:\s*32px/);
+  assert.doesNotMatch(outputCss, /--space-6:\s*var\(--space-6\)/);
 });
 
 test("normalizePreviewUrlInput adds https for bare domains", () => {
