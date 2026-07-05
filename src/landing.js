@@ -17,10 +17,10 @@ export function landingHtml(config, session) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Morph — CI for agent-written frontend</title>
-  <meta name="description" content="Morph catches design-system drift in AI-generated frontend, explains every violation, and emits deterministic repair patches before a PR reaches human review.">
-  <meta property="og:title" content="Morph — CI for agent-written frontend">
-  <meta property="og:description" content="AI writes the UI. Morph makes it belong.">
+  <title>morph — CI for agent-written frontend</title>
+  <meta name="description" content="morph catches design-system drift in AI-generated frontend, explains every violation, and emits deterministic repair patches before a PR reaches human review.">
+  <meta property="og:title" content="morph — CI for agent-written frontend">
+  <meta property="og:description" content="AI writes the UI. morph makes it belong.">
   <meta property="og:type" content="website">
   <meta name="theme-color" content="#09090b">
   ${headLinks()}
@@ -182,32 +182,6 @@ export function landingHtml(config, session) {
     .hero {
       padding: clamp(64px, 10vw, 112px) 0 clamp(48px, 8vw, 72px);
       text-align: center;
-    }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 28px;
-      padding: 6px 14px 6px 8px;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 500;
-      animation: fade-up 0.7s var(--ease) both;
-    }
-    .badge-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--ok);
-      box-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
-      animation: pulse-dot 2.4s ease-in-out infinite;
-    }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(0.85); }
     }
     h1 {
       margin: 0 auto 20px;
@@ -898,12 +872,8 @@ export function landingHtml(config, session) {
 
     <section class="hero">
       <div class="shell">
-        <div class="badge">
-          <span class="badge-dot"></span>
-          Interactive review for agent-written UI
-        </div>
-        <h1>AI writes the UI. <span class="gradient">Morph makes it belong.</span></h1>
-        <p class="lede">Connect a repo or preview URL in Studio. Morph scans for drift, shows before/after, and applies deterministic repairs — no terminal required.</p>
+        <h1>AI writes the UI. <span class="gradient">morph makes it belong.</span></h1>
+        <p class="lede">Connect a repo or preview URL in Studio. morph scans for drift, shows before/after, and applies deterministic repairs — no terminal required.</p>
         <div class="hero-actions">
           <a class="btn btn-primary btn-lg" href="/studio">
             Launch Studio
@@ -912,7 +882,7 @@ export function landingHtml(config, session) {
           <a class="btn btn-ghost btn-lg" href="#demo">See how it works</a>
         </div>
 
-        <div class="studio-mock" id="heroMock" aria-label="Morph Studio review preview">
+        <div class="studio-mock" id="heroMock" aria-label="morph Studio review preview">
           <div class="mock-bar">
             <div class="mock-repo">
               <strong>acme/control-plane</strong>
@@ -948,7 +918,7 @@ export function landingHtml(config, session) {
         <div class="section-head center reveal">
           <span class="section-label">Product</span>
           <h2>One gate. Four engines.</h2>
-          <p class="section-desc">Morph native rules, Buoy health scoring, ESLint token linting, and axe accessibility — unified in a single Studio review.</p>
+          <p class="section-desc">morph native rules, Buoy health scoring, ESLint token linting, and axe accessibility — unified in a single Studio review.</p>
         </div>
         <div class="bento">
           <div class="bento-card reveal" data-spotlight>
@@ -981,7 +951,7 @@ export function landingHtml(config, session) {
         <div class="section-head reveal">
           <span class="section-label">Demo</span>
           <h2>From drift to merge-ready in Studio</h2>
-          <p class="section-desc">Connect a GitHub repo or paste a preview URL. Morph runs the full review loop and shows exactly what changed.</p>
+          <p class="section-desc">Connect a GitHub repo or paste a preview URL. morph runs the full review loop and shows exactly what changed.</p>
         </div>
 
         <div class="pipeline reveal" id="pipeline">
@@ -1141,7 +1111,7 @@ export function landingHtml(config, session) {
         </div>
       </div>
       <div class="foot-bottom">
-        <span>© <span id="year">2026</span> Morph · MIT licensed</span>
+        <span>© <span id="year">2026</span> morph · MIT licensed</span>
         <span>Built for serious agent frontend review.</span>
       </div>
     </div>

@@ -1,4 +1,4 @@
-// Morph Design Intelligence Database — page layout archetypes.
+// morph Design Intelligence Database — page layout archetypes.
 //
 // Archetypes define how extracted content is composed into a full page:
 // hero variant, section order, and default pattern set.

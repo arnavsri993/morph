@@ -1,4 +1,4 @@
-// Morph Design Intelligence Database — UI quality heuristics.
+// morph Design Intelligence Database — UI quality heuristics.
 //
 // Rules that detect the fingerprints of quickly-generated, unpolished web UI.
 // Each rule inspects the combined HTML and CSS of a page and returns findings.

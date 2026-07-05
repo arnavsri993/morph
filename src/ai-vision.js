@@ -1,6 +1,6 @@
-// Morph AI vision — optional reference-image analysis and mockup generation.
+// morph AI vision — optional reference-image analysis and mockup generation.
 //
-// When OPENAI_API_KEY is set, Morph can:
+// When OPENAI_API_KEY is set, morph can:
 //   1. Analyze a reference screenshot/mockup and extract design hints
 //   2. Generate a UI mockup image from site content, then analyze it
 //

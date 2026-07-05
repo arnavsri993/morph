@@ -6,7 +6,7 @@ status: approved
 
 ## Problem
 
-The `<pre id="output">` panel in Morph Studio displays raw JSON. This is useful for developers but hard to read for non-technical users reviewing AI-generated UI reports.
+The `<pre id="output">` panel in morph Studio displays raw JSON. This is useful for developers but hard to read for non-technical users reviewing AI-generated UI reports.
 
 ## Goal
 

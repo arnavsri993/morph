@@ -747,7 +747,7 @@ test("studio github review clones the repo, transforms it, and serves the result
   await copyFixtureForDemo(path.join(repoRoot, "fixtures/codex-landing"), bareRepoDir);
   execFileSync("git", ["init", "--quiet"], { cwd: bareRepoDir });
   execFileSync("git", ["add", "."], { cwd: bareRepoDir });
-  execFileSync("git", ["-c", "user.email=test@morph.dev", "-c", "user.name=Morph Test", "commit", "--quiet", "-m", "fast codex site"], { cwd: bareRepoDir });
+  execFileSync("git", ["-c", "user.email=test@morph.dev", "-c", "user.name=morph Test", "commit", "--quiet", "-m", "fast codex site"], { cwd: bareRepoDir });
 
   const fixtureRoot = path.join(tempRoot, "acme-saas");
   await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);

@@ -62,7 +62,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Morph
+  console.log(`morph
 
 Usage:
   morph init [--project-name "Acme"] [--force] [--json]
@@ -82,9 +82,9 @@ Commands:
   repair     Generate or apply deterministic patch suggestions from the report.
   loop       Verify, repair, verify again, and emit a final pass/fail gate.
   transform  Re-render an arbitrary site with a frontier-grade design profile
-             selected from Morph's design intelligence database.
+             selected from morph's design intelligence database.
   demo       Run the bundled Acme SaaS judge demo.
-  serve      Start the local Morph control plane and JSON API.
+  serve      Start the local morph control plane and JSON API.
 `);
 }
 
@@ -107,7 +107,7 @@ async function main() {
     });
     if (args.json) console.log(JSON.stringify(result, null, 2));
     else {
-      console.log(`Initialized Morph for ${result.projectName}.`);
+      console.log(`Initialized morph for ${result.projectName}.`);
       for (const item of result.created) console.log(`- ${item}`);
     }
     return;
@@ -174,7 +174,7 @@ async function main() {
     const result = await repairProject(config, { apply: args.apply });
     if (args.json) console.log(JSON.stringify(result, null, 2));
     else {
-      console.log(args.apply ? "Applied Morph repair plan." : "Generated Morph repair plan.");
+      console.log(args.apply ? "Applied morph repair plan." : "Generated morph repair plan.");
       console.log(`${result.patches.length} file patch(es), ${result.replacements} replacement(s).`);
       for (const patch of result.patches) console.log(`- ${patch.file}`);
     }
@@ -193,7 +193,7 @@ async function main() {
     }
     if (args.json) console.log(JSON.stringify(result, null, 2));
     else {
-      console.log(`Morph loop ${result.finalVerdict.toUpperCase()}.`);
+      console.log(`morph loop ${result.finalVerdict.toUpperCase()}.`);
       console.log(`Before: ${result.before.verdict} (${result.before.score}/100), ${result.before.issues.length} issue(s)`);
       console.log(`Repair: ${result.repair.replacements} replacement(s), apply=${result.applied}`);
       console.log(`After: ${result.after.verdict} (${result.after.score}/100), ${result.after.issues.length} issue(s)`);
@@ -208,7 +208,7 @@ async function main() {
       host: args.host,
       port: args.port
     });
-    console.log(`Morph control plane: ${url}`);
+    console.log(`morph control plane: ${url}`);
     console.log("Press Ctrl+C to stop.");
     return;
   }

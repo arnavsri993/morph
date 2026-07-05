@@ -1,4 +1,4 @@
-// Morph Design Intelligence Database — optional component renderers.
+// morph Design Intelligence Database — optional component renderers.
 //
 // Each renderer returns an HTML section string for patterns selected from
 // the catalog. Styles live in componentStyles().

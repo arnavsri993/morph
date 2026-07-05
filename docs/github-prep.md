@@ -1,6 +1,6 @@
 # Release Checklist
 
-Use this before publishing or handing Morph to another team.
+Use this before publishing or handing morph to another team.
 
 ## Repository
 
@@ -25,7 +25,7 @@ npm run demo
 
 ```bash
 git add .
-git commit -m "Productize Morph review workflow"
+git commit -m "Productize morph review workflow"
 gh repo create morph --source=. --remote=origin --push
 gh repo edit --description "CI and Studio review for agent-written frontend."
 ```

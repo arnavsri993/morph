@@ -1,11 +1,11 @@
 {
-  "projectName": "Morph Product Smoke",
+  "projectName": "morph Product Smoke",
   "projectId": "morph-product-smoke",
   "projectRoot": "fixtures/acme-saas-clean",
   "morphDir": ".morph",
   "workspace": {
     "id": "morph-local-workspace",
-    "name": "Morph Local Workspace",
+    "name": "morph Local Workspace",
     "authMode": "dev"
   },
   "tokenFiles": [

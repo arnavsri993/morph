@@ -1,8 +1,8 @@
-// Morph Design Source Index.
+// morph Design Source Index.
 //
 // This is the scalable layer above the named reference corpus. It does not
 // vendor millions of web pages into the repo. Instead it models the aggregate
-// signal families Morph should learn from when a large crawler/export is
+// signal families morph should learn from when a large crawler/export is
 // attached later: curated sites, design systems, component libraries, product
 // screenshots, awards galleries, templates, and accessibility examples.
 

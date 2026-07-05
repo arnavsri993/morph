@@ -1,4 +1,4 @@
-// Morph Design Intelligence Database — public API.
+// morph Design Intelligence Database — public API.
 
 import { DESIGN_PROFILES, getProfile } from "./profiles.js";
 import { UI_HEURISTICS, assessUiQuality } from "./heuristics.js";

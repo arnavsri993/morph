@@ -1,4 +1,4 @@
-// Morph transform engine.
+// morph transform engine.
 //
 // Takes an arbitrary (usually agent-generated) website, extracts its content,
 // scores its UI quality against the design intelligence database heuristics,
@@ -25,7 +25,7 @@ import { mergeUiQualityAssessments, assessCssHealth } from "./scanners/design-he
 export async function transformSite(inputDir, outputDir, options = {}) {
   const entry = await findEntryHtml(inputDir);
   if (!entry) {
-    throw new Error(`No HTML entry point found under ${inputDir}. Morph transform needs at least one .html file.`);
+    throw new Error(`No HTML entry point found under ${inputDir}. morph transform needs at least one .html file.`);
   }
 
   const html = await readFile(entry, "utf8");
@@ -172,7 +172,7 @@ function buildSummary(plan, before, after, aiHints) {
     ? ` Matched ${plan.retrieval.topReference.name} (${plan.retrieval.topReference.tier}) from a ${plan.retrieval.corpusSize}-site reference corpus.`
     : "";
   const aiNote = aiHints?.layoutNotes ? ` AI reference: ${aiHints.layoutNotes}.` : "";
-  return `Morph re-rendered the site with ${plan.profile.profile.name} (${plan.archetype.archetype.name} layout, ${plan.patterns.length} UI patterns): UI quality ${before.score}/100 → ${after.score}/100.${refNote}${aiNote}`;
+  return `morph re-rendered the site with ${plan.profile.profile.name} (${plan.archetype.archetype.name} layout, ${plan.patterns.length} UI patterns): UI quality ${before.score}/100 → ${after.score}/100.${refNote}${aiNote}`;
 }
 
 export async function findEntryHtml(rootDir) {

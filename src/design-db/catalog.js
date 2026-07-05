@@ -1,4 +1,4 @@
-// Morph Design Intelligence Database — UI pattern catalog.
+// morph Design Intelligence Database — UI pattern catalog.
 //
 // A searchable library of production-grade web UI patterns distilled from
 // frontier product sites. Patterns are tagged by category, industry, and

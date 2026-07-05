@@ -300,8 +300,8 @@ export async function loopProject(config, options = {}) {
     finalVerdict: after.verdict,
     passed: after.verdict === "pass",
     ciSummary: after.verdict === "pass"
-      ? "Morph loop passed after deterministic repair."
-      : "Morph loop still fails. Escalate remaining findings to a human or expand grammar rules."
+      ? "morph loop passed after deterministic repair."
+      : "morph loop still fails. Escalate remaining findings to a human or expand grammar rules."
   };
 }
 
@@ -879,7 +879,7 @@ function buildCiSummary(score, issues) {
   return [
     `FAIL: score ${score}/100.`,
     `${summary.high} high, ${summary.medium} medium, ${summary.low} low finding(s).`,
-    "Block merge until Morph repair or explicit grammar approval."
+    "Block merge until morph repair or explicit grammar approval."
   ].join(" ");
 }
 
@@ -968,7 +968,7 @@ function defaultConfig(projectName) {
 }
 
 function defaultEnvExample() {
-  return `# Morph product shell
+  return `# morph product shell
 MORPH_AUTH_MODE=dev
 AUTH_SECRET=replace-with-a-long-random-value
 

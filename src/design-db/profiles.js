@@ -1,4 +1,4 @@
-// Morph Design Intelligence Database — design profiles.
+// morph Design Intelligence Database — design profiles.
 //
 // Each profile is a complete, production-grade design system distilled from
 // the visual grammar of frontier product companies. Profiles are selected by

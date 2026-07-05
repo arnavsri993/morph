@@ -1,11 +1,11 @@
 {
   "schemaVersion": "morph.report.v1",
-  "runId": "verify-20260705045449-c3cd6f",
-  "generatedAt": "2026-07-05T04:54:49.738Z",
-  "durationMs": 0,
+  "runId": "verify-20260705075047-c0be57",
+  "generatedAt": "2026-07-05T07:50:47.837Z",
+  "durationMs": 6,
   "workspace": {
     "id": "morph-demo-workspace",
-    "name": "Morph Demo Workspace",
+    "name": "morph Demo Workspace",
     "authMode": "dev"
   },
   "projectId": "acme-control-plane-demo",
@@ -81,6 +81,58 @@
     "globs": [
       "src/**/*.tsx"
     ]
+  },
+  "engines": {
+    "morph": 0,
+    "eslint": 0,
+    "buoy": 0,
+    "axe": 0,
+    "merged": 0
+  },
+  "health": {
+    "engine": "buoy",
+    "score": 77,
+    "tier": "Good",
+    "pillars": {
+      "valueDiscipline": {
+        "name": "Value Discipline",
+        "score": 60,
+        "maxScore": 60,
+        "description": "Hardcoded values per component"
+      },
+      "tokenHealth": {
+        "name": "Token Health",
+        "score": 10,
+        "maxScore": 20,
+        "description": "Token system adoption"
+      },
+      "consistency": {
+        "name": "Consistency",
+        "score": 3,
+        "maxScore": 10,
+        "description": "Naming convention adherence"
+      },
+      "criticalIssues": {
+        "name": "Critical Issues",
+        "score": 3,
+        "maxScore": 10,
+        "description": "Accessibility and critical failures"
+      }
+    },
+    "suggestions": [
+      "Your weakest area is Token Health (10/20) — improve token definitions and usage"
+    ],
+    "metrics": {
+      "componentCount": 1,
+      "tokenCount": 21,
+      "hardcodedValueCount": 0,
+      "unusedTokenCount": 0,
+      "namingInconsistencyCount": 0,
+      "criticalCount": 0,
+      "hasUtilityFramework": false,
+      "hasDesignSystemLibrary": false,
+      "totalDriftCount": 0
+    }
   },
   "issues": [],
   "remediation": {

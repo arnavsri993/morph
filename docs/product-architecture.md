@@ -1,6 +1,6 @@
-# Morph Product Architecture
+# morph Product Architecture
 
-Morph is the verification layer between AI coding agents and frontend merges. The local CLI is intentionally deterministic, while the server shell models the SaaS surface a team would expect from a serious CI product.
+morph is the verification layer between AI coding agents and frontend merges. The local CLI is intentionally deterministic, while the server shell models the SaaS surface a team would expect from a serious CI product.
 
 ## Core Loop
 
@@ -29,7 +29,7 @@ Morph is the verification layer between AI coding agents and frontend merges. Th
 
 ## Design Intelligence Database
 
-Morph uses two complementary context layers:
+morph uses two complementary context layers:
 
 - A named reference corpus of high-quality product sites with industry, tier, profile, archetype, keyword, and pattern hints.
 - A scalable source index that represents 4M+ aggregate frontend signals across source families such as frontier product sites, public design systems, component libraries, award galleries, SaaS landing pages, commerce/editorial surfaces, mobile web screens, and accessibility exemplars.
@@ -41,7 +41,7 @@ The source index is intentionally compact. It gives the transform engine broad t
 The built-in server stores run records under `.morph/runs` and exposes:
 
 - `GET /` (public landing page — always reachable, even in oauth mode)
-- `GET /studio` (Morph Studio dashboard — session-gated when `MORPH_AUTH_MODE=oauth`)
+- `GET /studio` (morph Studio dashboard — session-gated when `MORPH_AUTH_MODE=oauth`)
 - `GET /login` (SSO buttons when OAuth is configured, a dev-mode explainer when it is not)
 - `GET /api/health`
 - `GET /api/projects`
@@ -75,7 +75,7 @@ The current dependency-free storage shape is intentionally simple:
 ```text
 Workspace
   Project
-    Morph config
+    morph config
     Runs
       Report
       Repair plan

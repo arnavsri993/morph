@@ -309,7 +309,7 @@ export function createAuthManager(config, runtimeAuth) {
     const profileResponse = await fetch("https://api.github.com/user", {
       headers: {
         authorization: `Bearer ${tokenPayload.access_token}`,
-        "user-agent": "Morph-Studio",
+        "user-agent": "morph-Studio",
         accept: "application/json"
       }
     });
@@ -323,7 +323,7 @@ export function createAuthManager(config, runtimeAuth) {
       const emailResponse = await fetch("https://api.github.com/user/emails", {
         headers: {
           authorization: `Bearer ${tokenPayload.access_token}`,
-          "user-agent": "Morph-Studio",
+          "user-agent": "morph-Studio",
           accept: "application/json"
         }
       });
@@ -423,7 +423,7 @@ MORPH_AUTH_MODE=oauth</pre>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Log in · morph</title>
   <meta name="theme-color" content="#050507">
-  <meta name="description" content="Sign in to Morph Studio — review agent UI, run repair loops, and store merge gate receipts.">
+  <meta name="description" content="Sign in to morph Studio — review agent UI, run repair loops, and store merge gate receipts.">
   ${headLinks()}
   <style>
     :root {

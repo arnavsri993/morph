@@ -1,14 +1,14 @@
-# Morph
+# morph
 
-Morph Studio is an interactive review experience for agent-written frontend. It scans generated UI for design-system drift, shows a before/after product review, explains why the drift matters, and emits machine-readable repair patches an agent can apply before a human reviews the PR.
+morph Studio is an interactive review experience for agent-written frontend. It scans generated UI for design-system drift, shows a before/after product review, explains why the drift matters, and emits machine-readable repair patches an agent can apply before a human reviews the PR.
 
-Morph also ships a **design intelligence transform**: point it at any fast agent-generated website (a GitHub repo or a local folder) and it re-renders the site with a frontier-grade design system — curated profiles modeled on the visual grammar of companies like Linear, Stripe, Notion, and Apple — while keeping the original content.
+morph also ships a **design intelligence transform**: point it at any fast agent-generated website (a GitHub repo or a local folder) and it re-renders the site with a frontier-grade design system — curated profiles modeled on the visual grammar of companies like Linear, Stripe, Notion, and Apple — while keeping the original content.
 
-This repo ships the local CLI, an interactive Morph Studio app, JSON receipts, stored runs, a product API, an auth/billing-ready app shell, CI coverage, a clean smoke fixture, and a separate seeded demo fixture for repeatable review walkthroughs.
+This repo ships the local CLI, an interactive morph Studio app, JSON receipts, stored runs, a product API, an auth/billing-ready app shell, CI coverage, a clean smoke fixture, and a separate seeded demo fixture for repeatable review walkthroughs.
 
 ## Why this exists
 
-Coding agents can make UI that works but does not belong in the product. Morph improves the review journey for a real daily workflow: a developer receiving AI-generated frontend and needing to decide whether it is safe, polished, accessible, and consistent enough to merge. Morph gives those teams a consistency layer:
+Coding agents can make UI that works but does not belong in the product. morph improves the review journey for a real daily workflow: a developer receiving AI-generated frontend and needing to decide whether it is safe, polished, accessible, and consistent enough to merge. morph gives those teams a consistency layer:
 
 1. Read product tokens and component grammar.
 2. Scan generated frontend files.
@@ -34,7 +34,7 @@ npm run serve
 After `npm run serve`, open `http://127.0.0.1:4177`:
 
 - `/` is the public product landing page (hero, live CLI demo, pricing, docs).
-- `/studio` is the interactive Morph Studio review dashboard. The `Launch Studio` button on the landing page routes there.
+- `/studio` is the interactive morph Studio review dashboard. The `Launch Studio` button on the landing page routes there.
 - `/login` is the auth entry point: SSO buttons when OAuth is configured, a polished dev-mode state when it is not.
 
 For the repeatable sample review flow, use `DEMO.md`.
@@ -59,7 +59,7 @@ morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 - `loop` runs verify, repair, verify again, then returns a final CI gate.
 - `transform` clones (or reads) an arbitrary site, scores it against the design-quality heuristics, selects the best-matching design profile, and re-renders the whole site — polished HTML plus a generated `morph-theme.css` design system.
 - `demo` copies the seeded fixture, repairs the copy, and writes review receipts.
-- `serve` starts the Morph web app: the landing page at `/`, Morph Studio at `/studio`, and the API backed by `.morph/runs`. Studio full reviews run on `.studio-run/project` so the seeded fixture stays reusable.
+- `serve` starts the morph web app: the landing page at `/`, morph Studio at `/studio`, and the API backed by `.morph/runs`. Studio full reviews run on `.studio-run/project` so the seeded fixture stays reusable.
 
 ## Design intelligence database
 
@@ -71,7 +71,7 @@ morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 - **Source index** (`source-index.js`): the scalable high-end frontend knowledge layer. It models 4M+ source signals across frontier product sites, public design systems, component libraries, award galleries, SaaS pages, commerce/editorial sites, mobile web screens, and accessibility exemplars without vendoring millions of copyrighted pages into the repo.
 - **Retrieval** (`retrieval.js`): combines named references with the source index to choose a profile, archetype, pattern set, source-family context, and high-end dimensions such as composition, visual system, typography, interaction, conversion, responsiveness, trust, and content intelligence.
 
-The Studio GitHub flow uses the same engine end to end: connect a repo, and Morph clones it, scores the incoming UI, transforms it, and serves the result at `/transformed/index.html` with a before/after receipt.
+The Studio GitHub flow uses the same engine end to end: connect a repo, and morph clones it, scores the incoming UI, transforms it, and serves the result at `/transformed/index.html` with a before/after receipt.
 
 ## Sample Review Flow
 
@@ -107,7 +107,7 @@ The source fixture remains seeded so the sample review can be replayed.
 `morph serve` starts a dependency-free Node HTTP server with:
 
 - `GET /` (landing page)
-- `GET /studio` (Morph Studio dashboard)
+- `GET /studio` (morph Studio dashboard)
 - `GET /login` (auth entry)
 - `GET /api/health`
 - `GET /api/projects`
@@ -171,29 +171,29 @@ See `docs/product-architecture.md` for the workspace/project/run model and deplo
 
 ## Product Positioning
 
-Morph is not a generic dashboard and not a screenshot upload tool. It is an interactive review journey plus a machine-readable verification loop for coding agents:
+morph is not a generic dashboard and not a screenshot upload tool. It is an interactive review journey plus a machine-readable verification loop for coding agents:
 
 ```text
-Cursor changes frontend -> Morph Studio review -> JSON findings + patches -> Morph repair -> verify again -> safe to merge
+Cursor changes frontend -> morph Studio review -> JSON findings + patches -> morph repair -> verify again -> safe to merge
 ```
 
 Release and repository hygiene notes live in `docs/github-prep.md`.
 
 ## Scanner engines
 
-Morph verify runs a multi-engine stack (all MIT-licensed, local, deterministic):
+morph verify runs a multi-engine stack (all MIT-licensed, local, deterministic):
 
 | Engine | Package | Role |
 | --- | --- | --- |
-| **Morph** | built-in | Component grammar, focus/responsive drift, agent-native JSON patches |
+| **morph** | built-in | Component grammar, focus/responsive drift, agent-native JSON patches |
 | **Buoy** | `@buoy-design/core` | Token enrichment, CSS health audit, 4-pillar health score |
 | **ESLint** | `eslint-plugin-tailwind-palette-guard`, `@metamask/eslint-plugin-design-tokens` | AST-based Tailwind palette and hex detection |
 | **axe** | `axe-core` + `jsdom` | WCAG accessibility on scanned HTML |
 
 `morph init` also writes `AGENTS.md`, `DESIGN_SYSTEM.md`, and `.cursor/rules/morph-design-system.mdc` — agent guardrails inspired by drift-guard.
 
-Transform uses Buoy CSS health heuristics on the **before** receipt; Morph's design-db still handles profile selection and re-render.
+Transform uses Buoy CSS health heuristics on the **before** receipt; morph's design-db still handles profile selection and re-render.
 
 ## Existing tools checked
 
-Chromatic, Loki, BackstopJS, stylelint, and Lyse cover adjacent pieces (visual regression, token linting, full audits). Morph integrates Buoy + ESLint token plugins directly and keeps its wedge: the agent-native verify → patch → re-verify loop with Studio before/after review.
+Chromatic, Loki, BackstopJS, stylelint, and Lyse cover adjacent pieces (visual regression, token linting, full audits). morph integrates Buoy + ESLint token plugins directly and keeps its wedge: the agent-native verify → patch → re-verify loop with Studio before/after review.

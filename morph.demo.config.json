@@ -5,7 +5,7 @@
   "morphDir": ".morph",
   "workspace": {
     "id": "morph-demo-workspace",
-    "name": "Morph Demo Workspace",
+    "name": "morph Demo Workspace",
     "authMode": "dev"
   },
   "tokenFiles": [

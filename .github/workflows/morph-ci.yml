@@ -1,4 +1,4 @@
-name: Morph CI
+name: morph CI
 
 on:
   pull_request:

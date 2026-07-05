@@ -24,7 +24,7 @@ await writeFile(demoConfigPath, `${JSON.stringify({
   morphDir: ".morph",
   workspace: {
     id: "morph-demo-workspace",
-    name: "Morph Demo Workspace",
+    name: "morph Demo Workspace",
     authMode: "dev"
   },
   tokenFiles: ["design-system/tokens.css"],
@@ -71,20 +71,20 @@ const transcript = [
   before.ciSummary,
   "",
   "$ npm run demo",
-  "Morph demo complete.",
+  "morph demo complete.",
   `Before: ${before.verdict} (${before.score}/100), ${before.issues.length} issue(s)`,
   `Repair: ${repair.replacements} replacement(s) across ${repair.patches.length} file(s)`,
   `After: ${after.verdict} (${after.score}/100), ${after.issues.length} issue(s)`,
   "Reports written to demo/reports/.",
   "",
   "$ npm run serve -- --port 4188",
-  "Morph control plane: http://127.0.0.1:4188",
+  "morph control plane: http://127.0.0.1:4188",
   "Press Ctrl+C to stop.",
   "",
   "$ curl -s http://127.0.0.1:4188/api/health",
   JSON.stringify({
     ok: true,
-    product: "Morph",
+    product: "morph",
     authMode: "dev",
     billingMode: "local"
   }, null, 2),
@@ -93,7 +93,7 @@ const transcript = [
 
 await writeFile(path.join(root, "demo/terminal-transcript.txt"), transcript);
 
-console.log("Morph demo complete.");
+console.log("morph demo complete.");
 console.log(`Before: ${before.verdict} (${before.score}/100), ${before.issues.length} issue(s)`);
 console.log(`Repair: ${repair.replacements} replacement(s) across ${repair.patches.length} file(s)`);
 console.log(`After: ${after.verdict} (${after.score}/100), ${after.issues.length} issue(s)`);

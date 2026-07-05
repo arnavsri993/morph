@@ -1,10 +1,10 @@
-# Morph Sample Review Runbook
+# morph Sample Review Runbook
 
-Morph's sample review story is simple:
+morph's sample review story is simple:
 
 ```text
 A developer gets a Cursor-generated billing screen that works but drifts from the product.
-Morph Studio turns that stressful code-review moment into an interactive before/after review:
+morph Studio turns that stressful code-review moment into an interactive before/after review:
 it catches drift, narrates the critique, emits deterministic patches, applies the repair,
 and proves the branch is safe to review.
 ```
@@ -13,7 +13,7 @@ and proves the branch is safe to review.
 
 - Problem: developers increasingly review AI-generated frontend that compiles but is inconsistent, inaccessible, or off-brand.
 - User journey: inspect the agent output, understand the product-design issues, apply the fix, and see a passing merge gate.
-- Interactive solution: Morph Studio combines before/after UI, issue timeline, JSON receipts, and a repair loop that runs on an isolated review copy so the sample can be repeated safely.
+- Interactive solution: morph Studio combines before/after UI, issue timeline, JSON receipts, and a repair loop that runs on an isolated review copy so the sample can be repeated safely.
 
 ## One-Minute Walkthrough
 
@@ -21,7 +21,7 @@ and proves the branch is safe to review.
 
    ```text
    Cursor can ship UI in seconds, but developers still have to review whether it belongs in the product.
-   Morph Studio is an interactive review flow for agent-written frontend.
+   morph Studio is an interactive review flow for agent-written frontend.
    ```
 
 2. Show the seeded fail:
@@ -46,7 +46,7 @@ and proves the branch is safe to review.
    After: pass (100/100), 0 issue(s)
    ```
 
-4. Show Morph Studio:
+4. Show morph Studio:
 
    ```bash
    npm run serve
@@ -63,23 +63,23 @@ and proves the branch is safe to review.
 6. Close with:
 
    ```text
-   Most agent tools generate more code. Morph improves the human review journey
+   Most agent tools generate more code. morph improves the human review journey
    by making generated frontend understandable, repairable, and safe to merge.
    ```
 
 ## Site Transform Demo
 
-The headline sample: take a website an agent made fast, plug it into Morph through GitHub, and get back a site that looks like a frontier company built it.
+The headline sample: take a website an agent made fast, plug it into morph through GitHub, and get back a site that looks like a frontier company built it.
 
 1. Ask Codex/Cursor to "make a landing page fast" and push it to a GitHub repo. (A bundled stand-in lives at `fixtures/codex-landing` — pure `<center>` tags, inline styles, default fonts.)
-2. Start Morph and open Studio:
+2. Start morph and open Studio:
 
    ```bash
    npm run serve
    ```
 
 3. In Studio, keep the `Connect GitHub` tab, enter `owner/repo`, and click `Run full review`.
-4. Morph clones the repo, scores the UI against its design-quality heuristics (the bundled fixture scores **0/100** with 19 findings), extracts the content, searches a **150+ site reference corpus** (Linear, Stripe, Notion, Apple, etc.) to pick the best-matching design profile, and re-renders the site.
+4. morph clones the repo, scores the UI against its design-quality heuristics (the bundled fixture scores **0/100** with 19 findings), extracts the content, searches a **150+ site reference corpus** (Linear, Stripe, Notion, Apple, etc.) to pick the best-matching design profile, and re-renders the site.
 5. Click `Open transformed site ↗` in the receipt — the result is served at `/transformed/index.html`: gradient hero, glass nav, feature cards, quote band, CTA, fully responsive, **100/100**.
 
 CLI fallback if the network is down:
@@ -112,7 +112,7 @@ Use the web app in this order:
 ## What To Point At
 
 - `fixtures/acme-saas/src/routes/settings/billing.tsx`: the intentionally drifted agent output.
-- `fixtures/acme-saas/design-system/tokens.css`: the product grammar Morph enforces.
+- `fixtures/acme-saas/design-system/tokens.css`: the product grammar morph enforces.
 - `demo/reports/demo-before.json`: failure receipt.
 - `demo/reports/demo-repair.json`: deterministic patch plan.
 - `demo/reports/demo-after.json`: passing gate after repair.

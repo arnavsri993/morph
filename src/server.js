@@ -18,8 +18,6 @@ import {
 } from "./auth.js";
 import {
   billingPageHtml,
-  billingPanelHtml,
-  billingStyles,
   createBillingManager,
   readBillingState
 } from "./billing.js";
@@ -114,7 +112,7 @@ export async function createMorphHandler(config, options = {}) {
       }
 
       if (request.method === "GET" && (url.pathname === "/studio" || url.pathname === "/studio/")) {
-        return sendHtml(response, await dashboardHtml(config, session, runtimeAuth, auth.getAppUrl(request, host, port), billing));
+        return sendHtml(response, await dashboardHtml(config, session, runtimeAuth, auth.getAppUrl(request, host, port)));
       }
 
       if (request.method === "GET" && url.pathname === "/billing") {
@@ -129,7 +127,7 @@ export async function createMorphHandler(config, options = {}) {
         const google = getGoogleCredentials(runtimeAuth);
         return sendJson(response, 200, {
           ok: true,
-          product: "Morph",
+          product: "morph",
           authMode: auth.getAuthMode(),
           authenticated: Boolean(session),
           user: session ? publicUser(session) : null,
@@ -535,7 +533,7 @@ function heuristicsAsReport(assessment, file, config) {
       severity: finding.severity,
       file,
       reason: finding.message,
-      suggestedFix: "Handled by the Morph design-database transform."
+      suggestedFix: "Handled by the morph design-database transform."
     }))
   };
 }
@@ -807,11 +805,7 @@ function renderGithubConnectBlock({ githubConnected, githubLabel, githubConfigur
           </div>`;
 }
 
-async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
-  const billingState = await readBillingState(config);
-  const billingBlock = billingPanelHtml({
-    subscription: billingState
-  });
+async function dashboardHtml(config, session, runtimeAuth, appUrl) {
   const githubConnected = session?.provider === "github";
   const githubLabel = githubConnected ? escapeHtml(session.name || session.email || "GitHub account") : "";
   const githubConfigured = isGithubConfigured(runtimeAuth);
@@ -871,7 +865,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       --radius: 16px;
       --radius-sm: 10px;
       --radius-xs: 6px;
-      --page-pad: clamp(20px, 3.5vw, 64px);
+      --page-pad: clamp(20px, 3vw, 40px);
       --section-gap: clamp(48px, 5vw, 72px);
     }
     * { box-sizing: border-box; }
@@ -987,7 +981,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       display: grid;
       gap: var(--section-gap);
       width: 100%;
-      max-width: min(1160px, 100%);
+      max-width: min(1040px, 100%);
       margin: 0 auto;
     }
 
@@ -1486,7 +1480,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--surface);
-      padding: 44px 48px 48px;
+      padding: 32px 36px 36px;
       -webkit-backdrop-filter: blur(16px);
       backdrop-filter: blur(16px);
     }
@@ -1754,15 +1748,8 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     .gate-row { margin-bottom: 12px; font-size: 12.5px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
     .patch-title { font-size: 12px; font-weight: 600; display: block; margin-bottom: 6px; color: var(--ink); }
 
-    @media (min-width: 1280px) {
-      .content { max-width: 1280px; }
+    @media (min-width: 900px) {
       .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
-      .workgrid { gap: 24px; }
-    }
-    @media (min-width: 1920px) {
-      .content { max-width: 1400px; }
-      .page { padding-top: 56px; }
-      .stat-value { font-size: 44px; }
     }
     @media (max-width: 768px) {
       .nav { min-height: 64px; gap: 12px; }
@@ -1789,7 +1776,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       * { transition-duration: 0.01ms !important; animation: none !important; }
     }
 
-    ${billingStyles()}
   </style>
 </head>
 <body>
@@ -1805,7 +1791,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       <nav class="nav-links" aria-label="Studio sections">
         <a class="nav-link active" href="#overview" aria-current="page">Overview</a>
         <a class="nav-link" href="#history">History</a>
-        <a class="nav-link" href="#billing">Billing</a>
       </nav>
     </div>
     <div class="nav-right">
@@ -1816,7 +1801,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
   <div class="page">
     <main class="content">
       <section class="page-head" id="overview">
-        <div class="eyebrow"><span class="eyebrow-dot"></span> Morph Studio</div>
+        <div class="eyebrow"><span class="eyebrow-dot"></span> morph Studio</div>
         <h1><span class="title-gradient">Review agent UI</span><br>before it ships.</h1>
         <p class="lede">Connect a GitHub repo or preview URL, run a full review, and watch morph score your site, apply a redesign, and return a passing merge gate with before/after proof.</p>
       </section>
@@ -1901,8 +1886,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
           <div id="outputReadable" class="readable"></div>
         </div>
       </section>
-
-      ${billingBlock}
 
       <p class="foot-note">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -2507,10 +2490,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
         await refreshRuns();
         showWelcome();
         updateSourceBadge();
-        const billingQuery = new URLSearchParams(window.location.search).get("billing");
-        if (billingQuery === "success" || billingQuery === "saved") {
-          document.querySelector("#billing")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
       } catch (error) {
         const msg = error.message || String(error);
         if (msg.includes("unauthorized") || msg.includes("Sign in")) {

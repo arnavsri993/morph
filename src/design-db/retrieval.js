@@ -1,4 +1,4 @@
-// Morph Design Intelligence Database — reference retrieval engine.
+// morph Design Intelligence Database — reference retrieval engine.
 //
 // Scores incoming site content against the massive UI reference corpus to
 // select profile, archetype, and pattern combinations that match the visual

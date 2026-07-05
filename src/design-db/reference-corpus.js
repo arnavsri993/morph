@@ -1,4 +1,4 @@
-// Morph Design Intelligence Database — reference corpus.
+// morph Design Intelligence Database — reference corpus.
 //
 // A massive, searchable library of production web UI grammars distilled from
 // frontier and Fortune-class product sites. Used by the retrieval engine to

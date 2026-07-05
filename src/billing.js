@@ -374,7 +374,7 @@ export function billingPanelHtml({ subscription = {} } = {}) {
     <header class="billing-head">
       <div class="billing-eyebrow"><span class="billing-eyebrow-dot"></span> Workspace billing</div>
       <h2 class="billing-title" id="billingTitle">Plans &amp; usage</h2>
-      <p class="billing-lede">Manage your Morph workspace plan and usage limits. Paid checkout is not wired up yet.</p>
+      <p class="billing-lede">Manage your morph workspace plan and usage limits. Paid checkout is not wired up yet.</p>
       ${emailLine}
       <div class="billing-status" aria-label="Billing status">
         ${planBadge}
@@ -389,7 +389,7 @@ export function billingPanelHtml({ subscription = {} } = {}) {
           </div>
           ${!isTeam ? `<span class="billing-badge live"><span class="dot"></span>Active</span>` : ""}
         </div>
-        <p class="plan-copy">Run Morph locally with Studio reviews, repair loops, and merge gate receipts on your machine.</p>
+        <p class="plan-copy">Run morph locally with Studio reviews, repair loops, and merge gate receipts on your machine.</p>
         <ul class="plan-features">
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Local CLI &amp; Studio</li>
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>10 reviews / month</li>

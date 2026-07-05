@@ -1,0 +1,2 @@
+{"schema_version":1,"event_type":"audit","timestamp":"2026-07-05T05:04:34.968Z","score":48,"axes":{"tokens":25,"a11y":50,"components":67,"stories":null},"findings_count":22,"commit_sha":null,"lyse_version":"0.2.0-alpha.4"}
+{"schema_version":1,"event_type":"audit","timestamp":"2026-07-05T05:05:44.040Z","score":48,"axes":{"tokens":25,"a11y":50,"components":67,"stories":null},"findings_count":22,"commit_sha":null,"lyse_version":"0.2.0-alpha.4"}
