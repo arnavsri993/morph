@@ -407,6 +407,9 @@ export function renderCatalogSections(content, profile, patterns, helpers = {}) 
 }
 
 function deriveLogoNames(content) {
+  if (Array.isArray(content.logoPartners) && content.logoPartners.length >= 3) {
+    return content.logoPartners.slice(0, 8);
+  }
   const fromFeatures = (content.features ?? []).slice(0, 4).map((feature) => feature.title.split(/\s+/)[0]);
   const defaults = ["Acme", "Globex", "Initech", "Umbrella", "Stark"];
   const names = [...new Set(fromFeatures.filter((name) => name.length <= 12))];

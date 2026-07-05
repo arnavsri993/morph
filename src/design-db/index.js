@@ -142,7 +142,7 @@ export function databaseSummary() {
 }
 
 export function planTransform(content, options = {}) {
-  const selectionText = buildSelectionText(content, options.instructions);
+  const selectionText = buildSelectionText(content, options.instructions, options.siteResearch);
   const retrieval = buildRetrievalPlan(selectionText, content);
 
   let profileSelection = selectProfile(selectionText, options.profile ?? null, {
@@ -187,14 +187,18 @@ export function planTransform(content, options = {}) {
   };
 }
 
-function buildSelectionText(content, instructions = "") {
+function buildSelectionText(content, instructions = "", siteResearch = null) {
   return [
     content.title,
     content.brand,
     content.hero?.headline,
     content.hero?.subhead,
+    content.description,
+    siteResearch?.selectionText,
+    siteResearch?.meta?.keywords,
     ...(content.features ?? []).map((feature) => `${feature.title} ${feature.body}`),
     ...(content.sections ?? []).map((section) => `${section.heading} ${section.body}`),
+    ...(content.nav ?? []).map((link) => link.label),
     instructions ?? ""
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }

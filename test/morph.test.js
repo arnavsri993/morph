@@ -13,6 +13,7 @@ import {
 } from "../src/core.js";
 import { serveMorph } from "../src/server.js";
 import { extractContent, transformSite } from "../src/transform.js";
+import { enrichContent, researchSite } from "../src/site-research.js";
 import { assessUiQuality, databaseSummary, selectProfile, selectArchetype, catalogSummary, matchReferenceSites, buildRetrievalPlan, sourceIndexSummary, extractVisualPreferences, planTransform, alignProfileToPreferences } from "../src/design-db/index.js";
 import { aiVisionAvailable, analyzeUiReference, applyDesignHints } from "../src/ai-vision.js";
 import { getProfile } from "../src/design-db/profiles.js";
@@ -709,6 +710,42 @@ test("profile selection matches content keywords and honors explicit choice", ()
   const fallback = selectProfile("zzz qqq");
   assert.equal(fallback.profile.id, "aurora-dark");
   assert.equal(fallback.reason, "default_flagship");
+});
+
+test("site research maps audience, structure, and enriches content before transform", () => {
+  const html = `<!doctype html>
+<html class="dark">
+<head>
+  <title>Cerebral Valley — AI community</title>
+  <meta name="description" content="Community for AI builders, events, and meetups in San Francisco.">
+  <meta property="og:site_name" content="Cerebral Valley">
+</head>
+<body style="background:#0a0a0a;color:#fff">
+  <nav><a href="/events">Events</a><a href="/community">Community</a><a href="/jobs">Jobs</a></nav>
+  <h1>Cerebral Valley</h1>
+  <p>The home for AI builders, hackathons, and demo days across the Bay Area.</p>
+  <h2>Upcoming events</h2>
+  <p>Weekly meetups, founder dinners, and large-scale AI summits.</p>
+  <ul><li>Builder night — March 12</li><li>Demo day — April 3</li></ul>
+  <h3>Community programs</h3>
+  <p>Membership, job board, and curated introductions for founders.</p>
+  <img alt="OpenAI logo" src="/openai.svg">
+  <img alt="Anthropic logo" src="/anthropic.svg">
+  <img alt="Scale logo" src="/scale.svg">
+</body>
+</html>`;
+
+  const research = researchSite(html, "body { background: #0a0a0a; color-scheme: dark; }");
+  assert.equal(research.audience.some((item) => item.id === "ai-community"), true);
+  assert.equal(research.events.length >= 1, true);
+  assert.equal(research.navLinks.length >= 3, true);
+  assert.equal(research.cards.length >= 2, true);
+
+  const content = enrichContent(extractContent(html), research);
+  assert.equal(content.features.length >= 2, true);
+  assert.equal(content.sections.length >= 1, true);
+  assert.equal(content.logoPartners?.length >= 3, true);
+  assert.equal(content.research?.summary?.includes("Cerebral Valley"), true);
 });
 
 test("visual preferences detect dark sites and preserve mode during transform", async () => {

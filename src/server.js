@@ -472,16 +472,20 @@ async function runTransformReview(config, {
     ? [
         `Clone agent repo ${githubRepo} (shallow).`,
         `Score the current UI: ${before.score}/100.`,
-        "Extract the site's content: brand, navigation, hero copy, features, CTAs.",
+        "Research the live site: meta, audience, navigation, sections, events, partners, and social proof.",
+        `Mapped ${transform.siteResearch?.cardCount ?? 0} content blocks and ${transform.siteResearch?.topics?.length ?? 0} key topics before redesign.`,
         `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
+        "Preserve visible preferences from the original site: color mode, brand colors, and content structure.",
         "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
         `Possible score after redesign: ${after.score}/100. Preview at /transformed/index.html.`
       ]
     : [
         `Fetch live site at ${previewUrl}.`,
         `Score the current UI: ${before.score}/100.`,
-        "Extract the site's content: brand, navigation, hero copy, features, CTAs.",
+        "Research the live site: meta, audience, navigation, sections, events, partners, and social proof.",
+        `Mapped ${transform.siteResearch?.cardCount ?? 0} content blocks and ${transform.siteResearch?.topics?.length ?? 0} key topics before redesign.`,
         `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
+        "Preserve visible preferences from the original site: color mode, brand colors, and content structure.",
         "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
         `Possible score after redesign: ${after.score}/100. Preview at /transformed/index.html.`
       ];
@@ -505,6 +509,7 @@ async function runTransformReview(config, {
       profile: transform.profile,
       designDatabase: transform.designDatabase,
       content: transform.content,
+      siteResearch: transform.siteResearch,
       improvement: transform.improvement,
       outputFiles: transform.output.files
     },
@@ -1626,8 +1631,38 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     .review-summary { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
     .review-meta { margin-bottom: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
     .review-meta strong { color: var(--ink); font-weight: 500; }
-    .review-action { margin: 12px 0 4px; }
-    .review-action .btn { min-height: 40px; padding: 0 18px; font-size: 13px; }
+    .review-action { margin: 20px 0 10px; }
+    .review-action .btn-transform-preview {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 440px;
+      min-height: 56px;
+      padding: 16px 28px;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-md), 0 0 0 1px rgba(124, 124, 248, 0.18);
+    }
+    .review-action .btn-transform-preview:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-lg), 0 0 32px rgba(124, 124, 248, 0.22);
+    }
+    .research-brief {
+      margin: 0;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.03);
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      color: var(--ink-secondary);
+    }
     .review-pipeline {
       display: flex;
       gap: 10px;
@@ -2056,7 +2091,11 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
           + esc(p.transform.profile.name) + ' — ' + esc(p.transform.profile.inspiration || "") + '</div>';
       }
       if (p.transformedPreviewPath) {
-        html += '<div class="review-action"><a class="btn btn-primary" href="' + esc(p.transformedPreviewPath) + '" target="_blank" rel="noreferrer">Open transformed site ↗</a></div>';
+        html += '<div class="review-action"><a class="btn btn-primary btn-lg btn-transform-preview" href="' + esc(p.transformedPreviewPath) + '" target="_blank" rel="noreferrer">View transformed site ↗</a></div>';
+      }
+      if (p.transform?.siteResearch?.summary) {
+        html += '<details open><summary>Site research <span class="preview">before redesign</span></summary>';
+        html += '<div class="detail-body"><pre class="research-brief">' + esc(p.transform.siteResearch.summary) + '</pre></div></details>';
       }
       if (p.previewUrl) {
         html += '<div class="review-meta"><strong>Preview URL:</strong> ' + esc(p.previewUrl) + '</div>';

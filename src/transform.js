@@ -22,6 +22,7 @@ import {
   renderStylesheet
 } from "./design-db/index.js";
 import { mergeUiQualityAssessments, assessCssHealth } from "./scanners/design-health.js";
+import { enrichContent, researchSite } from "./site-research.js";
 
 export async function transformSite(inputDir, outputDir, options = {}) {
   const entry = await findEntryHtml(inputDir);
@@ -32,13 +33,16 @@ export async function transformSite(inputDir, outputDir, options = {}) {
   const html = await readFile(entry, "utf8");
   const css = await collectCss(inputDir, entry, html);
   const before = mergeUiQualityAssessments(assessUiQuality(html, css), assessCssHealth(html, css));
-  const content = extractContent(html);
+  const siteResearch = researchSite(html, css);
+  const content = enrichContent(extractContent(html), siteResearch);
 
   const contentSummary = [
     content.brand,
     content.hero?.headline,
     content.hero?.subhead,
-    `${(content.features ?? []).length} features`
+    siteResearch.meta?.description,
+    `${(content.features ?? []).length} features`,
+    siteResearch.audience?.map((item) => item.label).join(", ")
   ].filter(Boolean).join(" — ");
 
   let ai = null;
@@ -68,7 +72,8 @@ export async function transformSite(inputDir, outputDir, options = {}) {
     archetype: options.archetype ?? null,
     instructions: options.instructions ?? "",
     aiHints,
-    visualPreferences
+    visualPreferences,
+    siteResearch
   });
 
   const renderOptions = {
@@ -116,6 +121,15 @@ export async function transformSite(inputDir, outputDir, options = {}) {
         : "Set OPENAI_API_KEY to enable AI reference analysis."
     },
     visualPreferences,
+    siteResearch: {
+      summary: siteResearch.summary,
+      audience: siteResearch.audience,
+      inventory: siteResearch.inventory,
+      topics: siteResearch.topics?.slice(0, 12) ?? [],
+      navLinks: siteResearch.navLinks?.slice(0, 8) ?? [],
+      cardCount: siteResearch.cards?.length ?? 0,
+      eventCount: siteResearch.events?.length ?? 0
+    },
     profile: {
       id: plan.profile.profile.id,
       name: plan.profile.profile.name,
