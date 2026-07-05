@@ -1,31 +1,31 @@
 // morph AI vision — optional reference-image analysis and mockup generation.
 //
-// When OPENAI_API_KEY is set, morph can:
-//   1. Analyze a reference screenshot/mockup and extract design hints
-//   2. Generate a UI mockup image from site content, then analyze it
-//
-// Works with any OpenAI-compatible API via MORPH_AI_BASE_URL.
+// Routes through sponsor providers (OpenRouter, Nebius, NVIDIA NIM, Azure OpenAI,
+// Cloudflare Workers AI) with OpenAI-compatible fallbacks.
 
 import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
+import {
+  aiAvailable,
+  chatCompletion,
+  listConfiguredProviders,
+  resolveProviderOrder
+} from "./ai-providers.js";
 
-const DEFAULT_BASE = "https://api.openai.com/v1";
-const VISION_MODEL = process.env.MORPH_VISION_MODEL ?? "gpt-4o-mini";
 const IMAGE_MODEL = process.env.MORPH_IMAGE_MODEL ?? "dall-e-3";
 
 export function aiVisionAvailable() {
-  return Boolean(process.env.OPENAI_API_KEY?.trim());
+  return aiAvailable();
 }
 
 export async function analyzeUiReference(options = {}) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
+  if (!aiAvailable()) {
     return {
       available: false,
       reason: "no_api_key",
       hints: null,
-      message: "Set OPENAI_API_KEY to enable AI reference analysis."
+      message: "Configure OPENROUTER_API_KEY, NEBIUS_API_KEY, NVIDIA_API_KEY, AZURE_OPENAI_API_KEY, CLOUDFLARE_API_TOKEN, or OPENAI_API_KEY."
     };
   }
 
@@ -68,23 +68,25 @@ Return ONLY valid JSON with these fields:
   ];
 
   try {
-    const response = await aiRequest("/chat/completions", {
-      model: VISION_MODEL,
-      response_format: { type: "json_object" },
+    const response = await chatCompletion({
+      vision: true,
+      json: true,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userParts }
       ],
-      max_tokens: 500
-    }, apiKey);
+      maxTokens: 500
+    });
 
-    const raw = response.choices?.[0]?.message?.content ?? "{}";
+    const raw = response.content ?? "{}";
     const hints = normalizeHints(JSON.parse(raw));
     return {
       available: true,
       reason: "analyzed",
       hints,
-      model: VISION_MODEL,
+      provider: response.provider,
+      sponsor: response.sponsor,
+      model: response.model,
       message: hints.layoutNotes ?? "Reference analyzed."
     };
   } catch (error) {
@@ -98,14 +100,13 @@ Return ONLY valid JSON with these fields:
 }
 
 export async function generateUiReference(options = {}) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
+  if (!process.env.OPENAI_API_KEY?.trim() && !process.env.OPENROUTER_API_KEY?.trim()) {
     return {
       available: false,
       reason: "no_api_key",
       imagePath: null,
       hints: null,
-      message: "Set OPENAI_API_KEY to generate UI reference mockups."
+      message: "Set OPENAI_API_KEY or OPENROUTER_API_KEY to generate UI reference mockups."
     };
   }
 
@@ -122,7 +123,7 @@ export async function generateUiReference(options = {}) {
       size: "1792x1024",
       quality: "standard",
       response_format: "b64_json"
-    }, apiKey);
+    });
 
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) throw new Error("Image generation returned no data.");
@@ -173,6 +174,14 @@ export function applyDesignHints(profile, hints) {
   return merged;
 }
 
+export function aiVisionStatus() {
+  return {
+    available: aiAvailable(),
+    providers: listConfiguredProviders(),
+    order: resolveProviderOrder()
+  };
+}
+
 async function loadImageData(options) {
   if (options.imageUrl) return options.imageUrl;
   if (options.imagePath && existsSync(options.imagePath)) {
@@ -213,13 +222,23 @@ function normalizeHints(raw) {
   };
 }
 
-async function aiRequest(endpoint, body, apiKey) {
-  const base = (process.env.MORPH_AI_BASE_URL ?? DEFAULT_BASE).replace(/\/$/, "");
+async function aiRequest(endpoint, body) {
+  const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
+  const openAiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = openRouterKey || openAiKey;
+  const base = openRouterKey
+    ? "https://openrouter.ai/api/v1"
+    : (process.env.MORPH_AI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
+
   const response = await fetch(`${base}${endpoint}`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json"
+      "content-type": "application/json",
+      ...(openRouterKey ? {
+        "HTTP-Referer": process.env.MORPH_APP_URL ?? "https://morph.dev",
+        "X-Title": "morph Studio"
+      } : {})
     },
     body: JSON.stringify(body)
   });

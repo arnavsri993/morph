@@ -8,6 +8,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { runSponsorEnrichment } from "./ai-providers.js";
 import {
   aiVisionAvailable,
   analyzeUiReference,
@@ -47,6 +48,17 @@ export async function transformSite(inputDir, outputDir, options = {}) {
 
   let ai = null;
   let aiHints = options.aiHints ?? null;
+  let sponsorAi = null;
+
+  if (!aiHints && aiVisionAvailable()) {
+    sponsorAi = await runSponsorEnrichment({
+      contentSummary,
+      instructions: options.instructions
+    });
+    if (sponsorAi.mergedHints) {
+      aiHints = sponsorAi.mergedHints;
+    }
+  }
 
   if (options.generateReference && !aiHints) {
     ai = await generateUiReference({
@@ -73,15 +85,21 @@ export async function transformSite(inputDir, outputDir, options = {}) {
     instructions: options.instructions ?? "",
     aiHints,
     visualPreferences,
-    siteResearch
+    siteResearch,
+    taste: options.taste ?? null
   });
 
   const renderOptions = {
     archetype: plan.archetype.archetype,
-    patterns: plan.patterns
+    patterns: plan.patterns,
+    taste: plan.taste,
+    renderFlags: plan.renderFlags
   };
   const outputHtml = renderPage(content, plan.profile.profile, renderOptions);
-  const outputCss = renderStylesheet(plan.profile.profile);
+  const outputCss = renderStylesheet(plan.profile.profile, {
+    taste: plan.taste,
+    renderFlags: plan.renderFlags
+  });
   const after = assessUiQuality(outputHtml, outputCss);
 
   await mkdir(outputDir, { recursive: true });
@@ -112,14 +130,26 @@ export async function transformSite(inputDir, outputDir, options = {}) {
       reason: ai.reason,
       message: ai.message,
       imagePath: ai.imagePath ?? null,
-      hints: aiHints
+      hints: aiHints,
+      provider: ai.provider ?? ai.analysis?.provider ?? null,
+      sponsor: ai.sponsor ?? ai.analysis?.sponsor ?? null
     } : {
       available: aiVisionAvailable(),
-      reason: aiHints ? "provided_hints" : "not_used",
+      reason: aiHints ? (sponsorAi?.available ? "sponsor_enrichment" : "provided_hints") : "not_used",
       message: aiVisionAvailable()
         ? "Set --reference-image or --generate-reference to use AI vision."
-        : "Set OPENAI_API_KEY to enable AI reference analysis."
+        : "Configure OPENROUTER_API_KEY, NEBIUS_API_KEY, NVIDIA_API_KEY, AZURE_OPENAI_API_KEY, CLOUDFLARE_API_TOKEN, or OPENAI_API_KEY."
     },
+    sponsorAi: sponsorAi ? {
+      available: sponsorAi.available,
+      providers: Object.fromEntries(
+        Object.entries(sponsorAi.providers).map(([key, value]) => [key, {
+          provider: value.provider,
+          model: value.model,
+          hints: value.hints
+        }])
+      )
+    } : null,
     visualPreferences,
     siteResearch: {
       summary: siteResearch.summary,
@@ -164,6 +194,8 @@ export async function transformSite(inputDir, outputDir, options = {}) {
       name: pattern.name,
       category: pattern.category
     })),
+    taste: plan.taste,
+    renderFlags: plan.renderFlags,
     content: {
       brand: content.brand,
       headline: content.hero?.headline ?? null,

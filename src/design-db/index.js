@@ -10,6 +10,7 @@ import { corpusSummary } from "./reference-corpus.js";
 import { buildRetrievalPlan, retrievalSummary } from "./retrieval.js";
 import { analyzeHighEndSignals, sourceIndexSummary } from "./source-index.js";
 import { alignProfileToPreferences } from "./visual-preferences.js";
+import { resolveTaste, tasteRenderFlags } from "./taste.js";
 
 export {
   DESIGN_PROFILES,
@@ -32,10 +33,14 @@ export {
   corpusSummary,
   analyzeHighEndSignals,
   sourceIndexSummary,
-  alignProfileToPreferences
+  alignProfileToPreferences,
+  resolveTaste,
+  tasteRenderFlags
 };
 
 export { extractVisualPreferences } from "./visual-preferences.js";
+export { AI_SLOP_HEURISTICS, OVERUSED_FONTS } from "./ai-slop.js";
+export { DEFAULT_TASTE } from "./taste.js";
 
 const RETRIEVAL_CONFIDENCE_THRESHOLD = 0.35;
 
@@ -177,13 +182,19 @@ export function planTransform(content, options = {}) {
   const patterns = selectPatternsForContent(content, archetypeSelection.archetype, {
     retrievalHints: retrieval
   });
+  const taste = resolveTaste(content, {
+    instructions: options.instructions ?? "",
+    taste: options.taste ?? null
+  });
 
   return {
     profile: profileSelection,
     archetype: archetypeSelection,
     patterns,
     selectionText,
-    retrieval
+    retrieval,
+    taste,
+    renderFlags: tasteRenderFlags(taste)
   };
 }
 

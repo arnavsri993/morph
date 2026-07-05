@@ -10,7 +10,7 @@ export function headLinks() {
   return `<link rel="icon" href="${ICON_URL}" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">`;
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">`;
 }
 
 /** Solid black header bar matching the logo background. */
@@ -56,5 +56,6 @@ export function brandStyles() {
 
 /** Logo wordmark link for site chrome. */
 export function brandLink(href, { className = "brand", height = DEFAULT_LOGO_HEIGHT } = {}) {
-  return `<a class="${className}" href="${href}" aria-label="morph home" style="--logo-height:${height}px"><img class="logo" src="${LOGO_URL}" alt="morph" height="${height}" decoding="async"></a>`;
+  const styleAttr = height === DEFAULT_LOGO_HEIGHT ? "" : ` style="--logo-height:${height}px"`;
+  return `<a class="${className}" href="${href}" aria-label="morph home"${styleAttr}><img class="logo" src="${LOGO_URL}" alt="morph" height="${height}" decoding="async"></a>`;
 }

@@ -34,9 +34,9 @@ export function chromeTokens(extra = "") {
       --faint: #71717a;
       --brand: ${colors.primary};
       --brand-a: ${colors.primary};
-      --brand-b: #a78bfa;
-      --brand-c: #6366f1;
-      --brand-2: #a78bfa;
+      --brand-b: ${colors.primaryHover};
+      --brand-c: ${colors.accent};
+      --brand-2: ${colors.primaryHover};
       --cyan: ${colors.accent};
       --primary: ${colors.primary};
       --focus: ${colors.focus};
@@ -47,6 +47,7 @@ export function chromeTokens(extra = "") {
       --warn: #fbbf24;
       --warn-dim: rgba(251, 191, 36, 0.12);
       --font: ${fonts.bodyStack};
+      --font-display: ${fonts.displayStack};
       --mono: ${fonts.monoStack};
       --radius: ${radius.lg};
       --radius-sm: ${radius.sm};
@@ -54,7 +55,12 @@ export function chromeTokens(extra = "") {
       --radius-md: ${radius.md};
       --max: 1080px;
       --container: 1120px;
-      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+      --ease-hover: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --ease: var(--ease-out);
+      --duration-fast: 160ms;
+      --duration-ui: 220ms;
       --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.04);
       --shadow-md: 0 8px 32px -8px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
       --shadow-lg: 0 24px 64px -16px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
@@ -92,14 +98,14 @@ export function chromeReset(options = {}) {
       text-rendering: optimizeLegibility;
       overflow-x: hidden;${bodyExtra}
     }
-    ::selection { background: rgba(124, 124, 248, 0.35); color: #fff; }
+    ::selection { background: rgba(94, 106, 210, 0.35); color: #fff; }
     :focus-visible {
       outline: 2px solid var(--focus);
       outline-offset: 3px;
       border-radius: var(--radius-xs);
     }
     a { color: inherit; text-decoration: none; }
-    code { font-family: var(--mono); font-size: 0.9em; color: var(--cyan); }`;
+    code { font-family: var(--mono); font-size: 0.9em; color: var(--brand-c); }`;
 }
 
 /** Aurora + dot-grid backdrop used on marketing and app surfaces. */
@@ -119,9 +125,8 @@ export function backdropStyles() {
       left: -20%;
       top: -30%;
       background:
-        radial-gradient(ellipse 40% 35% at 20% 20%, rgba(124, 124, 248, 0.2), transparent 70%),
-        radial-gradient(ellipse 35% 30% at 80% 10%, rgba(167, 139, 250, 0.14), transparent 70%),
-        radial-gradient(ellipse 30% 25% at 60% 80%, rgba(34, 211, 238, 0.07), transparent 70%);
+        radial-gradient(ellipse 40% 35% at 20% 20%, rgba(94, 106, 210, 0.14), transparent 70%),
+        radial-gradient(ellipse 35% 30% at 80% 10%, rgba(61, 171, 184, 0.08), transparent 70%);
       animation: aurora-drift 20s ease-in-out infinite alternate;
     }
     @keyframes aurora-drift {
@@ -162,20 +167,23 @@ export function buttonStyles() {
       font-weight: 500;
       cursor: pointer;
       white-space: nowrap;
-      transition: transform 0.18s var(--ease), box-shadow 0.18s, background 0.18s, border-color 0.18s;
+      transition: transform var(--duration-fast) var(--ease-out),
+                  box-shadow var(--duration-fast) var(--ease-out),
+                  background var(--duration-fast) var(--ease-out),
+                  border-color var(--duration-fast) var(--ease-out);
     }
-    .btn svg { flex: none; transition: transform 0.18s var(--ease); }
+    .btn svg { flex: none; transition: transform var(--duration-fast) var(--ease-out); }
     .btn-primary {
       color: #fff;
-      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-      box-shadow: 0 0 32px -8px rgba(124, 124, 248, 0.65);
+      background: linear-gradient(180deg, var(--brand-b) 0%, var(--brand-a) 100%);
+      box-shadow: var(--shadow-sm);
     }
     .btn-primary:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 28px -4px rgba(124, 124, 248, 0.7);
+      box-shadow: var(--shadow-md);
     }
     .btn-primary:hover svg { transform: translateX(2px); }
-    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:active { transform: translateY(0) scale(0.98); transition-duration: 100ms; }
     .btn-ghost {
       color: var(--ink);
       background: rgba(255, 255, 255, 0.04);
@@ -203,13 +211,13 @@ export function shellStyles() {
       font-weight: 500;
       padding: 8px 14px;
       border-radius: 999px;
-      transition: color 0.18s, background 0.18s;
+      transition: color var(--duration-fast) var(--ease-hover), background var(--duration-fast) var(--ease-hover);
     }
     .nav-link:hover { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
     .nav-link.active {
       color: var(--ink);
-      background: rgba(124, 124, 248, 0.12);
-      box-shadow: inset 0 0 0 1px rgba(124, 124, 248, 0.22);
+      background: rgba(94, 106, 210, 0.12);
+      box-shadow: inset 0 0 0 1px rgba(94, 106, 210, 0.22);
     }
     .nav-actions { display: flex; align-items: center; gap: 10px; }
     .nav-toggle {

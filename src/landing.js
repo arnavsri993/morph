@@ -36,7 +36,7 @@ export function landingHtml(config, session) {
   <meta name="theme-color" content="${CHROME_THEME_COLOR}">
   ${headLinks()}
   <style>
-    ${chromeTokens()}
+    ${chromeTokens("--logo-height: 64px;")}
     ${chromeReset()}
     ${backdropStyles()}
     ${shellStyles()}
@@ -52,31 +52,21 @@ export function landingHtml(config, session) {
     h1 {
       margin: 0 auto 20px;
       max-width: 16ch;
+      font-family: var(--font-display);
       font-size: clamp(2.5rem, 6vw, 3.75rem);
       line-height: 1.05;
       letter-spacing: -0.03em;
       font-weight: 600;
-      animation: fade-up 0.7s var(--ease) 0.05s both;
+      animation: fade-up 0.36s var(--ease-out) 0.05s both;
     }
-    .gradient {
-      background: linear-gradient(100deg, #fafafa 0%, #a1a1aa 35%, var(--brand) 70%, var(--brand-2) 100%);
-      background-size: 200% auto;
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      animation: shimmer 6s ease-in-out infinite;
-    }
-    @keyframes shimmer {
-      0%, 100% { background-position: 0% center; }
-      50% { background-position: 100% center; }
-    }
+    .accent { color: var(--brand); }
     .lede {
       margin: 0 auto 36px;
       max-width: 52ch;
       color: var(--muted);
       font-size: 17px;
       line-height: 1.75;
-      animation: fade-up 0.7s var(--ease) 0.1s both;
+      animation: fade-up 0.36s var(--ease-out) 0.1s both;
     }
     .hero-actions {
       display: flex;
@@ -84,7 +74,7 @@ export function landingHtml(config, session) {
       justify-content: center;
       gap: 12px;
       margin-bottom: clamp(48px, 8vw, 64px);
-      animation: fade-up 0.7s var(--ease) 0.15s both;
+      animation: fade-up 0.36s var(--ease-out) 0.15s both;
     }
 
     /* Studio mock — hero showcase */
@@ -99,14 +89,14 @@ export function landingHtml(config, session) {
       -webkit-backdrop-filter: blur(20px);
       overflow: hidden;
       text-align: left;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 32px 80px -32px rgba(0,0,0,0.7);
-      animation: fade-up 0.8s var(--ease) 0.2s both;
+      box-shadow: var(--shadow-lg);
+      animation: fade-up 0.42s var(--ease-out) 0.2s both;
     }
     .studio-mock::before {
       content: "";
       position: absolute;
       inset: 0;
-      background: radial-gradient(520px circle at var(--spot-x, 50%) var(--spot-y, 0%), rgba(129,140,248,0.12), transparent 50%);
+      background: radial-gradient(520px circle at var(--spot-x, 50%) var(--spot-y, 0%), rgba(94,106,210,0.08), transparent 50%);
       pointer-events: none;
       z-index: 0;
     }
@@ -117,7 +107,7 @@ export function landingHtml(config, session) {
       left: -30%;
       width: 24%;
       height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(129,140,248,0.08), rgba(34,211,238,0.12), transparent);
+      background: linear-gradient(90deg, transparent, rgba(94,106,210,0.06), transparent);
       animation: scan-sweep 5s ease-in-out infinite;
       pointer-events: none;
       z-index: 1;
@@ -157,7 +147,7 @@ export function landingHtml(config, session) {
       letter-spacing: 0.04em;
       text-transform: uppercase;
       border: 1px solid transparent;
-      transition: color 0.5s, background 0.5s, border-color 0.5s;
+      transition: color var(--duration-ui) var(--ease-out), background var(--duration-ui) var(--ease-out), border-color var(--duration-ui) var(--ease-out);
     }
     .mock-pill.fail {
       color: var(--bad);
@@ -196,7 +186,7 @@ export function landingHtml(config, session) {
       background:
         radial-gradient(circle at 50% 50%, #0c0c0f 0 58%, transparent 59%),
         conic-gradient(var(--ring-color, var(--bad)) 0 var(--ring-pct, 68%), rgba(255,255,255,0.08) 0);
-      transition: --ring-color 0.6s var(--ease), --ring-pct 0.6s var(--ease);
+      transition: --ring-color 280ms var(--ease-out), --ring-pct 280ms var(--ease-out);
       box-shadow: 0 0 32px var(--ring-glow, rgba(248,113,113,0.15));
     }
     .score-ring.repaired {
@@ -210,7 +200,7 @@ export function landingHtml(config, session) {
       font-weight: 700;
       letter-spacing: -0.04em;
       color: var(--score-color, var(--bad));
-      transition: color 0.5s var(--ease);
+      transition: color 280ms var(--ease-out);
     }
     .score-ring.repaired strong { color: var(--ok); }
     .score-ring span {
@@ -228,7 +218,7 @@ export function landingHtml(config, session) {
       border-radius: var(--radius-sm);
       background: #f8fafc;
       color: #0f172a;
-      transition: border-radius 0.6s var(--ease), box-shadow 0.6s var(--ease), transform 0.6s var(--ease);
+      transition: border-radius 280ms var(--ease-out), box-shadow 280ms var(--ease-out), transform 280ms var(--ease-out);
       overflow: hidden;
     }
     .mock-ui.drift {
@@ -254,7 +244,7 @@ export function landingHtml(config, session) {
       color: #fff;
       border-radius: 999px;
       background: #7c3aed;
-      transition: border-radius 0.6s var(--ease), background 0.6s var(--ease), box-shadow 0.6s var(--ease);
+      transition: border-radius 280ms var(--ease-out), background 280ms var(--ease-out), box-shadow 280ms var(--ease-out);
     }
     .mock-ui.fixed .mock-btn {
       border-radius: 6px;
@@ -276,7 +266,7 @@ export function landingHtml(config, session) {
       color: var(--muted);
       opacity: 0;
       transform: translateX(-8px);
-      transition: opacity 0.4s var(--ease), transform 0.4s var(--ease), border-color 0.4s;
+      transition: opacity var(--duration-ui) var(--ease-out), transform var(--duration-ui) var(--ease-out), border-color var(--duration-ui) var(--ease-out);
     }
     .finding-chip.show { opacity: 1; transform: none; }
     .finding-chip.resolved {
@@ -337,8 +327,8 @@ export function landingHtml(config, session) {
       transition: border-color 0.35s, box-shadow 0.35s, transform 0.35s var(--ease);
     }
     .pipe-step.active {
-      border-color: rgba(129,140,248,0.4);
-      box-shadow: 0 0 32px -8px rgba(129,140,248,0.3);
+      border-color: rgba(94,106,210,0.35);
+      box-shadow: var(--shadow-sm);
       transform: translateY(-2px);
     }
     .pipe-step.done {
@@ -359,8 +349,8 @@ export function landingHtml(config, session) {
       transition: background 0.35s, border-color 0.35s, color 0.35s;
     }
     .pipe-step.active .pipe-num {
-      background: rgba(129,140,248,0.15);
-      border-color: rgba(129,140,248,0.35);
+      background: rgba(94,106,210,0.12);
+      border-color: rgba(94,106,210,0.28);
       color: var(--brand);
     }
     .pipe-step.done .pipe-num {
@@ -401,7 +391,7 @@ export function landingHtml(config, session) {
       font-size: 12px;
       font-weight: 500;
       color: var(--muted);
-      transition: background 0.3s, color 0.3s;
+      transition: background var(--duration-ui) var(--ease-out), color var(--duration-ui) var(--ease-out);
     }
     .compare-tab.on-before { background: rgba(248,113,113,0.12); color: var(--bad); }
     .compare-tab.on-after { background: rgba(74,222,128,0.12); color: var(--ok); }
@@ -409,7 +399,7 @@ export function landingHtml(config, session) {
       font-family: var(--mono);
       font-size: 13px;
       font-weight: 700;
-      transition: color 0.4s;
+      transition: color var(--duration-ui) var(--ease-out);
     }
     .compare-body {
       display: grid;
@@ -432,7 +422,7 @@ export function landingHtml(config, session) {
       padding: 20px;
       background: #f8fafc;
       color: #0f172a;
-      transition: border-radius 0.7s var(--ease), transform 0.7s var(--ease), box-shadow 0.7s var(--ease);
+      transition: border-radius 280ms var(--ease-out), transform 280ms var(--ease-out), box-shadow 280ms var(--ease-out);
     }
     .demo-card.before {
       border-radius: 26px;
@@ -455,7 +445,7 @@ export function landingHtml(config, session) {
       font-weight: 700;
       color: #fff;
       border: 0;
-      transition: border-radius 0.7s var(--ease), background 0.7s var(--ease), box-shadow 0.7s var(--ease);
+      transition: border-radius 280ms var(--ease-out), background 280ms var(--ease-out), box-shadow 280ms var(--ease-out);
     }
     .demo-card.before .demo-btn {
       border-radius: 20px;
@@ -486,7 +476,7 @@ export function landingHtml(config, session) {
       border: 1px solid transparent;
       opacity: 0;
       transform: translateY(6px);
-      transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), color 0.4s, border-color 0.4s, background 0.4s;
+      transition: opacity var(--duration-ui) var(--ease-out), transform var(--duration-ui) var(--ease-out), color var(--duration-ui) var(--ease-out), border-color var(--duration-ui) var(--ease-out), background var(--duration-ui) var(--ease-out);
     }
     .drift-tag.show { opacity: 1; transform: none; }
     .drift-tag.bad { color: rgba(251,191,36,0.9); background: rgba(251,191,36,0.08); border-color: rgba(251,191,36,0.2); }
@@ -514,7 +504,7 @@ export function landingHtml(config, session) {
       inset: 0;
       background: radial-gradient(400px circle at var(--bx,50%) var(--by,0%), rgba(129,140,248,0.1), transparent 50%);
       opacity: 0;
-      transition: opacity 0.4s;
+      transition: opacity var(--duration-ui) var(--ease-out);
       pointer-events: none;
     }
     .bento-card:hover {
@@ -573,7 +563,7 @@ export function landingHtml(config, session) {
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: var(--surface);
-      transition: border-color 0.2s, transform 0.2s var(--ease);
+      transition: border-color var(--duration-fast) var(--ease-hover), transform var(--duration-fast) var(--ease-out);
     }
     .link-card:hover { border-color: rgba(129,140,248,0.35); transform: translateY(-2px); }
     .link-card svg { flex: none; color: var(--brand); margin-top: 2px; }
@@ -659,12 +649,16 @@ export function landingHtml(config, session) {
     /* Scroll reveal */
     .reveal {
       opacity: 0;
-      transform: translateY(20px);
-      transition: opacity 0.65s var(--ease), transform 0.65s var(--ease);
+      transform: translateY(14px);
+      transition: opacity 0.36s var(--ease-out), transform 0.36s var(--ease-out);
     }
     .reveal.in { opacity: 1; transform: none; }
 
-    @keyframes fade-up {
+    .reveal-delay-1 { transition-delay: 60ms; }
+    .reveal-delay-2 { transition-delay: 120ms; }
+    .reveal-delay-3 { transition-delay: 50ms; }
+    .reveal-delay-4 { transition-delay: 100ms; }
+    .score-bad { color: var(--bad); }
       from { opacity: 0; transform: translateY(16px); }
       to { opacity: 1; transform: none; }
     }
@@ -729,7 +723,7 @@ export function landingHtml(config, session) {
 
     <section class="hero">
       <div class="shell">
-        <h1>AI writes the UI. <span class="gradient">morph makes it belong.</span></h1>
+        <h1>AI writes the UI. <span class="accent">morph makes it belong.</span></h1>
         <p class="lede">Connect a repo or preview URL in Studio. morph scans for drift, shows before/after, and applies deterministic repairs — no terminal required.</p>
         <div class="hero-actions">
           <a class="btn btn-primary btn-lg" href="/studio">
@@ -785,14 +779,14 @@ export function landingHtml(config, session) {
             <h3>Detect drift</h3>
             <p>Hardcoded colors, off-grid radii, raw HTML, missing focus states — flagged with severity and file paths.</p>
           </div>
-          <div class="bento-card reveal" data-spotlight style="transition-delay:.06s">
+          <div class="bento-card reveal reveal-delay-1" data-spotlight>
             <div class="bento-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
             </div>
             <h3>Repair in Studio</h3>
             <p>Exact token replacements and component swaps — applied interactively with a full before/after preview.</p>
           </div>
-          <div class="bento-card reveal" data-spotlight style="transition-delay:.12s">
+          <div class="bento-card reveal reveal-delay-2" data-spotlight>
             <div class="bento-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
             </div>
@@ -840,7 +834,7 @@ export function landingHtml(config, session) {
               <span class="compare-tab on-before" id="tabBefore">Before</span>
               <span class="compare-tab" id="tabAfter">After</span>
             </div>
-            <span class="compare-score" id="compareScore" style="color:var(--bad)">68 / 100</span>
+            <span class="compare-score score-bad" id="compareScore">68 / 100</span>
           </div>
           <div class="compare-body">
             <div class="demo-card before" id="demoCard">
@@ -884,7 +878,7 @@ export function landingHtml(config, session) {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.72.5.1.68-.22.68-.49v-1.7c-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.9-.64.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.7 0 0 .84-.28 2.75 1.05a9.4 9.4 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.4.2 2.44.1 2.7.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9v2.82c0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2z"/></svg>
             <div><strong>GitHub</strong><span>Source, issues, Studio server, and the seeded review fixture.</span></div>
           </a>
-          <a class="link-card reveal" style="transition-delay:.06s" href="${REPO_URL}#readme" target="_blank" rel="noreferrer">
+          <a class="link-card reveal reveal-delay-1" href="${REPO_URL}#readme" target="_blank" rel="noreferrer">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
             <div><strong>Documentation</strong><span>Quickstart, Studio flow, report shape, auth, and API map.</span></div>
           </a>
@@ -911,7 +905,7 @@ export function landingHtml(config, session) {
             </ul>
             <a class="btn btn-ghost" href="#docs">Read docs</a>
           </div>
-          <div class="price-card featured reveal" style="transition-delay:.05s">
+          <div class="price-card featured reveal reveal-delay-3">
             <h3>Team</h3>
             <div class="price">$29 <small>/ seat / mo</small></div>
             <p>Shared Studio runs for teams reviewing agent branches.</p>
@@ -922,7 +916,7 @@ export function landingHtml(config, session) {
             </ul>
             <a class="btn btn-primary" href="/studio">Launch Studio</a>
           </div>
-          <div class="price-card reveal" style="transition-delay:.1s">
+          <div class="price-card reveal reveal-delay-4">
             <h3>Enterprise</h3>
             <div class="price">Custom</div>
             <p>For teams gating many products and agent workflows.</p>

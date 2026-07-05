@@ -981,7 +981,15 @@ GOOGLE_CLIENT_SECRET=
 MORPH_APP_URL=http://localhost:3000
 
 # Optional AI vision for design-db transform (reference images / mockup generation)
+OPENROUTER_API_KEY=
+NEBIUS_API_KEY=
+NVIDIA_API_KEY=
+AZURE_OPENAI_API_KEY=
+AZURE_OPENAI_ENDPOINT=
+CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ACCOUNT_ID=
 OPENAI_API_KEY=
+# MORPH_AI_PROVIDER=openrouter
 # MORPH_AI_BASE_URL=https://api.openai.com/v1
 `;
 }

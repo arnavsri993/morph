@@ -38,6 +38,8 @@ import { landingHtml } from "./landing.js";
 import { fetchPageForTransform } from "./preview.js";
 import { transformSite } from "./transform.js";
 import { cloneRepo } from "./github.js";
+import { listSponsorIntegrations } from "./ai-providers.js";
+import { aiVisionStatus } from "./ai-vision.js";
 
 export async function createMorphHandler(config, options = {}) {
   if (options.loadEnv !== false) {
@@ -137,6 +139,8 @@ export async function createMorphHandler(config, options = {}) {
       if (request.method === "GET" && url.pathname === "/api/health") {
         const github = getGithubCredentials(runtimeAuth);
         const google = getGoogleCredentials(runtimeAuth);
+        const sponsors = listSponsorIntegrations();
+        const ai = aiVisionStatus();
         return sendJson(response, 200, {
           ok: true,
           product: "morph",
@@ -153,12 +157,21 @@ export async function createMorphHandler(config, options = {}) {
             configured: isGoogleConfigured(runtimeAuth),
             clientId: maskClientId(google.clientId)
           },
+          ai,
+          sponsorIntegrations: sponsors,
           scanners: {
             morph: "native drift + patch engine",
             buoy: "@buoy-design/core health scoring",
             eslint: "tailwind-palette-guard + metamask design-tokens",
             axe: "axe-core accessibility (HTML)"
           }
+        });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/sponsors") {
+        return sendJson(response, 200, {
+          bonusTracks: listSponsorIntegrations(),
+          ai: aiVisionStatus()
         });
       }
 

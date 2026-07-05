@@ -33,7 +33,10 @@ function parseArgs(argv) {
     archetype: null,
     instructions: null,
     referenceImage: null,
-    generateReference: false
+    generateReference: false,
+    designVariance: null,
+    motionIntensity: null,
+    visualDensity: null
   };
 
   for (let i = 3; i < argv.length; i += 1) {
@@ -55,6 +58,9 @@ function parseArgs(argv) {
     else if (arg === "--instructions") args.instructions = argv[++i];
     else if (arg === "--reference-image") args.referenceImage = argv[++i];
     else if (arg === "--generate-reference") args.generateReference = true;
+    else if (arg === "--design-variance") args.designVariance = argv[++i];
+    else if (arg === "--motion-intensity") args.motionIntensity = argv[++i];
+    else if (arg === "--visual-density") args.visualDensity = argv[++i];
     else if (arg === "--help" || arg === "-h") args.command = "help";
   }
 
@@ -72,7 +78,9 @@ Usage:
   morph transform (--input ./site | --repo owner/repo) [--output ./morph-output]
              [--profile aurora-dark] [--archetype landing-classic]
              [--instructions "..."] [--reference-image ./mockup.png]
-             [--generate-reference] [--json]
+             [--generate-reference]
+             [--design-variance 1-10] [--motion-intensity 1-10] [--visual-density 1-10]
+             [--json]
   morph demo
   morph serve --config morph.config.json [--host 127.0.0.1] [--port 4177]
 
@@ -131,12 +139,17 @@ async function main() {
       return;
     }
     const outputDir = path.resolve(args.output ?? "morph-output");
+    const taste = {};
+    if (args.designVariance) taste.designVariance = Number(args.designVariance);
+    if (args.motionIntensity) taste.motionIntensity = Number(args.motionIntensity);
+    if (args.visualDensity) taste.visualDensity = Number(args.visualDensity);
     const receipt = await transformSite(inputDir, outputDir, {
       profile: args.profile,
       archetype: args.archetype,
       instructions: args.instructions,
       referenceImage: args.referenceImage,
-      generateReference: args.generateReference
+      generateReference: args.generateReference,
+      taste: Object.keys(taste).length ? taste : null
     });
     if (args.json) console.log(JSON.stringify(receipt, null, 2));
     else {

@@ -12,10 +12,17 @@ import {
   repairProject
 } from "../src/core.js";
 import { serveMorph } from "../src/server.js";
+import { landingHtml } from "../src/landing.js";
 import { extractContent, transformSite } from "../src/transform.js";
 import { enrichContent, researchSite } from "../src/site-research.js";
 import { assessUiQuality, databaseSummary, selectProfile, selectArchetype, catalogSummary, matchReferenceSites, buildRetrievalPlan, sourceIndexSummary, extractVisualPreferences, planTransform, alignProfileToPreferences } from "../src/design-db/index.js";
 import { aiVisionAvailable, analyzeUiReference, applyDesignHints } from "../src/ai-vision.js";
+import {
+  describeSponsorIntegration,
+  isProviderConfigured,
+  listSponsorIntegrations,
+  resolveProviderOrder
+} from "../src/ai-providers.js";
 import { getProfile } from "../src/design-db/profiles.js";
 import { execFileSync } from "node:child_process";
 
@@ -286,6 +293,18 @@ test("landing page is served at / and the studio dashboard at /studio", async ()
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test("landing page passes morph anti-slop heuristics", async () => {
+  const config = await loadConfig("morph.config.json", repoRoot);
+  const html = landingHtml(config, null);
+  const css = html.match(/<style>([\s\S]*?)<\/style>/i)?.[1] ?? "";
+  const assessment = assessUiQuality(html, css);
+
+  assert.equal(assessment.model, "morph.ui-quality.v3");
+  assert.equal(assessment.score >= 95, true, `landing slop score ${assessment.score}: ${assessment.findings.map((f) => f.id).join(", ")}`);
+  assert.equal(assessment.findings.some((finding) => finding.id === "gradient-text"), false);
+  assert.equal(assessment.findings.some((finding) => finding.id === "overused-font"), false);
 });
 
 test("landing page stays public in oauth mode while studio requires sign-in", async () => {
@@ -654,15 +673,53 @@ test("source index summarizes millions of high-end frontend signals", () => {
 });
 
 test("ai vision degrades gracefully without an api key", async () => {
-  const previous = process.env.OPENAI_API_KEY;
-  delete process.env.OPENAI_API_KEY;
+  const keys = [
+    "OPENAI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "NEBIUS_API_KEY",
+    "NVIDIA_API_KEY",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+    "CLOUDFLARE_API_TOKEN",
+    "CLOUDFLARE_ACCOUNT_ID"
+  ];
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  for (const key of keys) delete process.env[key];
   try {
     assert.equal(aiVisionAvailable(), false);
     const result = await analyzeUiReference({ imagePath: "/tmp/nope.png" });
     assert.equal(result.available, false);
     assert.equal(result.reason, "no_api_key");
   } finally {
-    if (previous) process.env.OPENAI_API_KEY = previous;
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  }
+});
+
+test("sponsor integrations describe all bonus tracks", () => {
+  const sponsors = listSponsorIntegrations();
+  assert.equal(Object.keys(sponsors).sort().join(","), "cloudflare,microsoft,nebius,nvidia,openrouter,suse");
+  assert.equal(typeof describeSponsorIntegration("openrouter").role, "string");
+  assert.equal(isProviderConfigured("openrouter"), false);
+  assert.equal(resolveProviderOrder().length, 0);
+});
+
+test("health endpoint exposes sponsor integration status", async () => {
+  const config = await loadConfig("morph.config.json", repoRoot);
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false, cwd: repoRoot });
+  try {
+    const health = await fetchJson(`${url}/api/health`);
+    assert.equal(health.ok, true);
+    assert.equal(typeof health.sponsorIntegrations, "object");
+    assert.equal(typeof health.ai, "object");
+
+    const sponsors = await fetchJson(`${url}/api/sponsors`);
+    assert.equal(typeof sponsors.bonusTracks.openrouter, "object");
+    assert.equal(typeof sponsors.bonusTracks.suse, "object");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 
@@ -746,6 +803,18 @@ test("site research maps audience, structure, and enriches content before transf
   assert.equal(content.sections.length >= 1, true);
   assert.equal(content.logoPartners?.length >= 3, true);
   assert.equal(content.research?.summary?.includes("Cerebral Valley"), true);
+});
+
+test("enrich content does not duplicate hero or section headings as features", async () => {
+  const html = await readFile(path.join(repoRoot, "fixtures/codex-landing/index.html"), "utf8");
+  const research = researchSite(html, "");
+  const content = enrichContent(extractContent(html), research);
+
+  assert.equal(content.features.length, 4);
+  assert.equal(content.features.some((feature) => feature.title === "Organize your work in one place"), false);
+  assert.equal(content.features.some((feature) => feature.title === "Features"), false);
+  assert.equal(content.features.some((feature) => feature.title === "Pricing"), false);
+  assert.equal(content.hero?.eyebrow, null);
 });
 
 test("visual preferences detect dark sites and preserve mode during transform", async () => {

@@ -12,6 +12,9 @@ const AUDIENCE_SIGNALS = [
 
 const SOCIAL_HOSTS = ["twitter.com", "x.com", "linkedin.com", "github.com", "discord.gg", "discord.com", "youtube.com", "instagram.com"];
 
+const GENERIC_SECTION_HEADINGS = /^(?:features?|pricing|about(?:\s+us)?|faq|contact(?:\s+us)?|testimonials?|how\s+it\s+works|overview|benefits?|solutions?|products?|services?|resources?|blog|news|team|careers?|support|documentation?|docs)$/i;
+const CTA_HEADING = /(?:get\s+started|sign\s*up|start\s+(?:now|free|today)|join(?:\s+us)?|book\s+now|register|apply\s+now)/i;
+
 export function researchSite(rawHtml, css = "") {
   const html = String(rawHtml ?? "");
   const stylesheet = String(css ?? "");
@@ -89,9 +92,12 @@ export function enrichContent(content, research) {
   if (!enriched.description && research.meta?.description) {
     enriched.description = research.meta.description;
   }
-  if (!enriched.hero?.eyebrow && research.audience?.[0]?.label) {
-    enriched.hero ??= {};
-    enriched.hero.eyebrow = research.audience[0].label;
+  if (!enriched.hero?.eyebrow && research.meta?.description) {
+    const description = research.meta.description.trim();
+    if (description.length > 0 && description.length <= 80) {
+      enriched.hero ??= {};
+      enriched.hero.eyebrow = description;
+    }
   }
   if (research.navLinks?.length > (enriched.nav?.length ?? 0)) {
     enriched.nav = research.navLinks.slice(0, 6).map((link) => ({
@@ -100,13 +106,24 @@ export function enrichContent(content, research) {
     }));
   }
 
+  const skipTitles = buildEnrichmentSkipTitles(enriched);
+  const existingBodies = new Set(
+    (enriched.features ?? [])
+      .map((feature) => normalizeEnrichmentText(feature.body))
+      .filter(Boolean)
+  );
   const existingFeatureTitles = new Set((enriched.features ?? []).map((feature) => feature.title.toLowerCase()));
   for (const card of research.cards ?? []) {
     if ((enriched.features?.length ?? 0) >= 9) break;
-    if (!card.title || existingFeatureTitles.has(card.title.toLowerCase())) continue;
+    if (!card.title) continue;
+    const titleKey = card.title.toLowerCase();
+    if (existingFeatureTitles.has(titleKey) || skipTitles.has(titleKey)) continue;
+    const bodyKey = normalizeEnrichmentText(card.body);
+    if (bodyKey && existingBodies.has(bodyKey)) continue;
     enriched.features ??= [];
     enriched.features.push({ title: card.title, body: card.body || card.title });
-    existingFeatureTitles.add(card.title.toLowerCase());
+    existingFeatureTitles.add(titleKey);
+    if (bodyKey) existingBodies.add(bodyKey);
   }
 
   const existingSectionHeadings = new Set((enriched.sections ?? []).map((section) => section.heading.toLowerCase()));
@@ -224,14 +241,26 @@ function collectSocialLinks(html) {
 function extractCards(html, headings) {
   const cards = [];
   for (const heading of headings.filter((item) => item.level >= 2 && item.level <= 4)) {
-    const slice = html.slice(heading.index, heading.index + 1200);
+    if (heading.text.length > 80) continue;
+    if (isGenericSectionHeading(heading.text) || CTA_HEADING.test(heading.text)) continue;
+
+    const slice = sliceHeadingContent(html, heading, headings);
+    if (!slice) continue;
+
+    // h2/h3 that only wrap deeper headings are section labels, not cards.
+    if (heading.level <= 3 && hasNestedHeading(slice, heading.level)) {
+      const beforeNested = slice.split(new RegExp(`<h${heading.level + 1}\\b`, "i"))[0] ?? "";
+      const hasContent = /<p\b/i.test(beforeNested) || /<li\b/i.test(beforeNested);
+      if (!hasContent) continue;
+    }
+
     const body = cleanText(slice.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? "");
     const items = [...slice.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
       .map((match) => cleanText(match[1]))
       .filter((text) => text && text.length <= 120)
       .slice(0, 4);
     if (!body && !items.length) continue;
-    if (heading.text.length > 80) continue;
+
     cards.push({
       title: heading.text,
       body: body || items[0] || "",
@@ -245,6 +274,51 @@ function extractCards(html, headings) {
     seen.add(key);
     return true;
   }).slice(0, 12);
+}
+
+function sliceHeadingContent(html, heading, headings) {
+  const closeTag = `</h${heading.level}>`;
+  const closeEnd = html.indexOf(closeTag, heading.index);
+  if (closeEnd === -1) return "";
+  const start = closeEnd + closeTag.length;
+  const next = headings.find((item) => item.index > heading.index && item.level <= heading.level);
+  const end = next ? next.index : html.length;
+  return html.slice(start, end);
+}
+
+function hasNestedHeading(slice, level) {
+  const maxLevel = Math.min(level + 2, 6);
+  for (let nested = level + 1; nested <= maxLevel; nested += 1) {
+    if (new RegExp(`<h${nested}\\b`, "i").test(slice)) return true;
+  }
+  return false;
+}
+
+function isGenericSectionHeading(text) {
+  return GENERIC_SECTION_HEADINGS.test(String(text ?? "").trim());
+}
+
+function buildEnrichmentSkipTitles(content) {
+  const skip = new Set();
+  for (const value of [
+    content.brand,
+    content.hero?.headline,
+    content.hero?.subhead,
+    content.hero?.eyebrow,
+    content.featuresHeading,
+    content.cta?.headline
+  ]) {
+    const normalized = normalizeEnrichmentText(value);
+    if (normalized) skip.add(normalized);
+  }
+  return skip;
+}
+
+function normalizeEnrichmentText(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function extractEvents(html, headings) {

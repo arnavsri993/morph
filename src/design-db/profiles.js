@@ -17,36 +17,36 @@ export const DESIGN_PROFILES = [
       "ai", "ml", "model", "data", "cloud", "platform", "tool", "workflow"
     ],
     fonts: {
-      display: "Inter",
-      body: "Inter",
-      mono: "JetBrains Mono",
+      display: "Schibsted Grotesk",
+      body: "IBM Plex Sans",
+      mono: "IBM Plex Mono",
       googleImport:
-        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap",
-      displayStack: "'Inter', -apple-system, 'Segoe UI', sans-serif",
-      bodyStack: "'Inter', -apple-system, 'Segoe UI', sans-serif",
-      monoStack: "'JetBrains Mono', ui-monospace, 'SF Mono', monospace",
+        "https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap",
+      displayStack: "'Schibsted Grotesk', -apple-system, 'Segoe UI', sans-serif",
+      bodyStack: "'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif",
+      monoStack: "'IBM Plex Mono', ui-monospace, 'SF Mono', monospace",
       displayWeight: 700,
-      displayTracking: "-0.035em"
+      displayTracking: "-0.03em"
     },
     colors: {
-      bg: "#0a0a0f",
-      bgAlt: "#0e0e15",
-      surface: "#12121a",
-      surfaceRaised: "#181822",
+      bg: "#09090b",
+      bgAlt: "#0c0c0f",
+      surface: "#111114",
+      surfaceRaised: "#18181c",
       border: "rgba(255,255,255,0.08)",
       borderStrong: "rgba(255,255,255,0.14)",
-      ink: "#f4f4f6",
-      inkSecondary: "#c8c8d4",
-      muted: "#8a8a9b",
-      primary: "#7c7cf8",
-      primaryHover: "#8f8ffa",
-      primaryInk: "#0a0a0f",
-      accent: "#4cc9f0",
-      focus: "#8f8ffa",
-      heroGradient: "linear-gradient(135deg, #a5a0ff 0%, #6ee7f5 50%, #a5f0c5 100%)",
-      buttonGradient: "linear-gradient(180deg, #8b8bfa 0%, #6b6bf0 100%)",
-      glow: "radial-gradient(ellipse 60% 45% at 50% -10%, rgba(124,124,248,0.28), transparent 70%)",
-      cardHoverBorder: "rgba(139,139,250,0.45)"
+      ink: "#f4f4f5",
+      inkSecondary: "#c4c4cc",
+      muted: "#8b8b96",
+      primary: "#5e6ad2",
+      primaryHover: "#6b77de",
+      primaryInk: "#ffffff",
+      accent: "#3dabb8",
+      focus: "#6b77de",
+      heroGradient: "linear-gradient(135deg, #5e6ad2 0%, #3dabb8 100%)",
+      buttonGradient: "linear-gradient(180deg, #6b77de 0%, #5e6ad2 100%)",
+      glow: "radial-gradient(ellipse 60% 45% at 50% -10%, rgba(94,106,210,0.12), transparent 70%)",
+      cardHoverBorder: "rgba(94,106,210,0.35)"
     },
     radius: { sm: "8px", md: "12px", lg: "16px", xl: "24px", pill: "999px" },
     shadows: {
@@ -274,13 +274,13 @@ export const DESIGN_PROFILES = [
       "meeting", "event", "booking"
     ],
     fonts: {
-      display: "Plus Jakarta Sans",
-      body: "Plus Jakarta Sans",
+      display: "Manrope",
+      body: "Source Sans 3",
       mono: "IBM Plex Mono",
       googleImport:
-        "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400&display=swap",
-      displayStack: "'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif",
-      bodyStack: "'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif",
+        "https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap",
+      displayStack: "'Manrope', -apple-system, 'Segoe UI', sans-serif",
+      bodyStack: "'Source Sans 3', -apple-system, 'Segoe UI', sans-serif",
       monoStack: "'IBM Plex Mono', ui-monospace, monospace",
       displayWeight: 800,
       displayTracking: "-0.03em"
@@ -300,7 +300,7 @@ export const DESIGN_PROFILES = [
       primaryInk: "#ffffff",
       accent: "#f59e0b",
       focus: "#2563eb",
-      heroGradient: "linear-gradient(120deg, #2563eb 0%, #7c3aed 60%, #f59e0b 120%)",
+      heroGradient: "linear-gradient(120deg, #2563eb 0%, #1d4ed8 100%)",
       buttonGradient: "linear-gradient(180deg, #3b74f0 0%, #2563eb 100%)",
       glow: "radial-gradient(ellipse 65% 50% at 50% -12%, rgba(37,99,235,0.12), transparent 70%)",
       cardHoverBorder: "rgba(37,99,235,0.35)"

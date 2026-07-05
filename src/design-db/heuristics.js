@@ -4,6 +4,11 @@
 // Each rule inspects the combined HTML and CSS of a page and returns findings.
 // The transform engine uses the resulting score to decide how much of the
 // page needs to be re-rendered, and the findings become the "before" receipt.
+//
+// AI slop rules (Impeccable / Taste Skill / Emil Kowalski motion standards)
+// live in ai-slop.js and are merged here for a single assessment pass.
+
+import { AI_SLOP_HEURISTICS } from "./ai-slop.js";
 
 const GENERIC_FONT_ONLY = /font-family\s*:\s*(?:arial|helvetica|verdana|tahoma|georgia|"?times new roman"?|times|serif|sans-serif|monospace|cursive)\s*(?:,\s*(?:arial|helvetica|verdana|tahoma|georgia|"?times new roman"?|times|serif|sans-serif|monospace|cursive)\s*)*[;}"]/i;
 
@@ -40,10 +45,12 @@ export const UI_HEURISTICS = [
     message: "Uses raw saturated web colors (pure red/blue/green/yellow) instead of a tuned palette.",
     test: ({ css, html }) => {
       const cssValues = [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/:\s*([^;{}]+)/g)]
-        .map((match) => match[1]);
+        .map((match) => match[1])
+        .filter((value) => !/var\(--/i.test(value));
       const inlineValues = [...html.matchAll(/(?:style|bgcolor|color)=["']([^"']*)["']/gi)]
         .map((match) => match[1]);
-      const source = cssValues.concat(inlineValues).join("\n");
+      const source = cssValues.concat(inlineValues).join("\n")
+        .replace(/--[a-z-]+\s*:/gi, "");
       return /\b(?:red|blue|green|yellow|orange|purple|pink|lime|cyan|magenta)\b/i.test(source)
         || /#(?:f00|ff0000|00f|0000ff|0f0|00ff00|ff0|ffff00)\b/i.test(source);
     }
@@ -63,9 +70,16 @@ export const UI_HEURISTICS = [
     category: "layout",
     message: "No consistent spacing rhythm: margins and paddings are ad hoc values.",
     test: ({ css }) => {
-      const values = [...css.matchAll(/(?:margin|padding)[^:;{}]*:\s*([^;}]+)/gi)]
+      const decls = [...css.matchAll(/(?:margin|padding)[^:;{}]*:\s*([^;}]+)/gi)];
+      const values = decls
         .flatMap((match) => match[1].match(/\d+px/g) ?? []);
       if (values.length < 3) return true;
+      if (decls.length && decls.filter((match) => /var\(--/.test(match[1])).length / decls.length >= 0.35) {
+        return false;
+      }
+      if (/clamp\(/i.test(css) && decls.filter((match) => /clamp\(/i.test(match[1])).length >= 3) {
+        return false;
+      }
       const unique = new Set(values);
       const offGrid = [...unique].filter((value) => Number.parseInt(value, 10) % 4 !== 0);
       return offGrid.length / unique.size > 0.4;
@@ -226,7 +240,8 @@ export const UI_HEURISTICS = [
     category: "content",
     message: "Placeholder copy (lorem ipsum / TODO) left in the page.",
     test: ({ html }) => /lorem ipsum|placeholder text|todo:/i.test(html)
-  }
+  },
+  ...AI_SLOP_HEURISTICS
 ];
 
 export function assessUiQuality(html, css) {
@@ -253,7 +268,7 @@ export function assessUiQuality(html, css) {
   }
 
   return {
-    model: "morph.ui-quality.v1",
+    model: "morph.ui-quality.v3",
     score: Math.max(0, 100 - deduction),
     findings,
     summary: {

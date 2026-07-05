@@ -87,6 +87,7 @@ export function createAuthManager(config, runtimeAuth) {
     if (pathname === "/login") return true;
     if (pathname.startsWith("/auth/")) return true;
     if (pathname === "/api/health") return true;
+    if (pathname === "/api/sponsors" && method === "GET") return true;
     if (pathname === "/api/auth/providers" && method === "GET") return true;
     if (pathname.startsWith("/assets/")) return true;
     return false;

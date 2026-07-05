@@ -184,7 +184,7 @@ export function componentStyles(profile) {
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
-  transition: border-color 0.2s var(--ease), transform 0.2s var(--ease);
+  transition: border-color var(--duration-ui) var(--ease-out), transform var(--duration-ui) var(--ease-out);
 }
 .integration-tile:hover {
   border-color: ${colors.cardHoverBorder};
@@ -256,8 +256,9 @@ ${brands.map((name) => `        <span class="logo-chip">${esc(name)}</span>`).jo
   </section>`;
 }
 
-export function renderPricingSection(content, profile) {
+export function renderPricingSection(content, profile, options = {}) {
   const brand = content.brand || "Product";
+  const showKickers = options.showSectionKickers ?? false;
   const tiers = [
     { name: "Starter", price: "Free", period: "", features: ["Core features", "Community support", "1 workspace"] },
     { name: "Pro", price: "$19", period: "/mo", features: ["Everything in Starter", "Advanced analytics", "Priority support", "Unlimited projects"], featured: true },
@@ -266,8 +267,7 @@ export function renderPricingSection(content, profile) {
   return `  <section class="section alt" id="pricing">
     <div class="container">
       <div class="section-head centered reveal">
-        <div class="kicker">Pricing</div>
-        <h2>Plans that scale with ${esc(brand)}</h2>
+        ${showKickers ? `<div class="kicker">Pricing</div>\n        ` : ""}<h2>Plans that scale with ${esc(brand)}</h2>
       </div>
       <div class="pricing-grid">
 ${tiers.map((tier) => `        <article class="price-card reveal${tier.featured ? " featured" : ""}">
@@ -283,13 +283,13 @@ ${tier.features.map((feature) => `            <li>${esc(feature)}</li>`).join("\
   </section>`;
 }
 
-export function renderFaqSection(content) {
+export function renderFaqSection(content, options = {}) {
+  const showKickers = options.showSectionKickers ?? false;
   const faqs = deriveFaqs(content);
   return `  <section class="section" id="faq">
     <div class="container">
       <div class="section-head centered reveal">
-        <div class="kicker">FAQ</div>
-        <h2>Common questions</h2>
+        ${showKickers ? `<div class="kicker">FAQ</div>\n        ` : ""}<h2>Common questions</h2>
       </div>
       <div class="faq-list">
 ${faqs.map((faq) => `        <details class="faq-item reveal">
@@ -301,15 +301,15 @@ ${faqs.map((faq) => `        <details class="faq-item reveal">
   </section>`;
 }
 
-export function renderBentoFeatures(content) {
+export function renderBentoFeatures(content, options = {}) {
+  const showKickers = options.showSectionKickers ?? false;
   const features = (content.features ?? []).slice(0, 5);
   if (features.length < 2) return "";
   const spans = ["span-4", "span-2", "span-2", "span-3", "span-3"];
   return `  <section class="section alt" id="bento">
     <div class="container">
       <div class="section-head centered reveal">
-        <div class="kicker">Highlights</div>
-        <h2>Built for how you actually work</h2>
+        ${showKickers ? `<div class="kicker">Highlights</div>\n        ` : ""}<h2>Built for how you actually work</h2>
       </div>
       <div class="bento-grid">
 ${features.map((feature, index) => `        <article class="bento-cell ${spans[index % spans.length]} reveal">
@@ -332,13 +332,13 @@ ${badges.map((badge) => `        <span class="trust-badge">${esc(badge)}</span>`
   </section>`;
 }
 
-export function renderIntegrationGrid(content) {
+export function renderIntegrationGrid(content, options = {}) {
+  const showKickers = options.showSectionKickers ?? false;
   const names = INTEGRATION_NAMES.slice(0, 8);
   return `  <section class="section" id="integrations">
     <div class="container">
       <div class="section-head centered reveal">
-        <div class="kicker">Integrations</div>
-        <h2>Works with your stack</h2>
+        ${showKickers ? `<div class="kicker">Integrations</div>\n        ` : ""}<h2>Works with your stack</h2>
       </div>
       <div class="integration-grid">
 ${names.map((name) => `        <div class="integration-tile reveal">${esc(name)}</div>`).join("\n")}
@@ -347,21 +347,22 @@ ${names.map((name) => `        <div class="integration-tile reveal">${esc(name)}
   </section>`;
 }
 
-export function renderHeroSplit(content, profile, renderHeadline) {
+export function renderHeroSplit(content, profile, renderHeadline, options = {}) {
+  const { revealClass = "reveal", flags = {} } = options;
   const primaryCta = content.hero?.ctas?.[0] ?? { label: "Get started", href: "#" };
   const secondaryCta = content.hero?.ctas?.[1] ?? null;
   return `  <section class="hero">
     <div class="container hero-split">
       <div>
-        ${content.hero?.eyebrow ? `<div class="eyebrow reveal">${esc(content.hero.eyebrow)}</div>` : ""}
-        <h1 class="reveal">${renderHeadline(content.hero?.headline || content.brand || "Welcome")}</h1>
-        ${content.hero?.subhead ? `<p class="lede reveal">${esc(content.hero.subhead)}</p>` : ""}
-        <div class="hero-ctas reveal">
+        ${flags.showEyebrow && content.hero?.eyebrow ? `<div class="eyebrow ${revealClass}">${esc(content.hero.eyebrow)}</div>` : ""}
+        <h1 class="${revealClass}">${renderHeadline(content.hero?.headline || content.brand || "Welcome")}</h1>
+        ${content.hero?.subhead ? `<p class="lede ${revealClass}">${esc(content.hero.subhead)}</p>` : ""}
+        <div class="hero-ctas ${revealClass}">
           <a class="btn btn-primary btn-lg" href="${escAttr(primaryCta.href)}">${esc(primaryCta.label)}</a>
           ${secondaryCta ? `<a class="btn btn-ghost btn-lg" href="${escAttr(secondaryCta.href)}">${esc(secondaryCta.label)}</a>` : ""}
         </div>
       </div>
-      <div class="hero-panel reveal" aria-hidden="true">
+      <div class="hero-panel ${revealClass}" aria-hidden="true">
         <div class="mock-ui">
           <div class="mock-bar w80"></div>
           <div class="mock-bar w60"></div>
@@ -388,15 +389,18 @@ export function renderCatalogSections(content, profile, patterns, helpers = {}) 
   const sections = [];
   const order = helpers.sectionOrder ?? ["logos", "pricing", "faq", "trust", "integrations", "bento"];
   const patternIds = new Set((patterns ?? []).map((pattern) => pattern.id));
+  const sectionOptions = {
+    showSectionKickers: helpers.renderFlags?.showSectionKickers ?? false
+  };
 
   const renderers = {
     logos: () => patternIds.has("social-logo-cloud") ? renderLogoCloud(content) : "",
     pricing: () => (patternIds.has("pricing-three-tier") || patternIds.has("pricing-two-column"))
-      ? renderPricingSection(content, profile) : "",
-    faq: () => patternIds.has("content-faq-accordion") ? renderFaqSection(content) : "",
+      ? renderPricingSection(content, profile, sectionOptions) : "",
+    faq: () => patternIds.has("content-faq-accordion") ? renderFaqSection(content, sectionOptions) : "",
     trust: () => patternIds.has("social-trust-badges") ? renderTrustBadges() : "",
-    integrations: () => patternIds.has("features-integration-grid") ? renderIntegrationGrid(content) : "",
-    bento: () => patternIds.has("features-bento-grid") ? renderBentoFeatures(content) : ""
+    integrations: () => patternIds.has("features-integration-grid") ? renderIntegrationGrid(content, sectionOptions) : "",
+    bento: () => patternIds.has("features-bento-grid") ? renderBentoFeatures(content, sectionOptions) : ""
   };
 
   for (const key of order) {
