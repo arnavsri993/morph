@@ -2,6 +2,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
+import {
+  CHROME_THEME_COLOR,
+  backdropHtml,
+  backdropStyles,
+  chromeReset,
+  chromeTokens
+} from "./chrome.js";
 
 export function createBillingManager(config) {
   function getBillingMode() {
@@ -449,41 +456,12 @@ export function billingPageHtml(options = {}) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Billing · morph</title>
-  <meta name="theme-color" content="#050507">
+  <meta name="theme-color" content="${CHROME_THEME_COLOR}">
   ${headLinks()}
   <style>
-    :root {
-      color-scheme: dark;
-      --bg: #050507;
-      --ink: #fafafa;
-      --muted: #a1a1aa;
-      --faint: #71717a;
-      --line: rgba(255, 255, 255, 0.07);
-      --line-strong: rgba(255, 255, 255, 0.13);
-      --brand-a: #818cf8;
-      --cyan: #22d3ee;
-      --ok: #4ade80;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      min-height: 100dvh;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    .backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      pointer-events: none;
-      background:
-        radial-gradient(ellipse 60% 45% at 15% 10%, rgba(129, 140, 248, 0.14), transparent 65%),
-        radial-gradient(ellipse 50% 40% at 85% 20%, rgba(34, 211, 238, 0.06), transparent 65%),
-        var(--bg);
-    }
+    ${chromeTokens()}
+    ${chromeReset()}
+    ${backdropStyles()}
     .page {
       width: min(960px, 100%);
       margin: 0 auto;
@@ -508,7 +486,7 @@ export function billingPageHtml(options = {}) {
   </style>
 </head>
 <body>
-  <div class="backdrop" aria-hidden="true"></div>
+  ${backdropHtml()}
   <header class="site-header">
     <div class="shell site-header-inner">
       ${brandLink("/studio", { className: "brand-mini", height: 58 })}

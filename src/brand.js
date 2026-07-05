@@ -1,6 +1,8 @@
+import { CHROME_HEADER_BG } from "./chrome.js";
+
 export const LOGO_URL = "/assets/logo.png";
 export const ICON_URL = "/assets/icon.png";
-export const HEADER_BG = "#000000";
+export const HEADER_BG = CHROME_HEADER_BG;
 export const DEFAULT_LOGO_HEIGHT = 64;
 
 /** Shared favicon + font preloads for site chrome pages. */

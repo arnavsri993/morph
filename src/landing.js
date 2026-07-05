@@ -1,4 +1,15 @@
 import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
+import {
+  CHROME_THEME_COLOR,
+  backdropHtml,
+  backdropStyles,
+  buttonStyles,
+  chromeReset,
+  chromeTokens,
+  mobileNavScript,
+  reducedMotionStyles,
+  shellStyles
+} from "./chrome.js";
 
 const REPO_URL = "https://github.com/arnavsri993/morph";
 
@@ -22,161 +33,16 @@ export function landingHtml(config, session) {
   <meta property="og:title" content="morph — CI for agent-written frontend">
   <meta property="og:description" content="AI writes the UI. morph makes it belong.">
   <meta property="og:type" content="website">
-  <meta name="theme-color" content="#09090b">
+  <meta name="theme-color" content="${CHROME_THEME_COLOR}">
   ${headLinks()}
   <style>
-    :root {
-      color-scheme: dark;
-      --bg: #09090b;
-      --surface: rgba(24, 24, 27, 0.72);
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --text: #fafafa;
-      --muted: #a1a1aa;
-      --faint: #71717a;
-      --brand: #818cf8;
-      --brand-2: #a78bfa;
-      --cyan: #22d3ee;
-      --ok: #4ade80;
-      --bad: #f87171;
-      --warn: #fbbf24;
-      --font: "Inter", ui-sans-serif, system-ui, sans-serif;
-      --mono: "JetBrains Mono", ui-monospace, monospace;
-      --radius: 16px;
-      --radius-sm: 10px;
-      --max: 1080px;
-      --ease: cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    *, *::before, *::after { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      min-width: 320px;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 16px;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-    ::selection { background: rgba(129, 140, 248, 0.35); }
-    :focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 6px; }
-    a { color: inherit; text-decoration: none; }
-    code { font-family: var(--mono); font-size: 0.9em; color: var(--cyan); }
-
-    /* Animated backdrop */
-    .backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      pointer-events: none;
-      overflow: hidden;
-    }
-    .aurora {
-      position: absolute;
-      width: 140%;
-      height: 140%;
-      left: -20%;
-      top: -30%;
-      background:
-        radial-gradient(ellipse 40% 35% at 20% 20%, rgba(129, 140, 248, 0.2), transparent 70%),
-        radial-gradient(ellipse 35% 30% at 80% 10%, rgba(167, 139, 250, 0.14), transparent 70%),
-        radial-gradient(ellipse 30% 25% at 60% 80%, rgba(34, 211, 238, 0.07), transparent 70%);
-      animation: aurora-drift 20s ease-in-out infinite alternate;
-    }
-    @keyframes aurora-drift {
-      to { transform: translate3d(2%, 3%, 0) scale(1.05); }
-    }
-    .grid-bg {
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-      background-size: 32px 32px;
-      mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, black 15%, transparent 78%);
-      -webkit-mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, black 15%, transparent 78%);
-      opacity: 0.4;
-    }
-
-    .shell {
-      width: min(var(--max), calc(100vw - 48px));
-      margin: 0 auto;
-    }
-
+    ${chromeTokens()}
+    ${chromeReset()}
+    ${backdropStyles()}
+    ${shellStyles()}
     ${headerBarStyles()}
     ${brandStyles()}
-    .nav-links { display: flex; align-items: center; gap: 2px; }
-    .nav-link {
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 500;
-      padding: 8px 14px;
-      border-radius: 999px;
-      transition: color 0.18s, background 0.18s;
-    }
-    .nav-link:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
-    .nav-actions { display: flex; align-items: center; gap: 10px; }
-    .nav-toggle {
-      display: none;
-      width: 40px;
-      height: 40px;
-      place-items: center;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text);
-      cursor: pointer;
-    }
-    .mobile-menu {
-      display: none;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      background: #000000;
-      backdrop-filter: blur(20px);
-      padding: 12px 24px 20px;
-    }
-    .mobile-menu a {
-      display: block;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border);
-      font-weight: 500;
-    }
-    .mobile-menu .btn { margin-top: 16px; width: 100%; }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: 44px;
-      padding: 0 22px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      font: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: transform 0.18s var(--ease), box-shadow 0.18s, background 0.18s, border-color 0.18s;
-    }
-    .btn svg { flex: none; transition: transform 0.18s var(--ease); }
-    .btn-primary {
-      color: #fff;
-      background: linear-gradient(135deg, var(--brand), var(--brand-2));
-      box-shadow: 0 0 32px -8px rgba(129, 140, 248, 0.65);
-    }
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 28px -4px rgba(129, 140, 248, 0.7);
-    }
-    .btn-primary:hover svg { transform: translateX(2px); }
-    .btn-ghost {
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.04);
-      border-color: var(--border-strong);
-    }
-    .btn-ghost:hover { background: rgba(255, 255, 255, 0.08); transform: translateY(-1px); }
-    .btn-lg { min-height: 48px; padding: 0 26px; font-size: 15px; }
+    ${buttonStyles()}
 
     /* Hero */
     .hero {
@@ -816,27 +682,18 @@ export function landingHtml(config, session) {
       .foot-grid { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 768px) {
-      .shell { width: min(var(--max), calc(100vw - 32px)); }
-      .nav-links, .nav-actions .nav-link, .nav-actions .btn { display: none; }
-      .nav-toggle { display: grid; }
-      .mobile-menu.open { display: block; }
       .cta-band { flex-direction: column; align-items: flex-start; }
       .hero-actions .btn-lg { flex: 1 1 100%; }
       .foot-grid { grid-template-columns: 1fr; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-      *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
+    ${reducedMotionStyles(`
       .reveal { opacity: 1; transform: none; }
       .finding-chip, .drift-tag { opacity: 1; transform: none; }
-    }
+    `)}
   </style>
 </head>
 <body>
-  <div class="backdrop" aria-hidden="true">
-    <div class="aurora"></div>
-    <div class="grid-bg"></div>
-  </div>
+  ${backdropHtml()}
 
   <header class="site-header" id="siteHeader">
     <div class="shell site-header-inner">
@@ -1124,20 +981,7 @@ export function landingHtml(config, session) {
       var year = document.getElementById("year");
       if (year) year.textContent = String(new Date().getFullYear());
 
-      var toggle = document.getElementById("navToggle");
-      var menu = document.getElementById("mobileMenu");
-      if (toggle && menu) {
-        toggle.addEventListener("click", function () {
-          var open = menu.classList.toggle("open");
-          toggle.setAttribute("aria-expanded", open ? "true" : "false");
-        });
-        menu.addEventListener("click", function (e) {
-          if (e.target && e.target.tagName === "A") {
-            menu.classList.remove("open");
-            toggle.setAttribute("aria-expanded", "false");
-          }
-        });
-      }
+      ${mobileNavScript()}
 
       /* Spotlight on hero mock + bento cards */
       function bindSpotlight(el) {

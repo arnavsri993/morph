@@ -23,6 +23,17 @@ import {
   readBillingState
 } from "./billing.js";
 import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
+import {
+  CHROME_THEME_COLOR,
+  backdropHtml,
+  backdropStyles,
+  buttonStyles,
+  chromeReset,
+  chromeTokens,
+  mobileNavScript,
+  reducedMotionStyles,
+  shellStyles
+} from "./chrome.js";
 import { landingHtml } from "./landing.js";
 import { fetchPageForTransform } from "./preview.js";
 import { transformSite } from "./transform.js";
@@ -826,30 +837,10 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>morph Studio</title>
-  <meta name="theme-color" content="#05060b">
+  <meta name="theme-color" content="${CHROME_THEME_COLOR}">
   ${headLinks()}
   <style>
-    :root {
-      color-scheme: dark;
-      --bg: #060608;
-      --bg-subtle: #0c0c0f;
-      --surface: rgba(22, 22, 26, 0.72);
-      --surface-solid: #16161a;
-      --surface-elevated: #1e1e24;
-      --ink: #f4f4f5;
-      --muted: #a1a1aa;
-      --faint: #71717a;
-      --line: rgba(255, 255, 255, 0.07);
-      --line-strong: rgba(255, 255, 255, 0.13);
-      --brand-a: #818cf8;
-      --brand-b: #a78bfa;
-      --cyan: #22d3ee;
-      --ok: #4ade80;
-      --ok-dim: rgba(74, 222, 128, 0.12);
-      --bad: #f87171;
-      --bad-dim: rgba(248, 113, 113, 0.12);
-      --warn: #fbbf24;
-      --warn-dim: rgba(251, 191, 36, 0.12);
+    ${chromeTokens(`
       --drift-visual: #f472b6;
       --drift-visual-dim: rgba(244, 114, 182, 0.14);
       --drift-component: #818cf8;
@@ -858,31 +849,11 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       --drift-interaction-dim: rgba(34, 211, 238, 0.14);
       --drift-responsive: #c084fc;
       --drift-responsive-dim: rgba(192, 132, 252, 0.14);
-      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.04);
-      --shadow-md: 0 8px 32px -8px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
-      --shadow-lg: 0 24px 64px -16px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
-      --font: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      --radius: 16px;
-      --radius-sm: 10px;
-      --radius-xs: 6px;
-      --page-pad: clamp(20px, 3vw, 40px);
-      --section-gap: clamp(48px, 5vw, 72px);
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: var(--font);
-      font-size: 15px;
-      line-height: 1.65;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      text-rendering: optimizeLegibility;
-    }
-    ::selection { background: rgba(129, 140, 248, 0.38); color: #fff; }
-    :focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; border-radius: var(--radius-xs); }
+    `)}
+    ${chromeReset({ fontSize: "15px" })}
+    ${backdropStyles()}
+    ${shellStyles()}
+    ${buttonStyles()}
     .skip-link {
       position: absolute;
       left: -9999px;
@@ -900,32 +871,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     .skip-link:focus { left: 12px; }
     a { color: inherit; }
     code { font-family: var(--mono); font-size: 0.86em; color: var(--cyan); }
-
-    .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-    .aurora {
-      position: absolute;
-      width: 140%;
-      height: 140%;
-      left: -20%;
-      top: -30%;
-      background:
-        radial-gradient(ellipse 40% 35% at 20% 20%, rgba(129, 140, 248, 0.18), transparent 70%),
-        radial-gradient(ellipse 35% 30% at 80% 10%, rgba(167, 139, 250, 0.14), transparent 70%),
-        radial-gradient(ellipse 30% 25% at 60% 80%, rgba(34, 211, 238, 0.08), transparent 70%);
-      animation: aurora-drift 24s ease-in-out infinite alternate;
-    }
-    @keyframes aurora-drift {
-      to { transform: translate3d(2%, 3%, 0) scale(1.04); }
-    }
-    .grid-bg {
-      position: absolute; inset: 0;
-      background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
-      background-size: 32px 32px;
-      -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 20%, transparent 80%);
-      mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 20%, transparent 80%);
-      opacity: 0.35;
-    }
-
     ${headerBarStyles()}
     .nav {
       display: flex;
@@ -934,26 +879,11 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       gap: 24px;
       min-height: 72px;
       padding: 0 var(--page-pad);
+      flex-wrap: wrap;
     }
+    .site-header.nav .mobile-menu { width: 100%; flex-basis: 100%; }
     .nav-left { display: flex; align-items: center; gap: 32px; min-width: 0; }
     ${brandStyles()}
-    .nav-links { display: flex; align-items: center; gap: 4px; }
-    .nav-link {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 500;
-      padding: 8px 14px;
-      border-radius: 999px;
-      transition: color 0.2s ease, background 0.2s ease;
-    }
-    .nav-link:hover { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
-    .nav-link:focus-visible { outline-offset: -2px; }
-    .nav-link.active {
-      color: var(--ink);
-      background: rgba(129, 140, 248, 0.12);
-      box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.22);
-    }
     .nav-right { display: flex; align-items: center; gap: 16px; flex: none; }
     .user-chip { display: flex; align-items: center; gap: 10px; }
     .user-avatar {
@@ -1027,55 +957,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     p { margin: 0; color: var(--muted); }
 
     .actions { display: flex; flex-wrap: wrap; gap: 12px; }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      min-height: 48px;
-      padding: 0 22px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      font: inherit;
-      font-size: 15px;
-      font-weight: 500;
-      cursor: pointer;
-      text-decoration: none;
-      white-space: nowrap;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-    }
-    .btn svg { flex: none; }
-    .btn:active { transform: translateY(1px); }
-    .btn-primary {
-      position: relative;
-      color: #fff;
-      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-      box-shadow: 0 0 40px -8px rgba(129, 140, 248, 0.7);
-      overflow: hidden;
-    }
-    .btn-primary::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      padding: 1px;
-      background: linear-gradient(135deg, rgba(255,255,255,0.5), transparent 50%, rgba(255,255,255,0.2));
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      pointer-events: none;
-    }
-    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 32px -4px rgba(129, 140, 248, 0.75), 0 0 0 1px rgba(129, 140, 248, 0.3); }
-    .btn-primary:focus-visible { outline-color: var(--brand-a); }
-    .btn-ghost {
-      color: var(--ink);
-      background: rgba(255, 255, 255, 0.04);
-      border-color: var(--line-strong);
-    }
-    .btn-ghost:hover { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.08); transform: translateY(-1px); }
-    .btn-ghost:focus-visible { outline-color: var(--brand-a); }
-    .btn-ghost:active, .btn-primary:active { transform: translateY(0); }
     .btn[disabled] { opacity: 0.5; cursor: wait; transform: none !important; }
 
     /* ── Spotlight cards ───────────────────────────────────────────── */
@@ -1765,26 +1646,19 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     }
     @media (max-width: 720px) {
       .stats { grid-template-columns: 1fr; }
-      .nav-links { display: none; }
-      .user-name { display: none; }
       .setup-panel { padding: 28px 24px; }
       .panel-head { padding: 16px 20px; }
     }
     @media (max-width: 640px) {
       .pipe-summary { margin-left: 0; width: 100%; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      * { transition-duration: 0.01ms !important; animation: none !important; }
-    }
+    ${reducedMotionStyles()}
 
   </style>
 </head>
 <body>
   <a class="skip-link" href="#overview">Skip to content</a>
-  <div class="backdrop" aria-hidden="true">
-    <div class="aurora"></div>
-    <div class="grid-bg"></div>
-  </div>
+  ${backdropHtml()}
 
   <header class="site-header nav">
     <div class="nav-left">
@@ -1796,6 +1670,14 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     </div>
     <div class="nav-right">
       ${userBlock}
+      <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="mobileMenu" aria-label="Open menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#overview">Overview</a>
+      <a href="#history">History</a>
+      ${session ? `<a href="/auth/logout">Sign out</a>` : `<a href="/login?returnTo=%2Fstudio">Log in</a>`}
     </div>
   </header>
 
@@ -1895,6 +1777,10 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     </main>
   </div>
   <script>
+    (function () {
+      ${mobileNavScript()}
+    })();
+
     const output = document.querySelector("#output");
     const outputReadable = document.querySelector("#outputReadable");
     const runList = document.querySelector("#runList");

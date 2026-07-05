@@ -2,6 +2,15 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
+import {
+  CHROME_THEME_COLOR,
+  backdropHtml,
+  backdropStyles,
+  buttonStyles,
+  chromeReset,
+  chromeTokens,
+  reducedMotionStyles
+} from "./chrome.js";
 
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -422,100 +431,17 @@ MORPH_AUTH_MODE=oauth</pre>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Log in · morph</title>
-  <meta name="theme-color" content="#050507">
+  <meta name="theme-color" content="${CHROME_THEME_COLOR}">
   <meta name="description" content="Sign in to morph Studio — review agent UI, run repair loops, and store merge gate receipts.">
   ${headLinks()}
   <style>
-    :root {
-      color-scheme: dark;
-      --bg: #050507;
-      --bg-elevated: #0c0c0f;
-      --ink: #fafafa;
-      --muted: #a1a1aa;
-      --faint: #71717a;
-      --line: rgba(255, 255, 255, 0.07);
-      --line-strong: rgba(255, 255, 255, 0.13);
-      --surface: rgba(12, 12, 15, 0.78);
-      --surface-hover: rgba(255, 255, 255, 0.05);
-      --brand-a: #818cf8;
-      --brand-b: #a78bfa;
-      --brand-c: #6366f1;
-      --cyan: #22d3ee;
-      --ok: #4ade80;
-      --bad: #f87171;
-      --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    ${chromeTokens(`
       --radius: 28px;
       --radius-sm: 14px;
-      --shadow-xl: 0 48px 120px -48px rgba(0, 0, 0, 0.92), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-      --ease: cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      min-height: 100dvh;
-      display: grid;
-      place-items: center;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 16px;
-      line-height: 1.65;
-      padding: clamp(20px, 5vw, 48px);
-      overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
-    }
-    :focus-visible {
-      outline: 2px solid var(--cyan);
-      outline-offset: 3px;
-    }
-    .backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      overflow: hidden;
-      pointer-events: none;
-      background:
-        radial-gradient(ellipse 80% 50% at 50% 100%, rgba(99, 102, 241, 0.08), transparent 70%),
-        var(--bg);
-    }
-    .aurora {
-      position: absolute;
-      width: 160%;
-      height: 160%;
-      left: -30%;
-      top: -40%;
-      background:
-        radial-gradient(ellipse 42% 38% at 18% 22%, rgba(129, 140, 248, 0.22), transparent 68%),
-        radial-gradient(ellipse 36% 32% at 82% 12%, rgba(167, 139, 250, 0.18), transparent 68%),
-        radial-gradient(ellipse 28% 24% at 55% 68%, rgba(34, 211, 238, 0.08), transparent 72%);
-      animation: aurora-drift 28s var(--ease) infinite alternate;
-      will-change: transform;
-    }
-    .aurora-2 {
-      position: absolute;
-      inset: -20%;
-      background: radial-gradient(ellipse 50% 40% at 70% 80%, rgba(99, 102, 241, 0.1), transparent 65%);
-      animation: aurora-drift-2 32s var(--ease) infinite alternate-reverse;
-      opacity: 0.7;
-    }
-    @keyframes aurora-drift { to { transform: translate3d(3%, 4%, 0) scale(1.05) rotate(1deg); } }
-    @keyframes aurora-drift-2 { to { transform: translate3d(-2%, -3%, 0) scale(1.03); } }
-    .grid-bg {
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
-      background-size: 28px 28px;
-      mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, black 20%, transparent 80%);
-      opacity: 0.45;
-    }
-    .vignette {
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse 70% 60% at 50% 50%, transparent 30%, rgba(5, 5, 7, 0.55) 100%);
-    }
+    `)}
+    ${chromeReset({ centered: true })}
+    ${backdropStyles()}
+    ${buttonStyles()}
     .card-wrap {
       width: min(460px, 100%);
       position: relative;
@@ -777,22 +703,13 @@ MORPH_AUTH_MODE=oauth</pre>
       .provider { min-height: 48px; font-size: 14px; padding: 0 16px; }
       .setup-env { font-size: 10.5px; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation: none !important;
-        transition-duration: 0.01ms !important;
-      }
+    ${reducedMotionStyles(`
       .provider.continue::before { display: none; }
-    }
+    `)}
   </style>
 </head>
 <body>
-  <div class="backdrop" aria-hidden="true">
-    <div class="aurora"></div>
-    <div class="aurora-2"></div>
-    <div class="grid-bg"></div>
-    <div class="vignette"></div>
-  </div>
+  ${backdropHtml()}
   <header class="site-header">
     <div class="shell site-header-inner">
       ${brandLink("/")}
