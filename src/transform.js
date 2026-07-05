@@ -16,6 +16,7 @@ import {
 import {
   assessUiQuality,
   databaseSummary,
+  extractVisualPreferences,
   planTransform,
   renderPage,
   renderStylesheet
@@ -61,11 +62,13 @@ export async function transformSite(inputDir, outputDir, options = {}) {
     aiHints = ai.hints;
   }
 
+  const visualPreferences = extractVisualPreferences(html, css);
   const plan = planTransform(content, {
     profile: options.profile ?? null,
     archetype: options.archetype ?? null,
     instructions: options.instructions ?? "",
-    aiHints
+    aiHints,
+    visualPreferences
   });
 
   const renderOptions = {
@@ -112,6 +115,7 @@ export async function transformSite(inputDir, outputDir, options = {}) {
         ? "Set --reference-image or --generate-reference to use AI vision."
         : "Set OPENAI_API_KEY to enable AI reference analysis."
     },
+    visualPreferences,
     profile: {
       id: plan.profile.profile.id,
       name: plan.profile.profile.name,
@@ -120,7 +124,8 @@ export async function transformSite(inputDir, outputDir, options = {}) {
       selectionReason: plan.profile.reason,
       matchedKeywords: plan.profile.matchedKeywords,
       referenceSite: plan.profile.referenceSite ?? null,
-      matchedReference: plan.profile.matchedReference ?? null
+      matchedReference: plan.profile.matchedReference ?? null,
+      modeAdjustedFrom: plan.profile.modeAdjustedFrom ?? null
     },
     archetype: {
       id: plan.archetype.archetype.id,

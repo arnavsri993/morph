@@ -612,6 +612,19 @@ function normalizeGithubRepo(value) {
   return raw.replace(/^\/+|\/+$/g, "").replace(/\.git$/, "");
 }
 
+function isGithubRepoReference(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return false;
+  if (/^[\w.-]+\/[\w.-]+$/.test(raw)) return true;
+  return /github\.com\/[^/?#]+\/[^/?#]+/i.test(raw);
+}
+
+function looksLikePreviewUrl(value) {
+  const raw = String(value ?? "").trim();
+  if (!/^https?:\/\//i.test(raw)) return false;
+  return !isGithubRepoReference(raw);
+}
+
 function normalizeReviewTargetFile(value) {
   const candidate = String(value ?? DEFAULT_REVIEW_FILE).trim().replace(/^\/+/, "");
   if (!candidate || candidate.includes("..")) {
@@ -630,10 +643,18 @@ function resolveStudioSource(options) {
       throw new HttpError(400, "ambiguous_source", "Provide either a GitHub repo or a preview URL, not both.");
     }
     if (previewUrl) source = "url";
-    else if (githubRepo) source = "github";
-    else {
+    else if (githubRepo) {
+      if (looksLikePreviewUrl(githubRepo)) {
+        return { source: "url", previewUrl: String(options.githubRepo ?? "").trim(), githubRepo: null };
+      }
+      source = "github";
+    } else {
       throw new HttpError(400, "missing_project_source", "Connect a GitHub repo or provide a preview URL before running a review.");
     }
+  }
+
+  if (source === "github" && !previewUrl && looksLikePreviewUrl(githubRepo)) {
+    return { source: "url", previewUrl: String(options.githubRepo ?? "").trim(), githubRepo: null };
   }
 
   if (source === "url") {
@@ -1709,9 +1730,9 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
             <p class="source-note">morph clones the repo, scores the current UI, and shows the possible score after a full redesign at <code>/transformed</code>. Public repos work without sign-in; connect GitHub for private repos.</p>
           </div>
           <div class="source-pane" data-source-pane="url" hidden>
-            <form class="auth-form" id="previewForm" onsubmit="return false">
-              <label for="previewUrl">Live preview URL</label>
-              <input id="previewUrl" name="previewUrl" type="url" inputmode="url" autocomplete="url" required placeholder="https://your-app.vercel.app/page">
+            <form class="auth-form" id="previewForm">
+              <label for="previewUrl">Web URL</label>
+              <input id="previewUrl" name="previewUrl" type="url" inputmode="url" autocomplete="url" required placeholder="https://cerebralvalley.ai">
             </form>
             <p class="source-note">morph fetches your live site, scores the current UI, and shows the possible score after a full redesign at <code>/transformed</code>.</p>
             <div class="preview-frame" id="previewFrame" hidden>
@@ -1725,7 +1746,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
             <textarea id="agentInstructions" name="instructions" placeholder="What did the agent build? What should morph focus on — token drift, components, focus states, layout?"></textarea>
           </div>
           <div class="actions">
-            <button class="btn btn-primary" data-action="studio-review" id="runReviewBtn">
+            <button type="button" class="btn btn-primary" data-action="studio-review" id="runReviewBtn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
               Run full review
             </button>
@@ -1865,18 +1886,54 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       }
     }
 
-    previewUrlInput?.addEventListener("input", updateSourceBadge);
+    function looksLikeHttpUrl(value) {
+      return /^https?:\\/\\//i.test(String(value ?? "").trim());
+    }
+
+    function isGithubRepoInput(value) {
+      const raw = String(value ?? "").trim();
+      if (!raw) return false;
+      if (/^[\\w.-]+\\/[\\w.-]+$/.test(raw)) return true;
+      return /github\\.com\\//i.test(raw);
+    }
+
+    previewUrlInput?.addEventListener("input", () => {
+      if (looksLikeHttpUrl(previewUrlInput?.value)) {
+        activateSourceTab("url");
+      }
+      updateSourceBadge();
+    });
     githubRepoInput?.addEventListener("input", updateSourceBadge);
+
+    document.querySelector("#previewForm")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      activateSourceTab("url");
+      document.querySelector("#runReviewBtn")?.click();
+    });
+    previewUrlInput?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        activateSourceTab("url");
+        document.querySelector("#runReviewBtn")?.click();
+      }
+    });
 
     function buildReviewRequest() {
       const instructions = agentInstructionsInput?.value.trim() || "";
-      if (activeSource === "url") {
-        const previewUrl = previewUrlInput?.value.trim() || "";
-        if (!previewUrl) throw new Error("Enter a preview URL or switch to GitHub.");
+      const previewUrl = previewUrlInput?.value.trim() || "";
+      const githubRepo = githubRepoInput?.value.trim() || "";
+
+      if (looksLikeHttpUrl(previewUrl)) {
         return { source: "url", previewUrl, instructions };
       }
-      const githubRepo = githubRepoInput?.value.trim() || "";
-      if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo) or switch to Preview URL.");
+      if (looksLikeHttpUrl(githubRepo) && !isGithubRepoInput(githubRepo)) {
+        return { source: "url", previewUrl: githubRepo, instructions };
+      }
+      if (activeSource === "url") {
+        if (!previewUrl) throw new Error("Enter a web URL or switch to GitHub.");
+        return { source: "url", previewUrl, instructions };
+      }
+      if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo) or switch to Web URL.");
       return { source: "github", githubRepo, instructions };
     }
 

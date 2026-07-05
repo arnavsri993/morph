@@ -9,6 +9,7 @@ import { applyDesignHints } from "../ai-vision.js";
 import { corpusSummary } from "./reference-corpus.js";
 import { buildRetrievalPlan, retrievalSummary } from "./retrieval.js";
 import { analyzeHighEndSignals, sourceIndexSummary } from "./source-index.js";
+import { alignProfileToPreferences } from "./visual-preferences.js";
 
 export {
   DESIGN_PROFILES,
@@ -30,8 +31,11 @@ export {
   retrievalSummary,
   corpusSummary,
   analyzeHighEndSignals,
-  sourceIndexSummary
+  sourceIndexSummary,
+  alignProfileToPreferences
 };
+
+export { extractVisualPreferences } from "./visual-preferences.js";
 
 const RETRIEVAL_CONFIDENCE_THRESHOLD = 0.35;
 
@@ -105,7 +109,8 @@ export function selectProfile(text, preferredId = null, options = {}) {
     return { profile, matchedKeywords: bestKeywords, reason: "keyword_match" };
   }
 
-  const fallback = getProfile("aurora-dark");
+  const fallbackId = options.visualPreferences?.mode === "light" ? "meridian-light" : "aurora-dark";
+  const fallback = getProfile(fallbackId);
   return {
     profile: options.aiHints ? applyDesignHints(fallback, options.aiHints) : fallback,
     matchedKeywords: [],
@@ -140,10 +145,30 @@ export function planTransform(content, options = {}) {
   const selectionText = buildSelectionText(content, options.instructions);
   const retrieval = buildRetrievalPlan(selectionText, content);
 
-  const profileSelection = selectProfile(selectionText, options.profile ?? null, {
+  let profileSelection = selectProfile(selectionText, options.profile ?? null, {
     aiHints: options.aiHints ?? null,
-    retrieval
+    retrieval,
+    visualPreferences: options.visualPreferences ?? null
   });
+
+  if (options.visualPreferences) {
+    const originalId = profileSelection.profile.id;
+    const aligned = alignProfileToPreferences(
+      profileSelection.profile,
+      options.visualPreferences,
+      { matchedKeywords: profileSelection.matchedKeywords }
+    );
+    if (aligned.id !== originalId) {
+      profileSelection = {
+        ...profileSelection,
+        profile: aligned,
+        reason: `${profileSelection.reason}+mode_preserved`,
+        modeAdjustedFrom: originalId
+      };
+    } else {
+      profileSelection = { ...profileSelection, profile: aligned };
+    }
+  }
   const archetypeSelection = selectArchetype(selectionText, {
     archetypeId: options.archetype ?? null,
     aiHints: options.aiHints ?? null,

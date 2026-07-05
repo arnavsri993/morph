@@ -13,7 +13,7 @@ import {
 } from "../src/core.js";
 import { serveMorph } from "../src/server.js";
 import { extractContent, transformSite } from "../src/transform.js";
-import { assessUiQuality, databaseSummary, selectProfile, selectArchetype, catalogSummary, matchReferenceSites, buildRetrievalPlan, sourceIndexSummary } from "../src/design-db/index.js";
+import { assessUiQuality, databaseSummary, selectProfile, selectArchetype, catalogSummary, matchReferenceSites, buildRetrievalPlan, sourceIndexSummary, extractVisualPreferences, planTransform, alignProfileToPreferences } from "../src/design-db/index.js";
 import { aiVisionAvailable, analyzeUiReference, applyDesignHints } from "../src/ai-vision.js";
 import { getProfile } from "../src/design-db/profiles.js";
 import { execFileSync } from "node:child_process";
@@ -709,6 +709,67 @@ test("profile selection matches content keywords and honors explicit choice", ()
   const fallback = selectProfile("zzz qqq");
   assert.equal(fallback.profile.id, "aurora-dark");
   assert.equal(fallback.reason, "default_flagship");
+});
+
+test("visual preferences detect dark sites and preserve mode during transform", async () => {
+  const darkHtml = `<!doctype html>
+<html class="dark" style="color-scheme: dark">
+<head>
+  <title>Cerebral Valley</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <style>
+    :root { --primary: #8b5cf6; --bg: #0a0a0a; color-scheme: dark; }
+    body { background: #0a0a0a; color: #f5f5f5; }
+    button { background: #8b5cf6; color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>Cerebral Valley</h1>
+  <p>Community for AI builders, events, and meetups.</p>
+  <button>Join the community</button>
+</body>
+</html>`;
+
+  const prefs = extractVisualPreferences(darkHtml, "");
+  assert.equal(prefs.mode, "dark");
+  assert.equal(prefs.primaryColor, "#8b5cf6");
+
+  const halcyon = getProfile("halcyon-blue");
+  const aligned = alignProfileToPreferences(halcyon, prefs, { matchedKeywords: ["community", "event"] });
+  assert.equal(aligned.mode, "dark");
+  assert.notEqual(aligned.id, "halcyon-blue");
+
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-dark-transform-"));
+  const inputDir = path.join(tempRoot, "site");
+  const outputDir = path.join(tempRoot, "out");
+  await mkdir(inputDir, { recursive: true });
+  await writeFile(path.join(inputDir, "index.html"), darkHtml);
+
+  const receipt = await transformSite(inputDir, outputDir);
+  assert.equal(receipt.visualPreferences.mode, "dark");
+  assert.equal(receipt.profile.mode, "dark");
+  assert.equal(receipt.after.score >= 95, true);
+
+  const outputCss = await readFile(path.join(outputDir, "morph-theme.css"), "utf8");
+  const bgMatch = outputCss.match(/--bg:\s*(#[0-9a-f]{6}|rgba?\([^)]+\))/i)?.[1] ?? "";
+  const bgLum = bgMatch.startsWith("#")
+    ? (() => {
+      const hex = bgMatch.slice(1);
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    })()
+    : 1;
+  assert.equal(bgLum < 0.35, true);
+});
+
+test("plan transform keeps light sites on light profiles", () => {
+  const content = extractContent(`<html><body><h1>TaskPilot</h1><p>Plan projects and manage your team.</p></body></html>`);
+  const plan = planTransform(content, {
+    visualPreferences: { mode: "light", primaryColor: "#22c55e" }
+  });
+  assert.equal(plan.profile.profile.mode, "light");
 });
 
 test("transform re-renders an ugly site into a passing design-database page", async () => {
