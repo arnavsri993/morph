@@ -12,6 +12,42 @@ import { AI_SLOP_HEURISTICS } from "./ai-slop.js";
 
 const GENERIC_FONT_ONLY = /font-family\s*:\s*(?:arial|helvetica|verdana|tahoma|georgia|"?times new roman"?|times|serif|sans-serif|monospace|cursive)\s*(?:,\s*(?:arial|helvetica|verdana|tahoma|georgia|"?times new roman"?|times|serif|sans-serif|monospace|cursive)\s*)*[;}"]/i;
 
+/** Stylistic tells — skip when scoring real sites so we measure broken UX, not taste. */
+const INPUT_SKIP_RULES = new Set([
+  ...AI_SLOP_HEURISTICS.map((rule) => rule.id),
+  "no-transitions",
+  "no-border-radius",
+  "no-elevation",
+  "no-type-scale",
+  "centered-text-walls",
+  "emoji-as-icons",
+  "marketing-buzzword",
+  "no-dark-considered-contrast",
+  "underlined-raw-links",
+  "slow-ui-transition",
+  "transition-all",
+  "ease-in-ui"
+]);
+
+/** Need collected CSS to judge fairly — skip when stylesheets were not available. */
+const CSS_DEPENDENT_RULES = new Set([
+  "default-typography",
+  "no-type-scale",
+  "no-color-system",
+  "no-spacing-rhythm",
+  "no-max-width-container",
+  "no-hover-states",
+  "no-focus-states",
+  "no-transitions",
+  "no-border-radius",
+  "no-elevation",
+  "no-responsive-rules",
+  "no-font-loading",
+  "unstyled-forms",
+  "default-buttons",
+  "underlined-raw-links"
+]);
+
 export const UI_HEURISTICS = [
   {
     id: "no-viewport-meta",
@@ -244,12 +280,17 @@ export const UI_HEURISTICS = [
   ...AI_SLOP_HEURISTICS
 ];
 
-export function assessUiQuality(html, css) {
+export function assessUiQuality(html, css, options = {}) {
+  const perspective = options.perspective ?? "output";
+  const cssCoverage = options.cssCoverage ?? "full";
   const context = { html: String(html ?? ""), css: String(css ?? "") };
   const findings = [];
   let deduction = 0;
 
   for (const rule of UI_HEURISTICS) {
+    if (perspective === "input" && INPUT_SKIP_RULES.has(rule.id)) continue;
+    if (perspective === "input" && cssCoverage !== "full" && CSS_DEPENDENT_RULES.has(rule.id)) continue;
+
     let hit = false;
     try {
       hit = Boolean(rule.test(context));
@@ -268,7 +309,9 @@ export function assessUiQuality(html, css) {
   }
 
   return {
-    model: "morph.ui-quality.v3",
+    model: perspective === "input" ? "morph.ui-quality.input.v1" : "morph.ui-quality.v3",
+    perspective,
+    cssCoverage,
     score: Math.max(0, 100 - deduction),
     findings,
     summary: {

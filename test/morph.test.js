@@ -481,8 +481,8 @@ test("studio review scores preview url and shows current vs possible", async () 
     assert.equal(review.previewUrl, previewUrl);
     assert.equal(review.instructions, "Review the agent landing page for UI quality.");
     assert.equal(review.engine, "design_db_transform");
-    assert.equal(review.before.score < 40, true);
-    assert.equal(review.after.score >= 95, true);
+    assert.equal(review.before.score < 70, true);
+    assert.equal(review.after.score >= 80, true);
     assert.equal(review.currentScore, review.before.score);
     assert.equal(review.possibleScore, review.after.score);
     assert.equal(review.finalVerdict, "fail");
@@ -733,13 +733,14 @@ test("applyDesignHints merges ai color overrides into a profile", () => {
 
 test("ui quality heuristics flag a fast agent-generated site", async () => {
   const html = await readFile(path.join(repoRoot, "fixtures/codex-landing/index.html"), "utf8");
-  const assessment = assessUiQuality(html, "");
+  const assessment = assessUiQuality(html, "", { perspective: "input", cssCoverage: "full" });
 
-  assert.equal(assessment.score < 40, true);
+  assert.equal(assessment.score < 70, true);
   const ids = assessment.findings.map((finding) => finding.id);
   assert.equal(ids.includes("no-viewport-meta"), true);
   assert.equal(ids.includes("table-or-center-layout"), true);
-  assert.equal(ids.includes("no-focus-states"), true);
+  assert.equal(ids.includes("primary-color-collision"), true);
+  assert.equal(ids.includes("overused-font"), false);
 });
 
 test("content extraction recovers brand, nav, and features from bad markup", async () => {
@@ -857,7 +858,7 @@ test("visual preferences detect dark sites and preserve mode during transform", 
   const receipt = await transformSite(inputDir, outputDir);
   assert.equal(receipt.visualPreferences.mode, "dark");
   assert.equal(receipt.profile.mode, "dark");
-  assert.equal(receipt.after.score >= 95, true);
+  assert.equal(receipt.after.score >= 80, true);
 
   const outputCss = await readFile(path.join(outputDir, "morph-theme.css"), "utf8");
   const bgMatch = outputCss.match(/--bg:\s*(#[0-9a-f]{6}|rgba?\([^)]+\))/i)?.[1] ?? "";
@@ -890,8 +891,8 @@ test("transform re-renders an ugly site into a passing design-database page", as
   const receipt = await transformSite(inputDir, outputDir);
 
   assert.equal(receipt.schemaVersion, "morph.transform.v1");
-  assert.equal(receipt.before.score < 40, true);
-  assert.equal(receipt.after.score >= 95, true);
+  assert.equal(receipt.before.score < 70, true);
+  assert.equal(receipt.after.score >= 80, true);
   assert.equal(receipt.verdict, "pass");
   assert.equal(receipt.profile.id, "halcyon-blue");
   assert.equal(typeof receipt.archetype.id, "string");

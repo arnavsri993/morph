@@ -41,6 +41,7 @@ export {
 export { extractVisualPreferences } from "./visual-preferences.js";
 export { AI_SLOP_HEURISTICS, OVERUSED_FONTS } from "./ai-slop.js";
 export { DEFAULT_TASTE } from "./taste.js";
+export { TRANSFORM_PASS_SCORE, TRANSFORM_PRESERVE_SCORE, transformVerdict } from "./scoring.js";
 
 const RETRIEVAL_CONFIDENCE_THRESHOLD = 0.35;
 

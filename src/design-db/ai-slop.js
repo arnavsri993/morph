@@ -86,6 +86,7 @@ export const AI_SLOP_HEURISTICS = [
     message: "Uses an overused AI-default font (Inter, Roboto, Geist, Space Grotesk, etc.) instead of a distinctive pairing.",
     test: ({ html, css }) => {
       const fonts = collectFonts(html, css);
+      if (fonts.size >= 2) return false;
       return [...fonts].some((font) => OVERUSED_FONTS.has(font));
     }
   },

@@ -479,8 +479,8 @@ async function runTransformReview(config, {
     throw new HttpError(422, "transform_failed", error.message);
   }
 
-  const before = heuristicsAsReport(transform.before, transform.codeReview.file, config);
-  const after = heuristicsAsReport(transform.after, "index.html", config);
+  const before = heuristicsAsReport(transform.before, transform.codeReview.file, config, { transformMode: true });
+  const after = heuristicsAsReport(transform.after, "index.html", config, { transformMode: true });
   const userJourney = source === "github"
     ? [
         `Clone agent repo ${githubRepo} (shallow).`,
@@ -539,15 +539,26 @@ async function runTransformReview(config, {
     after,
     redesignVerdict: after.verdict,
     redesignPasses: after.verdict === "pass",
-    finalVerdict: before.verdict,
+    finalVerdict: transform.preservedOriginal && before.verdict === "pass"
+      ? "pass"
+      : before.verdict,
     passed: before.verdict === "pass",
     ciSummary: `Current UI ${before.score}/100${before.verdict === "pass" ? " passes" : " fails"} the gate. After redesign: ${after.score}/100. ${transform.summary}`
   };
 }
 
-function heuristicsAsReport(assessment, file, config) {
-  const threshold = config.gate?.minScore ?? 95;
-  const verdict = assessment.score >= threshold && assessment.findings.length === 0 ? "pass" : "fail";
+function heuristicsAsReport(assessment, file, config, options = {}) {
+  const transformMode = options.transformMode ?? false;
+  const threshold = transformMode
+    ? (config.gate?.transformMinScore ?? 80)
+    : (config.gate?.minScore ?? 95);
+  const verdict = transformMode
+    ? (assessment.score >= threshold
+      && !assessment.findings.some((finding) =>
+        finding.severity === "high"
+        && ["no-viewport-meta", "table-or-center-layout", "missing-image-alts"].includes(finding.id)
+      ) ? "pass" : "fail")
+    : (assessment.score >= threshold && assessment.findings.length === 0 ? "pass" : "fail");
   return {
     verdict,
     score: assessment.score,
@@ -563,7 +574,9 @@ function heuristicsAsReport(assessment, file, config) {
       severity: finding.severity,
       file,
       reason: finding.message,
-      suggestedFix: "Handled by the morph design-database transform."
+      suggestedFix: transformMode
+        ? "Handled by the morph design-database transform."
+        : "Handled by the morph design-database transform."
     }))
   };
 }

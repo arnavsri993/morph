@@ -4,7 +4,7 @@ import { scanHtmlWithAxe } from "./axe-a11y.js";
 import { dedupeIssues } from "./issue.js";
 
 export { buildAgentRules, writeAgentRules } from "./agent-rules.js";
-export { assessCssHealth, mergeUiQualityAssessments } from "./design-health.js";
+export { assessCssHealth, mergeUiQualityAssessments, assessFullUiQuality } from "./design-health.js";
 export { enrichGrammarFromTokens } from "./buoy-health.js";
 export { dedupeIssues } from "./issue.js";
 

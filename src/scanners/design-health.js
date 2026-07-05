@@ -1,4 +1,11 @@
 import { parseCssValues, groupByCategory, countOccurrences } from "@buoy-design/core";
+import { assessUiQuality } from "../design-db/heuristics.js";
+
+/** CSS health findings that duplicate an existing UI heuristic — count once. */
+const CSS_HEALTH_UI_OVERLAP = {
+  "css-no-custom-properties": "no-color-system",
+  "css-hardcoded-color-density": "no-color-system"
+};
 
 const CSS_HEALTH_RULES = [
   {
@@ -102,16 +109,20 @@ export function assessCssHealth(html, css) {
 export function mergeUiQualityAssessments(base, cssHealth) {
   const mergedFindings = [...base.findings];
   const seen = new Set(base.findings.map((finding) => finding.id));
+
   for (const finding of cssHealth.findings) {
     if (seen.has(finding.id)) continue;
+    const overlapId = CSS_HEALTH_UI_OVERLAP[finding.id];
+    if (overlapId && seen.has(overlapId)) continue;
     mergedFindings.push(finding);
+    seen.add(finding.id);
   }
 
-  const extraDeduction = cssHealth.findings.reduce((sum, finding) => sum + finding.weight, 0);
+  const deduction = mergedFindings.reduce((sum, finding) => sum + finding.weight, 0);
   return {
     ...base,
-    model: "morph.ui-quality.v2",
-    score: Math.max(0, base.score - extraDeduction),
+    model: "morph.ui-quality.v4",
+    score: Math.max(0, 100 - deduction),
     findings: mergedFindings,
     cssHealth: cssHealth.stats,
     summary: {
@@ -121,4 +132,10 @@ export function mergeUiQualityAssessments(base, cssHealth) {
       low: mergedFindings.filter((finding) => finding.severity === "low").length
     }
   };
+}
+
+export function assessFullUiQuality(html, css, options = {}) {
+  const base = assessUiQuality(html, css, options);
+  const cssHealth = assessCssHealth(html, css);
+  return mergeUiQualityAssessments(base, cssHealth);
 }

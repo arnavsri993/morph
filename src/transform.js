@@ -15,15 +15,19 @@ import {
   generateUiReference
 } from "./ai-vision.js";
 import {
-  assessUiQuality,
   databaseSummary,
   extractVisualPreferences,
   planTransform,
   renderPage,
   renderStylesheet
 } from "./design-db/index.js";
-import { mergeUiQualityAssessments, assessCssHealth } from "./scanners/design-health.js";
+import { TRANSFORM_PRESERVE_SCORE, transformVerdict } from "./design-db/scoring.js";
+import { assessFullUiQuality } from "./scanners/design-health.js";
 import { enrichContent, researchSite } from "./site-research.js";
+
+const REMOTE_CSS_TIMEOUT_MS = 5000;
+const REMOTE_CSS_MAX_BYTES = 256 * 1024;
+const REMOTE_CSS_MAX_FILES = 6;
 
 export async function transformSite(inputDir, outputDir, options = {}) {
   const entry = await findEntryHtml(inputDir);
@@ -32,10 +36,28 @@ export async function transformSite(inputDir, outputDir, options = {}) {
   }
 
   const html = await readFile(entry, "utf8");
-  const css = await collectCss(inputDir, entry, html);
-  const before = mergeUiQualityAssessments(assessUiQuality(html, css), assessCssHealth(html, css));
-  const siteResearch = researchSite(html, css);
+  const cssBundle = await collectCss(inputDir, entry, html);
+  const assessmentOptions = {
+    perspective: "input",
+    cssCoverage: cssBundle.coverage
+  };
+  const before = assessFullUiQuality(html, cssBundle.css, assessmentOptions);
+  const siteResearch = researchSite(html, cssBundle.css);
   const content = enrichContent(extractContent(html), siteResearch);
+
+  if (before.score >= TRANSFORM_PRESERVE_SCORE && !options.forceRerender) {
+    return await buildPreserveReceipt({
+      inputDir,
+      entry,
+      outputDir,
+      html,
+      cssBundle,
+      before,
+      siteResearch,
+      content,
+      options
+    });
+  }
 
   const contentSummary = [
     content.brand,
@@ -78,7 +100,7 @@ export async function transformSite(inputDir, outputDir, options = {}) {
     aiHints = ai.hints;
   }
 
-  const visualPreferences = extractVisualPreferences(html, css);
+  const visualPreferences = extractVisualPreferences(html, cssBundle.css);
   const plan = planTransform(content, {
     profile: options.profile ?? null,
     archetype: options.archetype ?? null,
@@ -100,7 +122,7 @@ export async function transformSite(inputDir, outputDir, options = {}) {
     taste: plan.taste,
     renderFlags: plan.renderFlags
   });
-  const after = assessUiQuality(outputHtml, outputCss);
+  const after = assessFullUiQuality(outputHtml, outputCss, { perspective: "output" });
 
   await mkdir(outputDir, { recursive: true });
   const htmlPath = path.join(outputDir, "index.html");
@@ -213,7 +235,9 @@ export async function transformSite(inputDir, outputDir, options = {}) {
       changed: true
     },
     improvement: after.score - before.score,
-    verdict: after.score >= 95 ? "pass" : "fail",
+    verdict: transformVerdict(after),
+    preservedOriginal: false,
+    cssCollection: cssBundle.meta,
     summary: buildSummary(plan, before, after, aiHints)
   };
 }
@@ -252,18 +276,44 @@ async function walkForHtml(directory) {
 
 async function collectCss(rootDir, entryFile, html) {
   const chunks = [];
+  const meta = {
+    inlineStyles: 0,
+    styleBlocks: 0,
+    localStylesheets: 0,
+    remoteStylesheets: 0,
+    remoteFetched: 0,
+    remoteFailed: 0
+  };
+  let remoteFetchBudget = REMOTE_CSS_MAX_FILES;
 
   for (const match of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
     chunks.push(match[1]);
+    meta.styleBlocks += 1;
   }
 
   for (const match of html.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/gi)) {
     const href = match[0].match(/href=["']([^"']+)["']/i)?.[1];
-    if (!href || /^https?:/i.test(href)) continue;
+    if (!href) continue;
+
+    if (/^https?:/i.test(href)) {
+      meta.remoteStylesheets += 1;
+      if (remoteFetchBudget <= 0) continue;
+      remoteFetchBudget -= 1;
+      const remoteCss = await fetchRemoteStylesheet(href);
+      if (remoteCss) {
+        chunks.push(remoteCss);
+        meta.remoteFetched += 1;
+      } else {
+        meta.remoteFailed += 1;
+      }
+      continue;
+    }
+
     const cssFile = path.resolve(path.dirname(entryFile), href.replace(/^\//, ""));
     if (cssFile.startsWith(path.resolve(rootDir)) && existsSync(cssFile)) {
       try {
         chunks.push(await readFile(cssFile, "utf8"));
+        meta.localStylesheets += 1;
       } catch {
         // unreadable stylesheet: treated as absent
       }
@@ -272,9 +322,123 @@ async function collectCss(rootDir, entryFile, html) {
 
   for (const match of html.matchAll(/style=["']([^"']*)["']/gi)) {
     chunks.push(`.inline{${match[1]}}`);
+    meta.inlineStyles += 1;
   }
 
-  return chunks.join("\n");
+  const css = chunks.join("\n");
+  const referencesStylesheets = meta.localStylesheets + meta.remoteStylesheets > 0
+    || /<link\b[^>]*rel=["']stylesheet["']/i.test(html);
+  const coverage = referencesStylesheets && css.trim().length < 120 ? "partial" : "full";
+
+  return { css, coverage, meta };
+}
+
+async function fetchRemoteStylesheet(url) {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REMOTE_CSS_TIMEOUT_MS);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { accept: "text/css,*/*;q=0.1" }
+    });
+    clearTimeout(timer);
+    if (!response.ok) return null;
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > REMOTE_CSS_MAX_BYTES) return null;
+    return new TextDecoder("utf-8").decode(buffer);
+  } catch {
+    return null;
+  }
+}
+
+async function buildPreserveReceipt({
+  inputDir,
+  entry,
+  outputDir,
+  html,
+  cssBundle,
+  before,
+  siteResearch,
+  content,
+  options
+}) {
+  const passthroughHtml = ensureViewportMeta(html);
+  const linkedCss = cssBundle.css.trim()
+    ? `<style>\n${cssBundle.css}\n</style>`
+    : "";
+
+  await mkdir(outputDir, { recursive: true });
+  const htmlPath = path.join(outputDir, "index.html");
+  await writeFile(htmlPath, passthroughHtml.includes("<head")
+    ? passthroughHtml.replace(/<head([^>]*)>/i, `<head$1>\n${linkedCss}`)
+    : `<!doctype html><html><head>${linkedCss}</head><body>${passthroughHtml}</body></html>`);
+
+  const after = assessFullUiQuality(passthroughHtml, cssBundle.css, { perspective: "output" });
+
+  return {
+    schemaVersion: "morph.transform.v1",
+    generatedAt: new Date().toISOString(),
+    input: {
+      root: inputDir,
+      entry: path.relative(inputDir, entry)
+    },
+    output: {
+      root: outputDir,
+      files: ["index.html"]
+    },
+    designDatabase: databaseSummary(),
+    ai: {
+      available: aiVisionAvailable(),
+      reason: "preserved_original",
+      message: "Site already meets the quality bar — morph preserved the original layout instead of applying a template."
+    },
+    sponsorAi: null,
+    visualPreferences: extractVisualPreferences(html, cssBundle.css),
+    siteResearch: {
+      summary: siteResearch.summary,
+      audience: siteResearch.audience,
+      inventory: siteResearch.inventory,
+      topics: siteResearch.topics?.slice(0, 12) ?? [],
+      navLinks: siteResearch.navLinks?.slice(0, 8) ?? [],
+      cardCount: siteResearch.cards?.length ?? 0,
+      eventCount: siteResearch.events?.length ?? 0
+    },
+    profile: null,
+    archetype: null,
+    retrieval: null,
+    patterns: [],
+    taste: options.taste ?? null,
+    renderFlags: null,
+    content: {
+      brand: content.brand,
+      headline: content.hero?.headline ?? null,
+      navLinks: (content.nav ?? []).length,
+      features: (content.features ?? []).length,
+      sections: (content.sections ?? []).length,
+      stats: (content.stats ?? []).length
+    },
+    before,
+    after,
+    codeReview: {
+      file: path.relative(inputDir, entry),
+      before: html,
+      after: passthroughHtml,
+      changed: passthroughHtml !== html
+    },
+    improvement: after.score - before.score,
+    verdict: transformVerdict(after),
+    preservedOriginal: true,
+    cssCollection: cssBundle.meta,
+    summary: `morph preserved the original site (${before.score}/100) — it already meets the quality bar. No template re-render applied.`
+  };
+}
+
+function ensureViewportMeta(html) {
+  if (/name=["']viewport["']/i.test(html)) return html;
+  if (/<head\b/i.test(html)) {
+    return html.replace(/<head([^>]*)>/i, '<head$1>\n<meta name="viewport" content="width=device-width, initial-scale=1">');
+  }
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${html}</body></html>`;
 }
 
 // ── Content extraction ─────────────────────────────────────────────────────
@@ -334,7 +498,7 @@ export function extractContent(rawHtml) {
     brand,
     nav,
     hero: {
-      eyebrow: description && description.length <= 80 ? description : null,
+      eyebrow: null,
       headline,
       subhead: subhead === headline ? "" : subhead,
       ctas

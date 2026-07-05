@@ -64,15 +64,15 @@ export function normalizeTaste(taste) {
 export function tasteRenderFlags(taste) {
   const normalized = normalizeTaste(taste);
   return {
-    showEyebrow: normalized.visualDensity >= 6,
-    showSectionKickers: normalized.designVariance >= 7,
-    showScrollReveal: normalized.motionIntensity >= 4,
-    showFeatureIcons: normalized.designVariance >= 5 && normalized.visualDensity >= 6,
+    showEyebrow: normalized.visualDensity >= 8,
+    showSectionKickers: normalized.designVariance >= 9,
+    showScrollReveal: normalized.motionIntensity >= 5,
+    showFeatureIcons: normalized.designVariance >= 8 && normalized.visualDensity >= 8,
     heroCentered: normalized.designVariance <= 5,
     motionScale: normalized.motionIntensity / DEFAULT_TASTE.motionIntensity,
     sectionPaddingScale: normalized.visualDensity <= 4 ? 1.15 : normalized.visualDensity >= 8 ? 0.85 : 1,
     hoverLift: normalized.motionIntensity >= 5 ? "-4px" : normalized.motionIntensity >= 3 ? "-2px" : "0",
-    revealDurationMs: normalized.motionIntensity >= 7 ? 480 : normalized.motionIntensity >= 4 ? 360 : 0
+    revealDurationMs: normalized.motionIntensity >= 7 ? 480 : normalized.motionIntensity >= 5 ? 360 : 0
   };
 }
 
