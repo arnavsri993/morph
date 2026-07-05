@@ -2745,9 +2745,15 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         possibleScore.className = "stat-value";
       }
       const finalVerdict = runPayload?.finalVerdict || before?.verdict;
+      const redesignPasses = runPayload?.redesignPasses === true;
       if (finalVerdict) {
-        gate.textContent = finalVerdict === "pass" ? "Open" : "Blocked";
-        gate.className = "stat-value " + (finalVerdict === "pass" ? "ok" : "bad");
+        if (redesignPasses && finalVerdict !== "pass") {
+          gate.textContent = "Open after redesign";
+          gate.className = "stat-value ok";
+        } else {
+          gate.textContent = finalVerdict === "pass" ? "Open" : "Blocked";
+          gate.className = "stat-value " + (finalVerdict === "pass" ? "ok" : "bad");
+        }
       }
       const issueCount = before?.issues?.length ?? runPayload?.repair?.replacements;
       if (issueCount !== undefined) fixes.textContent = issueCount;
@@ -2783,11 +2789,19 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       runList.innerHTML = "";
       for (const run of payload.runs.slice(0, 12)) {
         const verdict = verdictOf(run.payload);
-        const verdictCls = verdict === "pass" ? "pass" : verdict === "fail" ? "fail" : "stored";
+        const redesignPasses = run.payload?.redesignPasses === true;
+        const verdictCls = redesignPasses || verdict === "pass"
+          ? "pass"
+          : verdict === "fail"
+            ? "fail"
+            : "stored";
         const gradedScore = run.payload?.currentScore;
-        const verdictLabel = gradedScore != null
-          ? gradedScore + "/100 · " + verdict
-          : verdict;
+        const possibleScore = run.payload?.possibleScore;
+        const verdictLabel = gradedScore != null && possibleScore != null && redesignPasses
+          ? gradedScore + "→" + possibleScore + " · redesign pass"
+          : gradedScore != null
+            ? gradedScore + "/100 · " + verdict
+            : verdict;
         const button = document.createElement("button");
         button.type = "button";
         button.className = "run" + (run.id === selectedRunId ? " selected" : "");
