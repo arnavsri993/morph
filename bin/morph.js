@@ -10,6 +10,9 @@ import {
   storeRun
 } from "../src/core.js";
 import { serveMorph } from "../src/server.js";
+import { transformSite } from "../src/transform.js";
+import { cloneRepo } from "../src/github.js";
+import path from "node:path";
 
 function parseArgs(argv) {
   const args = {
@@ -23,7 +26,14 @@ function parseArgs(argv) {
     force: false,
     host: null,
     port: null,
-    projectName: null
+    projectName: null,
+    input: null,
+    repo: null,
+    profile: null,
+    archetype: null,
+    instructions: null,
+    referenceImage: null,
+    generateReference: false
   };
 
   for (let i = 3; i < argv.length; i += 1) {
@@ -38,6 +48,13 @@ function parseArgs(argv) {
     else if (arg === "--host") args.host = argv[++i];
     else if (arg === "--port") args.port = argv[++i];
     else if (arg === "--project-name") args.projectName = argv[++i];
+    else if (arg === "--input") args.input = argv[++i];
+    else if (arg === "--repo") args.repo = argv[++i];
+    else if (arg === "--profile") args.profile = argv[++i];
+    else if (arg === "--archetype") args.archetype = argv[++i];
+    else if (arg === "--instructions") args.instructions = argv[++i];
+    else if (arg === "--reference-image") args.referenceImage = argv[++i];
+    else if (arg === "--generate-reference") args.generateReference = true;
     else if (arg === "--help" || arg === "-h") args.command = "help";
   }
 
@@ -52,16 +69,22 @@ Usage:
   morph verify --config morph.config.json [--json] [--output report.json] [--store] [--no-fail]
   morph repair --config morph.config.json [--apply] [--json] [--store]
   morph loop --config morph.config.json [--apply] [--json] [--store] [--no-fail]
+  morph transform (--input ./site | --repo owner/repo) [--output ./morph-output]
+             [--profile aurora-dark] [--archetype landing-classic]
+             [--instructions "..."] [--reference-image ./mockup.png]
+             [--generate-reference] [--json]
   morph demo
   morph serve --config morph.config.json [--host 127.0.0.1] [--port 4177]
 
 Commands:
-  init     Create morph.config.json, .morph/runs, and safe env examples.
-  verify   Scan a frontend fixture and emit design-system drift reports.
-  repair   Generate or apply deterministic patch suggestions from the report.
-  loop     Verify, repair, verify again, and emit a final pass/fail gate.
-  demo     Run the bundled Acme SaaS judge demo.
-  serve    Start the local Morph control plane and JSON API.
+  init       Create morph.config.json, .morph/runs, and safe env examples.
+  verify     Scan a frontend fixture and emit design-system drift reports.
+  repair     Generate or apply deterministic patch suggestions from the report.
+  loop       Verify, repair, verify again, and emit a final pass/fail gate.
+  transform  Re-render an arbitrary site with a frontier-grade design profile
+             selected from Morph's design intelligence database.
+  demo       Run the bundled Acme SaaS judge demo.
+  serve      Start the local Morph control plane and JSON API.
 `);
 }
 
@@ -92,6 +115,40 @@ async function main() {
 
   if (args.command === "demo") {
     await import("../scripts/demo.mjs");
+    return;
+  }
+
+  if (args.command === "transform") {
+    let inputDir = args.input ? path.resolve(args.input) : null;
+    if (args.repo) {
+      inputDir = path.resolve(".morph/transform-checkout");
+      console.error(`Cloning ${args.repo}…`);
+      await cloneRepo(args.repo, inputDir);
+    }
+    if (!inputDir) {
+      console.error("morph transform needs --input <dir> or --repo <owner/repo>.");
+      process.exitCode = 1;
+      return;
+    }
+    const outputDir = path.resolve(args.output ?? "morph-output");
+    const receipt = await transformSite(inputDir, outputDir, {
+      profile: args.profile,
+      archetype: args.archetype,
+      instructions: args.instructions,
+      referenceImage: args.referenceImage,
+      generateReference: args.generateReference
+    });
+    if (args.json) console.log(JSON.stringify(receipt, null, 2));
+    else {
+      console.log(receipt.summary);
+      console.log(`Profile: ${receipt.profile.name} (${receipt.profile.inspiration})`);
+      console.log(`Layout: ${receipt.archetype.name} — ${receipt.patterns.length} UI pattern(s)`);
+      if (receipt.ai?.hints) console.log(`AI reference: ${receipt.ai.message}`);
+      console.log(`Before: ${receipt.before.score}/100 with ${receipt.before.findings.length} UI-quality finding(s).`);
+      console.log(`After: ${receipt.after.score}/100.`);
+      console.log(`Output: ${outputDir}`);
+      for (const file of receipt.output.files) console.log(`- ${file}`);
+    }
     return;
   }
 

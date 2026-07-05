@@ -1,11 +1,11 @@
 {
-  "projectName": "Morph Product Smoke",
-  "projectId": "morph-product-smoke",
-  "projectRoot": "fixtures/acme-saas-clean",
+  "projectName": "Acme Control Plane",
+  "projectId": "acme-control-plane",
+  "projectRoot": "fixtures/acme-saas",
   "morphDir": ".morph",
   "workspace": {
-    "id": "morph-local-workspace",
-    "name": "Morph Local Workspace",
+    "id": "morph-demo-workspace",
+    "name": "Morph Demo Workspace",
     "authMode": "dev"
   },
   "tokenFiles": [
@@ -23,7 +23,7 @@
     "mergePolicy": "block_on_any_drift"
   },
   "report": {
-    "defaultOutput": ".morph/latest-report.json"
+    "defaultOutput": "demo/reports/seeded-drift.json"
   },
   "server": {
     "host": "127.0.0.1",

@@ -23,8 +23,8 @@ await writeFile(demoConfigPath, `${JSON.stringify({
   projectRoot: "acme-saas",
   morphDir: ".morph",
   workspace: {
-    id: "raise-demo-workspace",
-    name: "RAISE Summit Demo Workspace",
+    id: "morph-demo-workspace",
+    name: "Morph Demo Workspace",
     authMode: "dev"
   },
   tokenFiles: ["design-system/tokens.css"],
@@ -67,7 +67,7 @@ const transcript = [
   "✔ default brace scan globs include frontend files",
   "✔ server exposes health, run storage, and invalid JSON errors",
   "",
-  "$ npm run verify -- --json --no-fail --output demo/reports/seeded-drift.json",
+  "$ npm run verify:demo -- --json --no-fail --output demo/reports/seeded-drift.json",
   `Acme Control Plane: ${before.verdict.toUpperCase()} (${before.score}/100)`,
   before.ciSummary,
   "",

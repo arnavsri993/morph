@@ -24,6 +24,8 @@ import {
 } from "./billing.js";
 import { landingHtml } from "./landing.js";
 import { capturePreviewUrl } from "./preview.js";
+import { transformSite } from "./transform.js";
+import { cloneRepo } from "./github.js";
 
 export async function serveMorph(config, options = {}) {
   if (options.loadEnv !== false) {
@@ -270,7 +272,9 @@ export async function serveMorph(config, options = {}) {
           source: body.source,
           previewUrl: body.previewUrl,
           githubRepo: body.githubRepo,
-          instructions: body.instructions
+          instructions: body.instructions,
+          referenceImage: body.referenceImage,
+          generateReference: body.generateReference
         });
         const stored = await storeRun(config, "studio-review", review);
         return sendJson(response, 201, { run: stored });
@@ -338,6 +342,10 @@ export async function serveMorph(config, options = {}) {
         return sendJson(response, 200, publicConfig(config, runtimeAuth, billing));
       }
 
+      if (request.method === "GET" && (url.pathname === "/transformed" || url.pathname.startsWith("/transformed/"))) {
+        return serveTransformedFile(response, config, url.pathname);
+      }
+
       return sendJson(response, 404, { error: "not_found" });
     } catch (error) {
       if (error instanceof AuthError && url && !url.pathname.startsWith("/api/")) {
@@ -365,6 +373,15 @@ const DEFAULT_REVIEW_FILE = "src/routes/settings/billing.tsx";
 async function runStudioReview(config, options = {}) {
   const instructions = String(options.instructions ?? "").trim();
   const { source, previewUrl, githubRepo } = resolveStudioSource(options);
+
+  if (source === "github") {
+    return runGithubTransformReview(config, {
+      githubRepo,
+      instructions,
+      referenceImage: options.referenceImage,
+      generateReference: options.generateReference
+    });
+  }
 
   let preview = null;
   if (source === "url") {
@@ -459,9 +476,136 @@ async function runStudioReview(config, options = {}) {
   };
 }
 
+async function runGithubTransformReview(config, { githubRepo, instructions, referenceImage, generateReference }) {
+  const studioRoot = path.join(config.configDir, ".studio-run");
+  const checkoutRoot = path.join(studioRoot, "checkout");
+  const transformedRoot = path.join(studioRoot, "transformed");
+  await mkdir(studioRoot, { recursive: true });
+
+  try {
+    await cloneRepo(githubRepo, checkoutRoot);
+  } catch (error) {
+    throw new HttpError(422, "github_clone_failed", `Could not clone ${githubRepo}: ${error.message}`);
+  }
+
+  let transform;
+  try {
+    transform = await transformSite(checkoutRoot, transformedRoot, {
+      instructions,
+      profile: null,
+      referenceImage: referenceImage || null,
+      generateReference: Boolean(generateReference)
+    });
+  } catch (error) {
+    throw new HttpError(422, "transform_failed", error.message);
+  }
+
+  const before = heuristicsAsReport(transform.before, transform.codeReview.file, config);
+  const after = heuristicsAsReport(transform.after, "index.html", config);
+
+  return {
+    schemaVersion: "morph.studio-review.v1",
+    generatedAt: new Date().toISOString(),
+    project: config.projectName,
+    isolated: true,
+    source: "github",
+    engine: "design_db_transform",
+    instructions: instructions || null,
+    githubRepo,
+    previewUrl: null,
+    preview: null,
+    targetFile: transform.codeReview.file,
+    codeReview: transform.codeReview,
+    transform: {
+      profile: transform.profile,
+      designDatabase: transform.designDatabase,
+      content: transform.content,
+      improvement: transform.improvement,
+      outputFiles: transform.output.files
+    },
+    transformedPreviewPath: "/transformed/index.html",
+    userJourney: [
+      `Clone agent repo ${githubRepo} (shallow).`,
+      `Score the incoming UI against ${transform.designDatabase.heuristics} design-quality heuristics: ${transform.before.score}/100.`,
+      "Extract the site's content: brand, navigation, hero copy, features, CTAs.",
+      `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
+      "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
+      `Verify the transformed UI: ${transform.after.score}/100. Preview it at /transformed/index.html.`
+    ],
+    before,
+    repair: {
+      runId: null,
+      applied: true,
+      replacements: transform.before.findings.length,
+      patches: [{ file: "index.html", replacements: [] }, { file: "morph-theme.css", replacements: [] }],
+      risk: "full_rerender_from_design_database"
+    },
+    after,
+    finalVerdict: after.verdict,
+    passed: after.verdict === "pass",
+    ciSummary: transform.summary
+  };
+}
+
+function heuristicsAsReport(assessment, file, config) {
+  const threshold = config.gate?.minScore ?? 95;
+  const verdict = assessment.score >= threshold && assessment.findings.length === 0 ? "pass" : "fail";
+  return {
+    verdict,
+    score: assessment.score,
+    summary: assessment.summary,
+    gate: {
+      threshold,
+      passed: verdict === "pass",
+      mergePolicy: config.gate?.mergePolicy ?? "block_on_any_drift"
+    },
+    issues: assessment.findings.map((finding) => ({
+      id: finding.id,
+      type: `${finding.category}_quality`,
+      severity: finding.severity,
+      file,
+      reason: finding.message,
+      suggestedFix: "Handled by the Morph design-database transform."
+    }))
+  };
+}
+
+const TRANSFORMED_CONTENT_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon"
+};
+
+async function serveTransformedFile(response, config, pathname) {
+  const transformedRoot = path.resolve(config.configDir, ".studio-run/transformed");
+  const relative = decodeURIComponent(pathname.replace(/^\/transformed\/?/, "")) || "index.html";
+  const target = path.resolve(transformedRoot, relative);
+  if (!target.startsWith(transformedRoot + path.sep) && target !== transformedRoot) {
+    return sendJson(response, 400, { error: "invalid_path" });
+  }
+  try {
+    const body = await readFile(target);
+    const type = TRANSFORMED_CONTENT_TYPES[path.extname(target).toLowerCase()] ?? "application/octet-stream";
+    response.writeHead(200, { "content-type": type, "cache-control": "no-store" });
+    response.end(body);
+  } catch {
+    return sendJson(response, 404, {
+      error: "no_transformed_site",
+      message: "Run a GitHub review first — the transformed site will be served here."
+    });
+  }
+}
+
 function normalizeGithubRepo(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
+  if (/^file:\/\//i.test(raw)) return raw;
   const match = raw.match(/github\.com\/([^/?#]+\/[^/?#]+)/i);
   if (match) return match[1].replace(/\.git$/, "");
   return raw.replace(/^\/+|\/+$/g, "").replace(/\.git$/, "");
@@ -1573,7 +1717,7 @@ function dashboardHtml(config, session) {
                   <span>Repository</span>
                   <input id="githubRepo" name="githubRepo" type="text" required autocomplete="off" placeholder="owner/repo or https://github.com/owner/repo">
                 </label>
-                <p class="source-note">morph stores the repo with the review receipt and scans the configured frontend root for drift.</p>
+                <p class="source-note">morph clones the repo, scores the UI against its design intelligence database, and re-renders the site with a frontier-grade design profile. The result is served at <code>/transformed</code>.</p>
               </div>
               <div class="source-pane" data-source-pane="url" hidden>
                 <form class="auth-form" id="previewForm" onsubmit="return false">
@@ -1814,6 +1958,13 @@ function dashboardHtml(config, session) {
       }
       if (p.githubRepo) {
         html += '<div style="margin-bottom:8px;font-size:12px;color:var(--muted)"><strong style="color:var(--ink)">GitHub:</strong> ' + esc(p.githubRepo) + '</div>';
+      }
+      if (p.transform?.profile) {
+        html += '<div style="margin-bottom:8px;font-size:12px;color:var(--muted)"><strong style="color:var(--ink)">Design profile:</strong> '
+          + esc(p.transform.profile.name) + ' — ' + esc(p.transform.profile.inspiration || "") + '</div>';
+      }
+      if (p.transformedPreviewPath) {
+        html += '<div style="margin:10px 0"><a class="btn btn-primary" href="' + esc(p.transformedPreviewPath) + '" target="_blank" rel="noreferrer">Open transformed site ↗</a></div>';
       }
       if (p.previewUrl) {
         html += '<div style="margin-bottom:8px;font-size:12px;color:var(--muted)"><strong style="color:var(--ink)">Preview URL:</strong> ' + esc(p.previewUrl) + '</div>';

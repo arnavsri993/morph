@@ -10,10 +10,25 @@ import {
 import path from "node:path";
 
 const SEVERITY_DEDUCTION = {
-  high: 6,
-  medium: 3,
+  high: 5.5,
+  medium: 2.75,
   low: 1
 };
+
+const TYPE_DEDUCTION_MULTIPLIER = {
+  design_drift: 1,
+  component_drift: 1.25,
+  interaction_drift: 1.15,
+  responsive_drift: 1.1
+};
+
+const SEVERITY_FAMILY_CAP = {
+  high: 18,
+  medium: 10,
+  low: 4
+};
+
+const REPEAT_DEDUCTION_FACTORS = [1, 0.6, 0.35];
 
 export async function loadConfig(configPath, cwd = process.cwd()) {
   const absoluteConfigPath = path.resolve(cwd, configPath);
@@ -49,7 +64,9 @@ export async function createReport(config, options = {}) {
     issues.push(...scanSource(relativeFile, source, grammar));
   }
 
-  const score = calculateScore(issues);
+  const grade = calculateGrade(issues);
+  const score = grade.score;
+  const gateThreshold = config.gate?.minScore ?? 95;
   const report = {
     schemaVersion: "morph.report.v1",
     runId: options.runId ?? createRunId("verify"),
@@ -62,12 +79,13 @@ export async function createReport(config, options = {}) {
     },
     projectId: config.projectId ?? slugify(config.projectName),
     project: config.projectName,
-    verdict: score >= 95 && issues.length === 0 ? "pass" : "fail",
+    verdict: score >= gateThreshold && issues.length === 0 ? "pass" : "fail",
     score,
+    grade,
     summary: summarizeIssues(issues),
     gate: {
-      threshold: config.gate?.minScore ?? 95,
-      passed: score >= (config.gate?.minScore ?? 95) && issues.length === 0,
+      threshold: gateThreshold,
+      passed: score >= gateThreshold && issues.length === 0,
       mergePolicy: config.gate?.mergePolicy ?? "block_on_any_drift"
     },
     ciSummary: buildCiSummary(score, issues),
@@ -108,38 +126,40 @@ export async function repairProject(config, options = {}) {
   for (const issue of report.issues) {
     if (!issue.patch?.replacements?.length) continue;
     const existing = grouped.get(issue.file) ?? [];
-    existing.push(...issue.patch.replacements);
+    existing.push(...issue.patch.replacements.map((replacement) => ({
+      ...replacement,
+      issueId: issue.id
+    })));
     grouped.set(issue.file, existing);
   }
 
   const patches = [];
+  const skippedReplacements = [];
+  let candidateReplacements = 0;
   let replacements = 0;
 
   for (const [relativeFile, fileReplacements] of grouped.entries()) {
     const absoluteFile = config.resolveFromProject(relativeFile);
-    let source = await readFile(absoluteFile, "utf8");
-    const applied = [];
+    const originalSource = await readFile(absoluteFile, "utf8");
+    const result = applyRepairReplacements(originalSource, fileReplacements);
+    candidateReplacements += result.candidates;
+    replacements += result.applied.length;
+    skippedReplacements.push(...result.skipped.map((replacement) => ({
+      ...replacement,
+      file: relativeFile
+    })));
 
-    const orderedReplacements = [...fileReplacements]
-      .sort((left, right) => right.find.length - left.find.length);
-
-    for (const replacement of orderedReplacements) {
-      if (!source.includes(replacement.find)) continue;
-      source = source.split(replacement.find).join(replacement.replace);
-      applied.push(replacement);
-      replacements += 1;
-    }
-
-    if (applied.length) {
+    if (result.applied.length) {
       patches.push({
         file: relativeFile,
-        replacements: applied
+        replacements: result.applied
       });
-      if (options.apply) await writeFile(absoluteFile, source);
+      if (options.apply) await writeFile(absoluteFile, result.source);
     }
   }
 
   const after = options.apply ? await createReport(config) : null;
+  const skippedSuperseded = skippedReplacements.some((replacement) => replacement.reason === "superseded_by_prior_replacement");
   return {
     schemaVersion: "morph.repair.v1",
     runId: options.repairId ?? createRunId(options.apply ? "repair-applied" : "repair-plan"),
@@ -149,14 +169,74 @@ export async function repairProject(config, options = {}) {
     basedOnScore: report.score,
     basedOnRunId: report.runId,
     patches,
+    candidateReplacements,
     replacements,
+    skippedReplacements,
     risk: patches.length
-      ? "deterministic_replacements_only"
+      ? skippedSuperseded
+        ? "deterministic_replacements_with_superseded_fixes"
+        : "deterministic_replacements_only"
       : "no_applicable_patch",
     instructions: options.apply
       ? "Patch applied. Re-run morph verify before merge."
       : "Review this patch plan, then run morph repair --apply or morph loop --apply.",
     after
+  };
+}
+
+function applyRepairReplacements(originalSource, replacements) {
+  let source = originalSource;
+  const applied = [];
+  const skipped = [];
+  const orderedReplacements = dedupeReplacements(replacements)
+    .map((replacement, index) => ({ ...replacement, index }))
+    .sort((left, right) => right.find.length - left.find.length || left.index - right.index);
+
+  for (const replacement of orderedReplacements) {
+    const cleanReplacement = {
+      find: replacement.find,
+      replace: replacement.replace
+    };
+    const skippedReplacement = {
+      ...cleanReplacement,
+      issueId: replacement.issueId ?? null
+    };
+
+    if (!replacement.find) {
+      skipped.push({
+        ...skippedReplacement,
+        reason: "empty_find"
+      });
+      continue;
+    }
+
+    if (replacement.find === replacement.replace) {
+      skipped.push({
+        ...skippedReplacement,
+        reason: "no_op"
+      });
+      continue;
+    }
+
+    if (!source.includes(replacement.find)) {
+      skipped.push({
+        ...skippedReplacement,
+        reason: originalSource.includes(replacement.find)
+          ? "superseded_by_prior_replacement"
+          : "not_found"
+      });
+      continue;
+    }
+
+    source = source.split(replacement.find).join(replacement.replace);
+    applied.push(cleanReplacement);
+  }
+
+  return {
+    source,
+    applied,
+    skipped,
+    candidates: orderedReplacements.length
   };
 }
 
@@ -618,9 +698,83 @@ function lineNumber(source, index) {
   return source.slice(0, index).split("\n").length;
 }
 
-function calculateScore(issues) {
-  const deduction = issues.reduce((sum, issueItem) => sum + SEVERITY_DEDUCTION[issueItem.severity], 0);
-  return Math.max(0, 100 - deduction);
+function calculateGrade(issues) {
+  const issueRepeatCounts = new Map();
+  const familyDeductions = new Map();
+  const deductions = [];
+  let totalDeduction = 0;
+
+  for (const issueItem of issues) {
+    const repeatKey = `${issueItem.file}\0${issueItem.id}`;
+    const repeatCount = (issueRepeatCounts.get(repeatKey) ?? 0) + 1;
+    issueRepeatCounts.set(repeatKey, repeatCount);
+
+    const base = SEVERITY_DEDUCTION[issueItem.severity] ?? 0;
+    const typeMultiplier = TYPE_DEDUCTION_MULTIPLIER[issueItem.type] ?? 1;
+    const repeatFactor = repeatFactorFor(repeatCount);
+    const proposedDeduction = roundGradeNumber(base * typeMultiplier * repeatFactor);
+    const familyCap = SEVERITY_FAMILY_CAP[issueItem.severity] ?? proposedDeduction;
+    const currentFamilyDeduction = familyDeductions.get(issueItem.id) ?? 0;
+    const availableFamilyDeduction = Math.max(0, familyCap - currentFamilyDeduction);
+    const deduction = roundGradeNumber(Math.min(proposedDeduction, availableFamilyDeduction));
+
+    familyDeductions.set(issueItem.id, roundGradeNumber(currentFamilyDeduction + deduction));
+    totalDeduction = roundGradeNumber(totalDeduction + deduction);
+    deductions.push({
+      issueId: issueItem.id,
+      file: issueItem.file,
+      severity: issueItem.severity,
+      type: issueItem.type,
+      repeatIndex: repeatCount,
+      repeatFactor,
+      proposedDeduction,
+      deduction
+    });
+  }
+
+  const filesAffected = new Set(issues.map((issueItem) => issueItem.file)).size;
+  const breadthPenalty = roundGradeNumber(Math.min(6, Math.max(0, filesAffected - 1) * 1.5));
+  totalDeduction = roundGradeNumber(totalDeduction + breadthPenalty);
+
+  return {
+    model: "severity_type_repeat_cap_v1",
+    score: Math.max(0, Math.round(100 - totalDeduction)),
+    totalDeduction,
+    breadthPenalty,
+    filesAffected,
+    issueFamilies: Object.fromEntries([...familyDeductions.entries()].sort()),
+    deductionsBySeverity: summarizeDeductions(deductions, "severity"),
+    deductionsByType: summarizeDeductions(deductions, "type"),
+    cappedIssueFamilies: [...familyDeductions.entries()]
+      .filter(([issueId, deduction]) => {
+        const severity = issues.find((issueItem) => issueItem.id === issueId)?.severity;
+        return deduction >= (SEVERITY_FAMILY_CAP[severity] ?? Infinity);
+      })
+      .map(([issueId]) => issueId)
+      .sort(),
+    deductions
+  };
+}
+
+function summarizeDeductions(deductions, key) {
+  const summary = key === "severity"
+    ? { high: 0, medium: 0, low: 0 }
+    : {};
+
+  for (const deduction of deductions) {
+    const name = deduction[key] ?? "unknown";
+    summary[name] = roundGradeNumber((summary[name] ?? 0) + deduction.deduction);
+  }
+
+  return summary;
+}
+
+function repeatFactorFor(repeatCount) {
+  return REPEAT_DEDUCTION_FACTORS[repeatCount - 1] ?? 0.2;
+}
+
+function roundGradeNumber(value) {
+  return Math.round(value * 100) / 100;
 }
 
 function summarizeIssues(issues) {
@@ -783,6 +937,10 @@ STRIPE_PRICE_ID=price_replace_me
 
 # Optional product URL used by checkout redirects
 MORPH_APP_URL=http://localhost:3000
+
+# Optional AI vision for design-db transform (reference images / mockup generation)
+OPENAI_API_KEY=
+# MORPH_AI_BASE_URL=https://api.openai.com/v1
 `;
 }
 

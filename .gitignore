@@ -2,6 +2,8 @@
 .studio-run/
 .morph/runs/
 .morph/latest-report.json
+.morph/transform-checkout/
+morph-output/
 node_modules/
 .env
 .DS_Store

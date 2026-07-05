@@ -1,7 +1,7 @@
 {
   "schemaVersion": "morph.report.v1",
-  "runId": "verify-20260705010205-5793e5",
-  "generatedAt": "2026-07-05T01:02:05.378Z",
+  "runId": "verify-20260705012034-8cf05c",
+  "generatedAt": "2026-07-05T01:20:34.337Z",
   "durationMs": 2,
   "workspace": {
     "id": "raise-demo-workspace",
@@ -12,6 +12,128 @@
   "project": "Acme Control Plane Demo Copy",
   "verdict": "fail",
   "score": 68,
+  "grade": {
+    "model": "severity_type_repeat_cap_v1",
+    "score": 68,
+    "totalDeduction": 31.98,
+    "breadthPenalty": 0,
+    "filesAffected": 1,
+    "issueFamilies": {
+      "component-fragmentation": 6.88,
+      "elevation-drift": 1,
+      "focus-state-regression": 3.16,
+      "hardcoded-color": 5.5,
+      "icon-button-missing-label": 3.16,
+      "mobile-overflow-risk": 3.03,
+      "off-scale-spacing": 2.75,
+      "radius-drift": 5.5,
+      "type-scale-drift": 1
+    },
+    "deductionsBySeverity": {
+      "high": 17.88,
+      "medium": 12.1,
+      "low": 2
+    },
+    "deductionsByType": {
+      "design_drift": 15.75,
+      "component_drift": 6.88,
+      "interaction_drift": 6.32,
+      "responsive_drift": 3.03
+    },
+    "cappedIssueFamilies": [],
+    "deductions": [
+      {
+        "issueId": "hardcoded-color",
+        "file": "src/routes/settings/billing.tsx",
+        "severity": "high",
+        "type": "design_drift",
+        "repeatIndex": 1,
+        "repeatFactor": 1,
+        "proposedDeduction": 5.5,
+        "deduction": 5.5
+      },
+      {
+        "issueId": "off-scale-spacing",
+        "file": "src/routes/settings/billing.tsx",
+        "severity": "medium",
+        "type": "design_drift",
+        "repeatIndex": 1,
+        "repeatFactor": 1,
+        "proposedDeduction": 2.75,
+        "deduction": 2.75
+      },
+      {
+        "issueId": "radius-drift",
+        "file": "src/routes/settings/billing.tsx",
+        "severity": "high",
+        "type": "design_drift",
+        "repeatIndex": 1,
+        "repeatFactor": 1,
+        "proposedDeduction": 5.5,
+        "deduction": 5.5
+      },
+      {
+        "issueId": "type-scale-drift",
+        "file": "src/routes/settings/billing.tsx",
+        "severity": "low",
+        "type": "design_drift",
+        "repeatIndex": 1,
+        "repeatFactor": 1,
+        "proposedDeduction": 1,
+        "deduction": 1
+      },
+      {
+        "issueId": "component-fragmentation",
+        "file": "src/routes/settings/billing.tsx",
+        "severity": "high",
+        "type": "component_drift",
+        "repeatIndex": 1,
+        "repeatFactor": 1,
+        "proposedDeduction": 6.88,
+        "deduction": 6.88
+      },
+      {
+        "issueId": "focus-state-regression",
+        "file": "src/routes/settings/billing.tsx",
+        "severity": "medium",
+        "type": "interaction_drift",
+        "repeatIndex": 1,
+        "repeatFactor": 1,
+        "proposedDeduction": 3.16,
+        "deduction": 3.16
+      },
+      {
+        "issueId": "mobile-overflow-risk",
+        "file": "src/routes/settings/billing.tsx",
+        "severity": "medium",
+        "type": "responsive_drift",
+        "repeatIndex": 1,
+        "repeatFactor": 1,
+        "proposedDeduction": 3.03,
+        "deduction": 3.03
+      },
+      {
+        "issueId": "elevation-drift",
+        "file": "src/routes/settings/billing.tsx",
+        "severity": "low",
+        "type": "design_drift",
+        "repeatIndex": 1,
+        "repeatFactor": 1,
+        "proposedDeduction": 1,
+        "deduction": 1
+      },
+      {
+        "issueId": "icon-button-missing-label",
+        "file": "src/routes/settings/billing.tsx",
+        "severity": "medium",
+        "type": "interaction_drift",
+        "repeatIndex": 1,
+        "repeatFactor": 1,
+        "proposedDeduction": 3.16,
+        "deduction": 3.16
+      }
+    ]
+  },
   "summary": {
     "total": 9,
     "high": 3,

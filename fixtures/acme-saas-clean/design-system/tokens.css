@@ -1,0 +1,27 @@
+:root {
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #111827;
+  --color-muted: #64748b;
+  --color-border: #d6dee8;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-foreground: #ffffff;
+  --color-focus: #60a5fa;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  --radius-button: 6px;
+  --radius-card: 8px;
+  --radius-panel: 12px;
+
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.08);
+}

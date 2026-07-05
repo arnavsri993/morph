@@ -1,8 +1,8 @@
 {
   "schemaVersion": "morph.report.v1",
-  "runId": "verify-20260705010205-3279c0",
-  "generatedAt": "2026-07-05T01:02:05.381Z",
-  "durationMs": 0,
+  "runId": "verify-20260705012034-2421ce",
+  "generatedAt": "2026-07-05T01:20:34.340Z",
+  "durationMs": 1,
   "workspace": {
     "id": "raise-demo-workspace",
     "name": "RAISE Summit Demo Workspace",
@@ -12,6 +12,22 @@
   "project": "Acme Control Plane Demo Copy",
   "verdict": "pass",
   "score": 100,
+  "grade": {
+    "model": "severity_type_repeat_cap_v1",
+    "score": 100,
+    "totalDeduction": 0,
+    "breadthPenalty": 0,
+    "filesAffected": 0,
+    "issueFamilies": {},
+    "deductionsBySeverity": {
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "deductionsByType": {},
+    "cappedIssueFamilies": [],
+    "deductions": []
+  },
   "summary": {
     "total": 0,
     "high": 0,

@@ -1,7 +1,7 @@
 {
   "name": "morph",
   "version": "0.1.0",
-  "description": "AI-native design-system consistency gate for agent-written frontend.",
+  "description": "CI and Studio review for agent-written frontend.",
   "type": "module",
   "bin": {
     "morph": "./bin/morph.js"
@@ -11,6 +11,8 @@
     "verify": "node ./bin/morph.js verify --config morph.config.json",
     "repair": "node ./bin/morph.js repair --config morph.config.json",
     "loop": "node ./bin/morph.js loop --config morph.config.json",
+    "verify:demo": "node ./bin/morph.js verify --config morph.demo.config.json",
+    "repair:demo": "node ./bin/morph.js repair --config morph.demo.config.json",
     "demo": "node ./scripts/demo.mjs",
     "serve": "node ./bin/morph.js serve --config morph.config.json",
     "test": "node --test"
@@ -20,7 +22,7 @@
     "frontend",
     "ci",
     "agents",
-    "hackathon"
+    "ci"
   ],
   "license": "MIT",
   "engines": {

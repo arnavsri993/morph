@@ -21,8 +21,11 @@ jobs:
       - name: Test deterministic scanner
         run: npm test
 
+      - name: Verify product smoke fixture
+        run: npm run verify
+
       - name: Generate seeded report for receipts
-        run: npm run verify -- --json --no-fail --output demo/reports/seeded-drift.json
+        run: npm run verify:demo -- --json --no-fail --output demo/reports/seeded-drift.json
 
       - name: Prove repair loop on demo fixture
         run: npm run demo

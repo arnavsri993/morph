@@ -1,56 +1,40 @@
-# GitHub Prep
+# Release Checklist
 
-Use this when the local demo is ready to publish. The 2026-07-04 hackathon start task explicitly approved repo creation, push, and collaborator invites.
+Use this before publishing or handing Morph to another team.
 
-## Suggested repo
+## Repository
 
 - Name: `morph`
-- Visibility: public, required by the RAISE Summit Hackathon rules
-- Description: `CI for agent-written frontend: detect design-system drift and emit repair patches.`
+- Visibility: choose public for open-source distribution, private for customer/internal pilots
+- Description: `CI and Studio review for agent-written frontend.`
+- Default branch: `main`
 
-## Collaborators to invite
-
-- Arefazizi574@gmail.com
-- Sowmyan.ssk@gmail.com
-- Akshaj.kommepalli@gmail.com
-- Harshankrishna30@gmail.com
-- Arnavsri993@gmail.com
-
-## Commands
+## Local Gates
 
 ```bash
-cd /Users/arnavsrivastava/.openclaw/workspace/morph
-git init
+cd /Users/arnavsrivastava/Documents/morph
+npm test
+npm run verify
+npm run verify:demo -- --no-fail
+npm run demo
+```
+
+`npm run verify` proves the clean product smoke fixture passes. `npm run verify:demo -- --no-fail` proves the intentionally drifted fixture still produces the expected failure receipt.
+
+## GitHub Setup
+
+```bash
 git add .
-git commit -m "Build Morph hackathon demo"
-gh repo create morph --public --source=. --remote=origin --push
-gh repo edit --description "CI for agent-written frontend: detect design-system drift and emit repair patches."
+git commit -m "Productize Morph review workflow"
+gh repo create morph --source=. --remote=origin --push
+gh repo edit --description "CI and Studio review for agent-written frontend."
 ```
 
-GitHub's collaborator API accepts usernames, not arbitrary email addresses. If only email addresses are known, try the invite and record the exact failure, then ask the repo owner to invite from GitHub's web UI if GitHub cannot resolve them.
+Invite collaborators by GitHub username when possible. If only email addresses are available, use the GitHub web UI so GitHub can resolve invitations without exposing addresses in repo documentation.
 
-```bash
-gh api -X PUT repos/:owner/morph/collaborators/Arefazizi574@gmail.com -f permission=push
-gh api -X PUT repos/:owner/morph/collaborators/Sowmyan.ssk@gmail.com -f permission=push
-gh api -X PUT repos/:owner/morph/collaborators/Akshaj.kommepalli@gmail.com -f permission=push
-gh api -X PUT repos/:owner/morph/collaborators/Harshankrishna30@gmail.com -f permission=push
-gh api -X PUT repos/:owner/morph/collaborators/Arnavsri993@gmail.com -f permission=push
-```
+## Release Notes
 
-## 2026-07-04 invite attempt
-
-Repo created and pushed:
-
-- `https://github.com/arnavsri993/morph`
-
-GitHub user search for the provided emails returned no resolvable usernames. Direct collaborator API calls using the email strings failed for every requested email with:
-
-```json
-{
-  "message": "Not Found",
-  "documentation_url": "https://docs.github.com/rest/collaborators/collaborators#add-a-repository-collaborator",
-  "status": "404"
-}
-```
-
-`Arnavsri993` resolves to the owner account `arnavsri993`, which already owns the repo. Required action: invite the remaining collaborators through GitHub's web UI by email, or provide their GitHub usernames for API invites.
+- Mention that the default config is now a passing smoke fixture.
+- Mention that `morph.demo.config.json` owns the seeded drift sample.
+- Link to `DEMO.md` for the repeatable sample review flow.
+- Link to `docs/product-architecture.md` for runtime and API details.

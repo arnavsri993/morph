@@ -2,7 +2,9 @@
 
 Morph Studio is an interactive review experience for agent-written frontend. It scans generated UI for design-system drift, shows a before/after product review, explains why the drift matters, and emits machine-readable repair patches an agent can apply before a human reviews the PR.
 
-This repo is a RAISE Summit Hackathon demo for the Cursor track: a local product fixture, seeded agent drift, verifier, isolated Studio review loop, JSON receipts, stored runs, an interactive Morph Studio app, a small product API, an auth/billing-ready app shell, CI, and tests.
+Morph also ships a **design intelligence transform**: point it at any fast agent-generated website (a GitHub repo or a local folder) and it re-renders the site with a frontier-grade design system — curated profiles modeled on the visual grammar of companies like Linear, Stripe, Notion, and Apple — while keeping the original content.
+
+This repo ships the local CLI, an interactive Morph Studio app, JSON receipts, stored runs, a product API, an auth/billing-ready app shell, CI coverage, a clean smoke fixture, and a separate seeded demo fixture for repeatable review walkthroughs.
 
 ## Why this exists
 
@@ -17,16 +19,17 @@ Coding agents can make UI that works but does not belong in the product. Morph i
 ## Quickstart
 
 ```bash
-cd /Users/arnavsrivastava/.openclaw/workspace/morph
+cd /Users/arnavsrivastava/Documents/morph
 npm test
-npm run verify -- --json --no-fail --output demo/reports/seeded-drift.json
+npm run verify
+npm run verify:demo -- --json --no-fail --output demo/reports/seeded-drift.json
 npm run repair -- --json
 npm run loop -- --apply --store
 npm run demo
 npm run serve
 ```
 
-`npm run verify` intentionally fails without `--no-fail`, because the fixture contains seeded drift.
+`npm run verify` is the product smoke gate and should pass. `npm run verify:demo` points at the intentionally drifted Acme fixture; use `--no-fail` when you want a receipt without a failing process exit.
 
 After `npm run serve`, open `http://127.0.0.1:4177`:
 
@@ -34,15 +37,18 @@ After `npm run serve`, open `http://127.0.0.1:4177`:
 - `/studio` is the interactive Morph Studio review dashboard. The `Launch Studio` button on the landing page routes there.
 - `/login` is the auth entry point: SSO buttons when OAuth is configured, a polished dev-mode state when it is not.
 
-For the exact one-minute video and live judge flow, use `DEMO.md`.
+For the repeatable sample review flow, use `DEMO.md`.
 
 ## Commands
 
 ```bash
 morph init
 morph verify --config morph.config.json --json --store
+morph verify --config morph.demo.config.json --no-fail
 morph repair --config morph.config.json --apply --json
 morph loop --config morph.config.json --apply --store
+morph transform --repo owner/repo --output ./morph-output
+morph transform --input ./my-ugly-site --profile aurora-dark
 morph demo
 morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 ```
@@ -51,12 +57,23 @@ morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 - `verify` scans frontend source and emits JSON plus a human report.
 - `repair` generates deterministic replacements and can apply them.
 - `loop` runs verify, repair, verify again, then returns a final CI gate.
-- `demo` copies the seeded fixture, repairs the copy, and writes judge receipts.
+- `transform` clones (or reads) an arbitrary site, scores it against the design-quality heuristics, selects the best-matching design profile, and re-renders the whole site — polished HTML plus a generated `morph-theme.css` design system.
+- `demo` copies the seeded fixture, repairs the copy, and writes review receipts.
 - `serve` starts the Morph web app: the landing page at `/`, Morph Studio at `/studio`, and the API backed by `.morph/runs`. Studio full reviews run on `.studio-run/project` so the seeded fixture stays reusable.
 
-## Demo flow
+## Design intelligence database
 
-The fixture is `fixtures/acme-saas`, a tiny SaaS billing screen with a real design-token file and a seeded agent-generated drift in `src/routes/settings/billing.tsx`.
+`src/design-db/` is the engine behind the transform:
+
+- **Profiles** (`profiles.js`): complete design systems — color palette, font pairing, type scale, spacing rhythm, radii, shadows, gradients, and hero textures — distilled from the visual grammar of frontier product companies (Linear/Vercel-class dark developer sites, Stripe-class fintech, Notion-warm consumer, Apple-minimal monochrome, and more).
+- **Heuristics** (`heuristics.js`): 25 rules that fingerprint quickly-generated UI — missing viewport meta, default typography, raw saturated colors, no hover/focus states, no responsive rules, `<center>`-era markup — and produce a 0–100 UI quality score.
+- **Patterns** (`patterns.js`): the component library (glass nav, gradient hero, feature card grid, split sections, quote band, CTA band, footer) that re-renders extracted content into a finished page with reveal-on-scroll motion, `focus-visible` states, and `prefers-reduced-motion` support.
+
+The Studio GitHub flow uses the same engine end to end: connect a repo, and Morph clones it, scores the incoming UI, transforms it, and serves the result at `/transformed/index.html` with a before/after receipt.
+
+## Sample Review Flow
+
+The product smoke fixture is `fixtures/acme-saas-clean`; it should pass the default gate. The seeded review fixture is `fixtures/acme-saas`, a tiny SaaS billing screen with a real design-token file and agent-generated drift in `src/routes/settings/billing.tsx`.
 
 The drift includes:
 
@@ -79,9 +96,9 @@ The script copies the fixture to `.demo-run`, writes:
 - `demo/reports/demo-before.json`
 - `demo/reports/demo-repair.json`
 - `demo/reports/demo-after.json`
-- `demo/terminal-transcript.txt` captures the judge-friendly command transcript.
+- `demo/terminal-transcript.txt` captures the review transcript.
 
-The source fixture remains seeded so judges can see the catch.
+The source fixture remains seeded so the sample review can be replayed.
 
 ## Product API
 
@@ -161,7 +178,7 @@ See `docs/product-architecture.md` for the workspace/project/run model and deplo
 }
 ```
 
-## Hackathon positioning
+## Product Positioning
 
 Morph is not a generic dashboard and not a screenshot upload tool. It is an interactive review journey plus a machine-readable verification loop for coding agents:
 
@@ -169,8 +186,8 @@ Morph is not a generic dashboard and not a screenshot upload tool. It is an inte
 Cursor changes frontend -> Morph Studio review -> JSON findings + patches -> Morph repair -> verify again -> safe to merge
 ```
 
-The public repo and collaborator invite checklist is in `docs/github-prep.md`.
+Release and repository hygiene notes live in `docs/github-prep.md`.
 
 ## Existing tools checked
 
-Chromatic, Loki, BackstopJS, stylelint, ESLint, and token linters cover pieces of this space. Morph's hackathon wedge is the agent-native loop: product grammar extraction, drift classification, and patch output designed for Cursor/Codex-style repair cycles.
+Chromatic, Loki, BackstopJS, stylelint, ESLint, and token linters cover pieces of this space. Morph's wedge is the agent-native loop: product grammar extraction, drift classification, and patch output designed for Cursor/Codex-style repair cycles.

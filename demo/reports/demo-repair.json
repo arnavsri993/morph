@@ -1,11 +1,11 @@
 {
   "schemaVersion": "morph.repair.v1",
-  "runId": "repair-applied-20260705010205-149afe",
-  "generatedAt": "2026-07-05T01:02:05.380Z",
+  "runId": "repair-applied-20260705012034-631478",
+  "generatedAt": "2026-07-05T01:20:34.339Z",
   "project": "Acme Control Plane Demo Copy",
   "applied": true,
   "basedOnScore": 68,
-  "basedOnRunId": "repair-base-20260705010205-42e0ee",
+  "basedOnRunId": "repair-base-20260705012034-59c23c",
   "patches": [
     {
       "file": "src/routes/settings/billing.tsx",
@@ -49,14 +49,52 @@
       ]
     }
   ],
+  "candidateReplacements": 14,
   "replacements": 9,
-  "risk": "deterministic_replacements_only",
+  "skippedReplacements": [
+    {
+      "find": "focus:outline-none",
+      "replace": "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]",
+      "issueId": "focus-state-regression",
+      "reason": "superseded_by_prior_replacement",
+      "file": "src/routes/settings/billing.tsx"
+    },
+    {
+      "find": "text-[#faf5ff]",
+      "replace": "text-[var(--color-primary-foreground)]",
+      "issueId": "hardcoded-color",
+      "reason": "superseded_by_prior_replacement",
+      "file": "src/routes/settings/billing.tsx"
+    },
+    {
+      "find": "bg-[#7c3aed]",
+      "replace": "bg-[var(--color-primary)]",
+      "issueId": "hardcoded-color",
+      "reason": "superseded_by_prior_replacement",
+      "file": "src/routes/settings/billing.tsx"
+    },
+    {
+      "find": "px-[21px]",
+      "replace": "px-[var(--space-4)]",
+      "issueId": "off-scale-spacing",
+      "reason": "superseded_by_prior_replacement",
+      "file": "src/routes/settings/billing.tsx"
+    },
+    {
+      "find": "py-[11px]",
+      "replace": "py-[var(--space-4)]",
+      "issueId": "off-scale-spacing",
+      "reason": "superseded_by_prior_replacement",
+      "file": "src/routes/settings/billing.tsx"
+    }
+  ],
+  "risk": "deterministic_replacements_with_superseded_fixes",
   "instructions": "Patch applied. Re-run morph verify before merge.",
   "after": {
     "schemaVersion": "morph.report.v1",
-    "runId": "verify-20260705010205-3d7586",
-    "generatedAt": "2026-07-05T01:02:05.380Z",
-    "durationMs": 1,
+    "runId": "verify-20260705012034-7d5193",
+    "generatedAt": "2026-07-05T01:20:34.339Z",
+    "durationMs": 0,
     "workspace": {
       "id": "raise-demo-workspace",
       "name": "RAISE Summit Demo Workspace",
@@ -66,6 +104,22 @@
     "project": "Acme Control Plane Demo Copy",
     "verdict": "pass",
     "score": 100,
+    "grade": {
+      "model": "severity_type_repeat_cap_v1",
+      "score": 100,
+      "totalDeduction": 0,
+      "breadthPenalty": 0,
+      "filesAffected": 0,
+      "issueFamilies": {},
+      "deductionsBySeverity": {
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "deductionsByType": {},
+      "cappedIssueFamilies": [],
+      "deductions": []
+    },
     "summary": {
       "total": 0,
       "high": 0,

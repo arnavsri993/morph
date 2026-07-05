@@ -19,7 +19,7 @@ Morph is the verification layer between AI coding agents and frontend merges. Th
 - `morph verify` emits a report suitable for CI logs or agent context.
 - `morph repair` emits or applies deterministic remediation.
 - `morph loop` verifies, repairs, verifies again, and returns the merge gate.
-- `morph demo` runs the Acme SaaS judge story without mutating the fixture.
+- `morph demo` runs the Acme SaaS sample review without mutating the seeded fixture.
 - `morph serve` starts a dependency-free HTTP control plane.
 
 ## Server API

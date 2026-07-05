@@ -1702,8 +1702,8 @@ export function landingHtml(config, session) {
     <section id="demo" class="section">
       <div class="shell">
         <div class="section-head reveal">
-          <div class="kicker">Three-command demo</div>
-          <h2>Premium terminal, plain deterministic loop</h2>
+          <div class="kicker">Deterministic loop</div>
+          <h2>One command path from drift to gate</h2>
           <p>The shipped fixture, ${projectName}, starts with seeded drift. The loop verifies, repairs, verifies again, and writes receipts that a CI job can attach to the PR.</p>
         </div>
 
@@ -1771,7 +1771,7 @@ merge gate open">Copy</button>
         <div class="section-head reveal">
           <div class="kicker">Morph Studio</div>
           <h2>A real review console, not a decorative mockup</h2>
-          <p>Studio gives judges and teams a dashboard for repo context, branch status, findings, exact patches, and the merge gate state after repair.</p>
+          <p>Studio gives reviewers and teams a dashboard for repo context, branch status, findings, exact patches, and the merge gate state after repair.</p>
         </div>
 
         <div class="studio-preview">
@@ -1847,7 +1847,7 @@ merge gate open">Copy</button>
         <div class="doc-grid">
           <a class="doc-card reveal" href="${REPO_URL}" target="_blank" rel="noreferrer">
             <strong><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.72.5.1.68-.22.68-.49v-1.7c-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.9-.64.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.7 0 0 .84-.28 2.75 1.05a9.4 9.4 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.4.2 2.44.1 2.7.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9v2.82c0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2z"/></svg> GitHub</strong>
-            <span>Source, issues, workflow, CLI, Studio server, and the seeded hackathon fixture.</span>
+            <span>Source, issues, workflow, CLI, Studio server, and the seeded review fixture.</span>
           </a>
           <a class="doc-card reveal" style="transition-delay:.04s" href="${REPO_URL}#readme" target="_blank" rel="noreferrer">
             <strong><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg> Docs</strong>
@@ -1855,7 +1855,7 @@ merge gate open">Copy</button>
           </a>
           <a class="doc-card reveal" style="transition-delay:.08s" href="${REPO_URL}/blob/main/DEMO.md" target="_blank" rel="noreferrer">
             <strong><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg> Demo runbook</strong>
-            <span>The one-minute judge flow, exact terminal story, and live demo path.</span>
+            <span>The one-minute sample flow, exact terminal story, and live demo path.</span>
           </a>
           <a class="doc-card reveal" style="transition-delay:.12s" href="/api/health">
             <strong><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 8L9 4l-3 8H2"/></svg> API status</strong>
@@ -1871,7 +1871,7 @@ merge gate open">Copy</button>
       <div class="shell">
         <div class="section-head reveal">
           <div class="kicker">Pricing</div>
-          <h2>Secondary, because the demo is the story</h2>
+          <h2>Plans for local gates and shared reviews</h2>
           <p>The local loop is MIT-licensed and runs anywhere Node 20 does. Team features are ready when you want shared Studio reviews and billing.</p>
         </div>
         <div class="pricing-grid">
