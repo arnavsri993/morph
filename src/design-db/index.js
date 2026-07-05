@@ -10,6 +10,11 @@ import { corpusSummary } from "./reference-corpus.js";
 import { buildRetrievalPlan, retrievalSummary } from "./retrieval.js";
 import { analyzeHighEndSignals, sourceIndexSummary } from "./source-index.js";
 import { externalCorpusSummary } from "./external-corpus.js";
+import {
+  applyReferenceInsightsToArchetype,
+  applyReferenceInsightsToPatterns,
+  mergeReferenceTaste
+} from "./reference-insights.js";
 import { alignProfileToPreferences } from "./visual-preferences.js";
 import { resolveTaste, tasteRenderFlags } from "./taste.js";
 
@@ -186,22 +191,34 @@ export function planTransform(content, options = {}) {
     aiHints: options.aiHints ?? null,
     retrieval
   });
-  const patterns = selectPatternsForContent(content, archetypeSelection.archetype, {
-    retrievalHints: retrieval
+  const insights = retrieval.insights ?? null;
+  const resolvedArchetype = applyReferenceInsightsToArchetype(archetypeSelection.archetype, insights);
+  let patterns = selectPatternsForContent(content, resolvedArchetype, {
+    retrievalHints: retrieval,
+    referenceInsights: insights
   });
-  const taste = resolveTaste(content, {
+  patterns = applyReferenceInsightsToPatterns(patterns, insights);
+  let taste = resolveTaste(content, {
     instructions: options.instructions ?? "",
     taste: options.taste ?? null
   });
+  if (insights?.taste) {
+    taste = mergeReferenceTaste(taste, insights);
+  }
+  const renderFlags = tasteRenderFlags(taste);
 
   return {
     profile: profileSelection,
-    archetype: archetypeSelection,
+    archetype: {
+      ...archetypeSelection,
+      archetype: resolvedArchetype
+    },
     patterns,
     selectionText,
     retrieval,
+    insights,
     taste,
-    renderFlags: tasteRenderFlags(taste)
+    renderFlags
   };
 }
 
@@ -212,10 +229,13 @@ function buildSelectionText(content, instructions = "", siteResearch = null) {
     content.hero?.headline,
     content.hero?.subhead,
     content.description,
+    content.sourceText,
     siteResearch?.selectionText,
     siteResearch?.meta?.keywords,
     ...(content.features ?? []).map((feature) => `${feature.title} ${feature.body}`),
     ...(content.sections ?? []).map((section) => `${section.heading} ${section.body}`),
+    ...(content.preservedBlocks ?? []).map((block) => block.text ?? block.heading ?? ""),
+    ...(content.allParagraphs ?? []),
     ...(content.nav ?? []).map((link) => link.label),
     instructions ?? ""
   ].filter(Boolean).join(" ");

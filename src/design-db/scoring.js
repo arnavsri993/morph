@@ -2,7 +2,7 @@
 
 export const TRANSFORM_PASS_SCORE = 80;
 
-/** Input sites at or above this score skip full template re-render unless forced. */
+/** Input sites at or above this score skip re-render only when preserveIfGood is set. */
 export const TRANSFORM_PRESERVE_SCORE = 78;
 
 /** Rules that indicate broken UX — block a pass even when the numeric score is high. */

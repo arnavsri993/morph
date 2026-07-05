@@ -26,6 +26,7 @@ npm run verify:demo -- --json --no-fail --output demo/reports/seeded-drift.json
 npm run repair -- --json
 npm run loop -- --apply --store
 npm run demo
+npm run build:design-db
 npm run serve
 ```
 
@@ -69,7 +70,8 @@ morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 - **Profiles** (`profiles.js`): complete design systems — color palette, font pairing, type scale, spacing rhythm, radii, shadows, gradients, and hero textures — distilled from the visual grammar of frontier product companies (Linear/Vercel-class dark developer sites, Stripe-class fintech, Notion-warm consumer, Apple-minimal monochrome, and more).
 - **Heuristics** (`heuristics.js`): 25 rules that fingerprint quickly-generated UI — missing viewport meta, default typography, raw saturated colors, no hover/focus states, no responsive rules, `<center>`-era markup — and produce a 0–100 UI quality score.
 - **Patterns** (`patterns.js`): the component library (glass nav, gradient hero, feature card grid, split sections, quote band, CTA band, footer) that re-renders extracted content into a finished page with reveal-on-scroll motion, `focus-visible` states, and `prefers-reduced-motion` support.
-- **Source index** (`source-index.js`): the scalable high-end frontend knowledge layer. It models 4M+ source signals across frontier product sites, public design systems, component libraries, award galleries, SaaS pages, commerce/editorial sites, mobile web screens, and accessibility exemplars without vendoring millions of copyrighted pages into the repo.
+- **Source index** (`source-index.js`): the scalable high-end frontend knowledge layer. It models **18M+** source signals across npm UI packages, frontier product sites, public design systems, component libraries, award galleries, SaaS pages, commerce/editorial sites, mobile web screens, Figma community kits, Storybook catalogs, and accessibility exemplars — without vendoring millions of copyrighted pages into the repo.
+- **External corpus** (`generated/external-references.json`): **14,000+** named references ingested from the npm registry and public awesome-list catalogs via `npm run build:design-db`.
 - **Retrieval** (`retrieval.js`): combines named references with the source index to choose a profile, archetype, pattern set, source-family context, and high-end dimensions such as composition, visual system, typography, interaction, conversion, responsiveness, trust, and content intelligence.
 
 The Studio GitHub flow uses the same engine end to end: connect a repo, and morph clones it, scores the incoming UI, transforms it, and serves the result at `/transformed/index.html` with a before/after receipt.

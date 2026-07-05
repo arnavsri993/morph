@@ -1,64 +1,358 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>TaskPilot - Task Management App</title>
+  <meta charset="UTF-8">
+  <title>TaskPilot - Task Management App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #4f46e5;
+      --accent-soft: #eef2ff;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      letter-spacing: -0.01em;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+
+    a:hover { color: #3730a3; }
+
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      border: none;
+      background: none;
+    }
+
+    .nav-links {
+      display: inline-flex;
+      gap: 28px;
+      margin-top: 12px;
+      font-size: 0.9375rem;
+      font-weight: 500;
+    }
+
+    .tagline {
+      font-size: 1rem;
+      margin-top: 4px;
+    }
+
+    main { padding-bottom: 64px; }
+
+    .hero {
+      padding: 72px 0 56px;
+      text-align: center;
+    }
+
+    .hero h2 {
+      font-size: 2.75rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.15;
+      max-width: 720px;
+      margin: 0 auto 20px;
+    }
+
+    .hero p {
+      font-size: 1.125rem;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto 32px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    button:hover {
+      background: var(--bg);
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
+
+    section {
+      padding: 56px 0;
+    }
+
+    section h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: var(--shadow);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1), 0 16px 40px rgba(15, 23, 42, 0.08);
+    }
+
+    .feature-card h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.9375rem;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      max-width: 840px;
+      margin: 0 auto;
+    }
+
+    .pricing-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+
+    .pricing-card strong {
+      display: block;
+      font-size: 1.125rem;
+      margin-bottom: 8px;
+    }
+
+    .about-content {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .about-content p {
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      font-size: 1.0625rem;
+    }
+
+    .about-content ul {
+      list-style: none;
+      margin-bottom: 32px;
+    }
+
+    .about-content li {
+      padding: 12px 0 12px 28px;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .about-content li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    blockquote {
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 24px 28px;
+      font-size: 1.0625rem;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .cta-section {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 64px 0;
+      text-align: center;
+    }
+
+    .cta-section h2 {
+      margin-bottom: 12px;
+    }
+
+    .cta-section p {
+      color: var(--text-muted);
+      margin-bottom: 28px;
+    }
+
+    footer {
+      padding: 32px 0;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+  </style>
 </head>
 <body>
-<center>
-<h1>TaskPilot</h1>
-<p style="color: blue;">The best task management app for teams</p>
-<a href="#features">Features</a> | <a href="#pricing">Pricing</a> | <a href="#about">About</a>
-<hr>
-</center>
+  <header>
+    <div class="wrap">
+      <center>
+        <h1 class="brand">TaskPilot</h1>
+        <p class="tagline" style="color: blue;">The best task management app for teams</p>
+        <nav class="nav-links">
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#about">About</a>
+        </nav>
+      </center>
+    </div>
+  </header>
 
-<div style="padding: 10px;">
-<h2>Organize your work in one place</h2>
-<p>TaskPilot helps your team plan projects, track tasks, and hit deadlines without the chaos. Everything your team needs to stay in sync, from daily standups to quarterly planning.</p>
-<button style="background-color: green; color: white;">Get Started</button>
-<button>Learn More</button>
-</div>
+  <main>
+    <div class="wrap">
+      <section class="hero">
+        <h2>Organize your work in one place</h2>
+        <p>TaskPilot helps your team plan projects, track tasks, and hit deadlines without the chaos. Everything your team needs to stay in sync, from daily standups to quarterly planning.</p>
+        <div class="hero-actions">
+          <button style="background-color: green; color: white; border-color: green;">Get Started</button>
+          <button>Learn More</button>
+        </div>
+      </section>
 
-<div id="features" style="padding: 10px;">
-<h2>Features</h2>
+      <section id="features">
+        <h2>Features</h2>
+        <div class="features-grid">
+          <article class="feature-card">
+            <h3>Task Boards</h3>
+            <p>Drag and drop tasks between columns. See what everyone is working on at a glance.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Deadlines and Reminders</h3>
+            <p>Never miss a due date. TaskPilot sends reminders before tasks are due.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Team Chat</h3>
+            <p>Discuss tasks right where the work happens instead of switching to another app.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Reports</h3>
+            <p>Weekly progress reports show what got done and what is falling behind.</p>
+          </article>
+        </div>
+      </section>
 
-<h3>Task Boards</h3>
-<p>Drag and drop tasks between columns. See what everyone is working on at a glance.</p>
+      <section id="pricing">
+        <h2>Pricing</h2>
+        <div class="pricing-grid">
+          <div class="pricing-card">
+            <strong>Free</strong>
+            <span>up to 5 users</span>
+          </div>
+          <div class="pricing-card">
+            <strong>Pro</strong>
+            <span>$8 per user per month</span>
+          </div>
+          <div class="pricing-card">
+            <strong>Enterprise</strong>
+            <span>contact us</span>
+          </div>
+        </div>
+      </section>
 
-<h3>Deadlines and Reminders</h3>
-<p>Never miss a due date. TaskPilot sends reminders before tasks are due.</p>
+      <section id="about">
+        <h2>Why teams choose TaskPilot</h2>
+        <div class="about-content">
+          <p>We built TaskPilot because project tools were either too simple or too complicated. TaskPilot is powerful enough for engineering teams and simple enough for everyone else.</p>
+          <ul>
+            <li>Set up your first board in under 2 minutes</li>
+            <li>Works on web and mobile</li>
+            <li>Import from other tools with one click</li>
+          </ul>
+          <blockquote>TaskPilot cut our weekly planning meeting from an hour to 15 minutes. - A happy customer</blockquote>
+        </div>
+      </section>
+    </div>
 
-<h3>Team Chat</h3>
-<p>Discuss tasks right where the work happens instead of switching to another app.</p>
+    <section class="cta-section">
+      <div class="wrap">
+        <center>
+          <h2>Sign up today</h2>
+          <p>Start free. No credit card required.</p>
+          <button style="background-color: green; color: white; border-color: green;">Sign Up</button>
+        </center>
+      </div>
+    </section>
+  </main>
 
-<h3>Reports</h3>
-<p>Weekly progress reports show what got done and what is falling behind.</p>
-</div>
-
-<div id="pricing" style="padding: 10px;">
-<h2>Pricing</h2>
-<ul>
-<li>Free - up to 5 users</li>
-<li>Pro - $8 per user per month</li>
-<li>Enterprise - contact us</li>
-</ul>
-</div>
-
-<div id="about" style="padding: 10px;">
-<h2>Why teams choose TaskPilot</h2>
-<p>We built TaskPilot because project tools were either too simple or too complicated. TaskPilot is powerful enough for engineering teams and simple enough for everyone else.</p>
-<ul>
-<li>Set up your first board in under 2 minutes</li>
-<li>Works on web and mobile</li>
-<li>Import from other tools with one click</li>
-</ul>
-<blockquote>TaskPilot cut our weekly planning meeting from an hour to 15 minutes. - A happy customer</blockquote>
-</div>
-
-<center>
-<h2>Sign up today</h2>
-<p>Start free. No credit card required.</p>
-<button style="background-color: green; color: white;">Sign Up</button>
-<hr>
-<p>Copyright 2026 TaskPilot</p>
-</center>
+  <footer>
+    <div class="wrap">
+      <center>
+        <p>Copyright 2026 TaskPilot</p>
+      </center>
+    </div>
+  </footer>
 </body>
 </html>

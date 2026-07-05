@@ -25,6 +25,7 @@ import {
 import { TRANSFORM_PRESERVE_SCORE, transformVerdict } from "./design-db/scoring.js";
 import { assessFullUiQuality } from "./scanners/design-health.js";
 import { enrichContent, researchSite } from "./site-research.js";
+import { captureSiteSnapshot, mergeCapturedIntoContent } from "./site-capture.js";
 
 const REMOTE_CSS_TIMEOUT_MS = 5000;
 const REMOTE_CSS_MAX_BYTES = 256 * 1024;
@@ -44,9 +45,13 @@ export async function transformSite(inputDir, outputDir, options = {}) {
   };
   const before = assessFullUiQuality(html, cssBundle.css, assessmentOptions);
   const siteResearch = researchSite(html, cssBundle.css);
-  const content = enrichContent(extractContent(html), siteResearch);
+  const capture = captureSiteSnapshot(html, cssBundle.css);
+  const content = mergeCapturedIntoContent(
+    enrichContent(extractContent(html), siteResearch),
+    capture
+  );
 
-  if (before.score >= TRANSFORM_PRESERVE_SCORE && !options.forceRerender) {
+  if (options.preserveIfGood && before.score >= TRANSFORM_PRESERVE_SCORE && !options.forceRerender) {
     return await buildPreserveReceipt({
       inputDir,
       entry,
@@ -109,6 +114,11 @@ export async function transformSite(inputDir, outputDir, options = {}) {
     aiHints,
     visualPreferences,
     siteResearch,
+    sourceCapture: {
+      inventory: capture.inventory,
+      fullTextLength: capture.fullText.length,
+      blockCount: capture.blocks.length
+    },
     taste: options.taste ?? null
   });
 
@@ -116,13 +126,16 @@ export async function transformSite(inputDir, outputDir, options = {}) {
     archetype: plan.archetype.archetype,
     patterns: plan.patterns,
     taste: plan.taste,
-    renderFlags: plan.renderFlags
+    renderFlags: plan.renderFlags,
+    navVariant: plan.insights?.navVariant ?? null,
+    referenceInsights: plan.insights ?? null
   };
   const outputHtml = renderPage(content, plan.profile.profile, renderOptions);
   const outputCss = renderStylesheet(plan.profile.profile, {
     taste: plan.taste,
     renderFlags: plan.renderFlags,
-    navVariant: resolveNavVariant(plan.patterns)
+    navVariant: plan.insights?.navVariant ?? resolveNavVariant(plan.patterns),
+    referenceInspiration: plan.insights?.appliedReferences?.slice(0, 3).map((ref) => ref.name).join(", ") ?? null
   });
   const after = assessFullUiQuality(outputHtml, outputCss, { perspective: "output" });
 
@@ -179,10 +192,15 @@ export async function transformSite(inputDir, outputDir, options = {}) {
       summary: siteResearch.summary,
       audience: siteResearch.audience,
       inventory: siteResearch.inventory,
-      topics: siteResearch.topics?.slice(0, 12) ?? [],
-      navLinks: siteResearch.navLinks?.slice(0, 8) ?? [],
+      topics: siteResearch.topics ?? [],
+      navLinks: siteResearch.navLinks ?? [],
       cardCount: siteResearch.cards?.length ?? 0,
       eventCount: siteResearch.events?.length ?? 0
+    },
+    sourceCapture: {
+      inventory: capture.inventory,
+      fullTextLength: capture.fullText.length,
+      blockCount: capture.blocks.length
     },
     profile: {
       id: plan.profile.profile.id,
@@ -202,16 +220,23 @@ export async function transformSite(inputDir, outputDir, options = {}) {
       matchedTags: plan.archetype.matchedTags
     },
     retrieval: {
-      engine: plan.retrieval.sourceIndex?.version ?? "reference_corpus_v2",
+      engine: plan.retrieval.sourceIndex?.version ?? "source_index_v2",
       corpusSize: plan.retrieval.corpusSize,
       estimatedSourceSignals: plan.retrieval.sourceIndex?.estimatedSources ?? null,
       confidence: plan.retrieval.confidence,
       topReference: plan.retrieval.topReference,
       matchedReferences: (plan.retrieval.matches ?? []).slice(0, 5),
+      appliedReferences: (plan.insights?.appliedReferences ?? []).slice(0, 32),
+      referencesUsed: plan.insights?.referencesUsed ?? plan.insights?.appliedReferences?.length ?? 0,
+      matchedReferenceCount: plan.retrieval.matches?.length ?? 0,
       industry: plan.retrieval.industry?.industry ?? null,
       highEndDimensions: plan.retrieval.sourceSignals?.topDimensions ?? [],
       matchedSourceFamilies: plan.retrieval.sourceSignals?.sourceFamilies ?? [],
-      patternHints: plan.retrieval.patternHints?.length ?? 0
+      patternHints: plan.retrieval.patternHints?.length ?? 0,
+      patternsApplied: plan.patterns.length,
+      inspirationLine: plan.insights?.inspirationLine ?? null,
+      repairNotes: plan.insights?.repairNotes ?? [],
+      sourceBreakdown: plan.insights?.sourceBreakdown ?? []
     },
     patterns: plan.patterns.map((pattern) => ({
       id: pattern.id,
@@ -226,7 +251,12 @@ export async function transformSite(inputDir, outputDir, options = {}) {
       navLinks: (content.nav ?? []).length,
       features: (content.features ?? []).length,
       sections: (content.sections ?? []).length,
-      stats: (content.stats ?? []).length
+      stats: (content.stats ?? []).length,
+      preservedBlocks: (content.preservedBlocks ?? []).length,
+      sourceTextLength: content.sourceText?.length ?? capture.fullText.length,
+      capturedParagraphs: content.allParagraphs?.length ?? capture.paragraphs.length,
+      capturedLinks: content.allLinks?.length ?? capture.links.length,
+      capturedImages: content.allImages?.length ?? capture.images.length
     },
     before,
     after,
@@ -245,11 +275,15 @@ export async function transformSite(inputDir, outputDir, options = {}) {
 }
 
 function buildSummary(plan, before, after, aiHints) {
-  const refNote = plan.retrieval?.topReference
-    ? ` Matched ${plan.retrieval.topReference.name} (${plan.retrieval.topReference.tier}) from a ${plan.retrieval.corpusSize}-site reference corpus.`
+  const refNote = plan.insights?.inspirationLine
+    ?? (plan.retrieval?.topReference
+      ? ` Matched ${plan.retrieval.topReference.name} (${plan.retrieval.topReference.tier}) from a ${plan.retrieval.corpusSize}-entry reference corpus.`
+      : "");
+  const appliedNote = plan.insights?.appliedReferences?.length
+    ? ` Applied ${plan.insights.appliedReferences.length} corpus references and ${plan.patterns.length} UI patterns.`
     : "";
   const aiNote = aiHints?.layoutNotes ? ` AI reference: ${aiHints.layoutNotes}.` : "";
-  return `morph re-rendered the site with ${plan.profile.profile.name} (${plan.archetype.archetype.name} layout, ${plan.patterns.length} UI patterns): UI quality ${before.score}/100 → ${after.score}/100.${refNote}${aiNote}`;
+  return `morph re-rendered the site with ${plan.profile.profile.name} (${plan.archetype.archetype.name} layout, ${plan.patterns.length} UI patterns): UI quality ${before.score}/100 → ${after.score}/100.${refNote}${appliedNote}${aiNote}`;
 }
 
 export async function findEntryHtml(rootDir) {
@@ -447,6 +481,25 @@ function ensureViewportMeta(html) {
 
 const CTA_PATTERN = /(get started|start (?:now|free|building|today)|sign ?up|try (?:it|now|free)|download|buy now|join|book|request|contact|learn more|see (?:how|demo)|view demo|explore)/i;
 
+import { isAccessibilityNoise } from "./content-noise.js";
+
+function deriveTitleParts(title) {
+  const clean = String(title ?? "").trim();
+  if (!clean) return null;
+
+  const pipeParts = clean.split(/[|–—]/).map((part) => part.trim()).filter(Boolean);
+  if (pipeParts.length >= 2 && pipeParts[0].length <= 40) {
+    return { brand: pipeParts[0], headline: pipeParts.slice(1).join(" — "), subhead: "" };
+  }
+
+  const dotParts = clean.split(/\.\s+/).map((part) => part.trim()).filter(Boolean);
+  if (dotParts.length >= 2 && dotParts[0].length <= 40) {
+    return { brand: dotParts[0], headline: dotParts.slice(1).join(". "), subhead: "" };
+  }
+
+  return null;
+}
+
 export function extractContent(rawHtml) {
   const html = String(rawHtml ?? "")
     .replace(/<script\b[\s\S]*?<\/script>/gi, "")
@@ -454,35 +507,45 @@ export function extractContent(rawHtml) {
 
   const title = textOf(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
   const description = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)?.[1] ?? "";
+  const titleParts = deriveTitleParts(title);
 
   const headings = collectTags(html, "h1")
     .concat(collectTags(html, "h2"), collectTags(html, "h3"))
+    .filter((heading) => !isAccessibilityNoise(heading.text))
     .sort((left, right) => left.index - right.index);
   const paragraphs = collectTags(html, "p");
   const listItems = collectTags(html, "li");
-  const anchors = collectAnchors(html);
+  const anchors = collectAnchors(html).filter((anchor) => !isAccessibilityNoise(anchor.label));
   const blockquote = textOf(html.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/i)?.[1] ?? "");
 
-  const h1 = headings.find((heading) => heading.tag === "h1") ?? headings[0] ?? null;
-  let headline = h1?.text || title || "Welcome";
-  const brand = deriveBrand(html, title, headline);
+  const realH1 = headings.find((heading) => heading.tag === "h1") ?? null;
+  const h1 = realH1 ?? headings[0] ?? null;
+  const brand = deriveBrand(html, title, h1?.text ?? title, titleParts);
+  let headline = realH1?.text || titleParts?.headline || title || "Welcome";
 
   // Fast sites often use the brand name as the h1 and put the real tagline in
   // the next heading. Promote that heading into the hero.
-  let heroHeading = h1;
-  if (h1 && brand && h1.text.toLowerCase() === brand.toLowerCase()) {
+  let heroHeading = realH1 ?? null;
+  if (realH1 && brand && realH1.text.toLowerCase() === brand.toLowerCase()) {
     const tagline = headings.find((heading) =>
-      heading !== h1 && heading.index > h1.index && heading.text.length > brand.length + 4
+      heading !== realH1 && heading.index > realH1.index && heading.text.length > brand.length + 4
     );
     if (tagline) {
       headline = tagline.text;
       heroHeading = tagline;
     }
+  } else if (!realH1 && titleParts?.headline) {
+    headline = titleParts.headline;
+    heroHeading = null;
+  } else if (!realH1 && h1) {
+    headline = h1.text;
+    heroHeading = h1;
   }
 
   const subhead = paragraphs.find((paragraph) => heroHeading && paragraph.index > heroHeading.index && paragraph.text.length > 40)?.text
     ?? paragraphs.find((paragraph) => paragraph.text.length > 40)?.text
     ?? description
+    ?? titleParts?.subhead
     ?? "";
   const nav = deriveNav(html, anchors, headings);
   const ctas = deriveCtas(html, anchors);
@@ -540,10 +603,26 @@ function collectAnchors(html) {
   return results;
 }
 
-function deriveBrand(html, title, headline) {
+function deriveBrand(html, title, headline, titleParts = null) {
+  const pickMeta = (pattern) => html.match(pattern)?.[1]?.trim() ?? "";
+  const ogSiteName = pickMeta(/<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']*)["']/i)
+    || pickMeta(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:site_name["']/i);
+  if (ogSiteName && ogSiteName.length <= 32) return textOf(ogSiteName);
+
+  const logoAlt = html.match(/<img\b[^>]*\balt=["']([^"']{2,32})["'][^>]*(?:class|id)=["'][^"']*(?:logo|brand)/i)?.[1]
+    ?? html.match(/<img\b[^>]*(?:class|id)=["'][^"']*(?:logo|brand)[^"']*["'][^>]*\balt=["']([^"']{2,32})["']/i)?.[1];
+  if (logoAlt && !isAccessibilityNoise(logoAlt)) return textOf(logoAlt);
+
+  if (titleParts?.brand && titleParts.brand.length <= 32) return titleParts.brand;
+
   const headerBlock = html.match(/<(?:header|nav)[^>]*>([\s\S]*?)<\/(?:header|nav)>/i)?.[1] ?? "";
-  const headerBrand = textOf(headerBlock.match(/<(?:a|strong|b|span|h\d)[^>]*>([\s\S]*?)<\/(?:a|strong|b|span|h\d)>/i)?.[1] ?? "");
-  if (headerBrand && headerBrand.length <= 32) return headerBrand;
+  for (const match of headerBlock.matchAll(/<(?:a|strong|b|span|h\d)\b[^>]*>([\s\S]*?)<\/(?:a|strong|b|span|h\d)>/gi)) {
+    const headerBrand = textOf(match[1]);
+    if (headerBrand && headerBrand.length <= 32 && !isAccessibilityNoise(headerBrand)) {
+      return headerBrand;
+    }
+  }
+
   const cleanTitle = title.split(/[|–—-]/)[0].trim();
   if (cleanTitle && cleanTitle.length <= 32) return cleanTitle;
   const shortHeadline = headline.split(/\s+/).slice(0, 2).join(" ");
@@ -554,15 +633,18 @@ function deriveNav(html, anchors, headings) {
   const navBlock = html.match(/<nav[^>]*>([\s\S]*?)<\/nav>/i)?.[1]
     ?? html.match(/<header[^>]*>([\s\S]*?)<\/header>/i)?.[1]
     ?? "";
-  let candidates = collectAnchors(navBlock);
+  let candidates = collectAnchors(navBlock).filter((candidate) => !isAccessibilityNoise(candidate.label));
   if (!candidates.length) {
-    candidates = anchors.filter((anchor) => anchor.href.startsWith("#") && anchor.label.length <= 24);
+    candidates = anchors.filter((anchor) =>
+      !isAccessibilityNoise(anchor.label)
+      && (anchor.href.startsWith("#") || anchor.label.length <= 24)
+    );
   }
   if (!candidates.length) {
     // Fabricate anchor navigation from section headings so the page still
     // gets a real nav.
     candidates = headings
-      .filter((heading) => heading.tag !== "h1" && heading.text.length <= 24)
+      .filter((heading) => heading.tag !== "h1" && heading.text.length <= 24 && !isAccessibilityNoise(heading.text))
       .slice(0, 4)
       .map((heading) => ({ label: heading.text, href: `#${slugify(heading.text)}` }));
   }
@@ -574,7 +656,6 @@ function deriveNav(html, anchors, headings) {
       seen.add(key);
       return true;
     })
-    .slice(0, 5)
     .map((candidate) => ({ label: candidate.label, href: candidate.href || "#" }));
 }
 
@@ -625,6 +706,7 @@ function deriveFeatureSections(headings, paragraphs, listItems, heroHeading) {
   }).filter((entry) =>
     entry.heading
     && !CTA_PATTERN.test(entry.heading)
+    && !isAccessibilityNoise(entry.heading)
     && (entry.body || entry.items.length)
   );
 
@@ -650,7 +732,7 @@ function deriveFeatureSections(headings, paragraphs, listItems, heroHeading) {
     }
   }
 
-  return { features: features.slice(0, 9), sections: sections.slice(0, 4) };
+  return { features, sections };
 }
 
 function parseTestimonial(blockquote) {

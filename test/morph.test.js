@@ -14,7 +14,9 @@ import {
 import { serveMorph } from "../src/server.js";
 import { landingHtml } from "../src/landing.js";
 import { extractContent, transformSite } from "../src/transform.js";
+import { assessCaptureQuality } from "../src/preview.js";
 import { enrichContent, researchSite } from "../src/site-research.js";
+import { captureSiteSnapshot, mergeCapturedIntoContent } from "../src/site-capture.js";
 import { assessUiQuality, databaseSummary, selectProfile, selectArchetype, catalogSummary, matchReferenceSites, buildRetrievalPlan, sourceIndexSummary, extractVisualPreferences, planTransform, alignProfileToPreferences } from "../src/design-db/index.js";
 import { aiVisionAvailable, analyzeUiReference, applyDesignHints } from "../src/ai-vision.js";
 import {
@@ -488,7 +490,7 @@ test("studio review scores preview url and shows current vs possible", async () 
     assert.equal(review.possibleScore, review.after.score);
     assert.equal(review.finalVerdict, "fail");
     assert.equal(review.redesignPasses, true);
-    assert.equal(review.transformedPreviewPath, "/transformed/index.html");
+    assert.match(review.transformedPreviewPath, /^\/api\/runs\/studio-review-[^/]+\/transformed\/index\.html$/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -625,10 +627,11 @@ test("design intelligence database exposes profiles and heuristics", () => {
   assert.equal(summary.patterns >= 75, true);
   assert.equal(summary.archetypes >= 8, true);
   assert.equal(summary.referenceSites >= 100, true);
-  assert.equal(summary.referenceCorpus >= 100, true);
-  assert.equal(summary.estimatedSourceSignals >= 4000000, true);
-  assert.equal(summary.sourceIndex.families >= 8, true);
-  assert.equal(summary.retrievalEngine, "reference_corpus_v2");
+  assert.equal(summary.referenceCorpus >= 1000, true);
+  assert.equal(summary.externalReferences >= 1000, true);
+  assert.equal(summary.estimatedSourceSignals >= 10000000, true);
+  assert.equal(summary.sourceIndex.families >= 12, true);
+  assert.equal(summary.retrievalEngine, "reference_corpus_v3");
   assert.equal(summary.profileIds.includes("aurora-dark"), true);
   assert.equal(summary.profileIds.includes("cobalt-enterprise"), true);
 });
@@ -654,8 +657,8 @@ test("reference corpus retrieval matches frontier sites to incoming content", as
     content
   );
 
-  assert.equal(plan.corpusSize >= 100, true);
-  assert.equal(plan.sourceIndex.estimatedSources >= 4000000, true);
+  assert.equal(plan.corpusSize >= 1000, true);
+  assert.equal(plan.sourceIndex.estimatedSources >= 10000000, true);
   assert.equal(plan.sourceSignals.topDimensions.length >= 1, true);
   assert.equal(plan.sourceSignals.estimatedMatchedSources > 0, true);
   assert.equal(plan.matches.length >= 1, true);
@@ -668,9 +671,9 @@ test("reference corpus retrieval matches frontier sites to incoming content", as
 test("source index summarizes millions of high-end frontend signals", () => {
   const summary = sourceIndexSummary();
 
-  assert.equal(summary.version, "source_index_v1");
-  assert.equal(summary.estimatedSources >= 4000000, true);
-  assert.equal(summary.families >= 8, true);
+  assert.equal(summary.version, "source_index_v2");
+  assert.equal(summary.estimatedSources >= 10000000, true);
+  assert.equal(summary.families >= 12, true);
   assert.equal(summary.dimensions >= 8, true);
 });
 
@@ -883,6 +886,57 @@ test("plan transform keeps light sites on light profiles", () => {
   assert.equal(plan.profile.profile.mode, "light");
 });
 
+test("transform captures 100% of original site content before redesign", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-capture-"));
+  const inputDir = path.join(tempRoot, "site");
+  const outputDir = path.join(tempRoot, "out");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/codex-landing"), inputDir);
+
+  const receipt = await transformSite(inputDir, outputDir);
+  const sourceHtml = await readFile(path.join(inputDir, "index.html"), "utf8");
+  const outputHtml = await readFile(path.join(outputDir, "index.html"), "utf8");
+
+  assert.equal(receipt.sourceCapture.fullTextLength > 100, true);
+  assert.equal(receipt.content.capturedParagraphs >= 1, true);
+  assert.equal(receipt.content.sourceTextLength > 100, true);
+  assert.equal(outputHtml.includes("TaskPilot"), true);
+  assert.equal(outputHtml.includes("Drag and drop tasks between columns"), true);
+  assert.equal(sourceHtml.includes("Drag and drop tasks between columns"), true);
+});
+
+test("reference retrieval uses full corpus match budget", async () => {
+  const html = await readFile(path.join(repoRoot, "fixtures/codex-landing/index.html"), "utf8");
+  const content = extractContent(html);
+  const capture = captureSiteSnapshot(html);
+  const merged = mergeCapturedIntoContent(content, capture);
+  const plan = buildRetrievalPlan(
+    "TaskPilot plan projects track tasks manage team pricing subscription workflow",
+    merged
+  );
+
+  assert.equal(plan.corpusSize >= 1000, true);
+  assert.equal(plan.matches.length >= 24, true);
+  assert.equal(plan.insights.referencesUsed >= 24, true);
+  assert.equal(plan.insights.patternIds.length >= 8, true);
+});
+
+test("transform actively applies external corpus references during repair", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-transform-insights-"));
+  const inputDir = path.join(tempRoot, "site");
+  const outputDir = path.join(tempRoot, "out");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/codex-landing"), inputDir);
+
+  const receipt = await transformSite(inputDir, outputDir);
+
+  assert.equal(receipt.retrieval.appliedReferences.length >= 3, true);
+  assert.equal(receipt.retrieval.patternsApplied >= 8, true);
+  assert.equal(receipt.retrieval.repairNotes.length >= 1, true);
+  assert.equal(typeof receipt.retrieval.inspirationLine, "string");
+
+  const outputCss = await readFile(path.join(outputDir, "morph-theme.css"), "utf8");
+  assert.equal(outputCss.includes("Active references:"), true);
+});
+
 test("transform re-renders an ugly site into a passing design-database page", async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-transform-"));
   const inputDir = path.join(tempRoot, "site");
@@ -895,11 +949,12 @@ test("transform re-renders an ugly site into a passing design-database page", as
   assert.equal(receipt.before.score < 70, true);
   assert.equal(receipt.after.score >= 80, true);
   assert.equal(receipt.verdict, "pass");
-  assert.equal(receipt.profile.id, "halcyon-blue");
-  assert.equal(typeof receipt.archetype.id, "string");
+  assert.equal(receipt.profile.id, "meridian-light");
   assert.equal(receipt.patterns.length >= 3, true);
-  assert.equal(receipt.retrieval.corpusSize >= 100, true);
-  assert.equal(receipt.retrieval.estimatedSourceSignals >= 4000000, true);
+  assert.equal(receipt.retrieval.corpusSize >= 1000, true);
+  assert.equal(receipt.retrieval.appliedReferences.length >= 3, true);
+  assert.equal(receipt.retrieval.patternsApplied >= 8, true);
+  assert.equal(receipt.retrieval.estimatedSourceSignals >= 10000000, true);
   assert.equal(receipt.retrieval.highEndDimensions.length >= 1, true);
   assert.equal(receipt.retrieval.confidence > 0, true);
 
@@ -911,6 +966,53 @@ test("transform re-renders an ugly site into a passing design-database page", as
   assert.equal(outputCss.includes("--primary"), true);
   assert.equal(outputCss.includes("focus-visible"), true);
   assert.equal(outputCss.includes("@media"), true);
+});
+
+test("assessCaptureQuality rejects bot-check pages", () => {
+  const botWall = `<html><head><title>Amazon.com</title></head><body>
+    <h4>Click the button below to continue shopping</h4>
+    <button>Continue shopping</button>
+    <a href="/terms">Conditions of Use</a>
+    <a href="/privacy">Privacy Policy</a>
+    <input type="hidden" name="amzn" value="1">
+  </body></html>`;
+  const result = assessCaptureQuality(botWall);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /bot-check/i);
+});
+
+test("extractContent ignores accessibility boilerplate and uses title taglines", () => {
+  const html = `<!doctype html>
+<html>
+<head>
+  <title>Amazon.com. Spend less. Smile more.</title>
+  <meta property="og:site_name" content="Amazon">
+</head>
+<body>
+  <header>
+    <a href="#main">Skip to main content</a>
+    <nav>
+      <a href="#main">Main content</a>
+      <a href="#shortcuts">Keyboard shortcuts</a>
+      <a href="/">Amazon</a>
+    </nav>
+  </header>
+  <main>
+    <h2>Skip to</h2>
+    <h2>Official soccer merch</h2>
+    <p>Shop jerseys, scarves, and more from your favorite teams.</p>
+    <h2>Shop off to college</h2>
+    <p>Everything you need for dorm life and campus style.</p>
+  </main>
+</body>
+</html>`;
+
+  const content = extractContent(html);
+  assert.equal(content.brand, "Amazon");
+  assert.equal(content.hero.headline, "Spend less. Smile more.");
+  assert.equal(content.features.some((feature) => feature.title === "Official soccer merch"), true);
+  assert.equal(content.nav.some((link) => /keyboard/i.test(link.label)), false);
+  assert.equal(content.nav.some((link) => /skip to/i.test(link.label)), false);
 });
 
 test("studio github review clones the repo, transforms it, and serves the result", async () => {
@@ -953,18 +1055,18 @@ test("studio github review clones the repo, transforms it, and serves the result
     assert.equal(review.before.verdict, "fail");
     assert.equal(review.finalVerdict, "fail");
     assert.equal(review.redesignPasses, true);
-    assert.equal(review.transform.profile.id, "halcyon-blue");
-    assert.equal(review.transformedPreviewPath, "/transformed/index.html");
+    assert.equal(review.transform.profile.id, "meridian-light");
+    assert.match(review.transformedPreviewPath, /^\/api\/runs\/studio-review-[^/]+\/transformed\/index\.html$/);
     assert.equal(review.codeReview.changed, true);
 
-    const previewResponse = await fetch(`${url}/transformed/index.html`);
+    const previewResponse = await fetch(`${url}${review.transformedPreviewPath}`);
     assert.equal(previewResponse.status, 200);
     assert.equal(previewResponse.headers.get("content-type").includes("text/html"), true);
     const previewHtml = await previewResponse.text();
     assert.equal(previewHtml.includes("TaskPilot"), true);
     assert.equal(previewHtml.includes("morph-theme.css"), true);
 
-    const cssResponse = await fetch(`${url}/transformed/morph-theme.css`);
+    const cssResponse = await fetch(`${url}${review.transformedPreviewPath.replace("index.html", "morph-theme.css")}`);
     assert.equal(cssResponse.status, 200);
   } finally {
     await new Promise((resolve) => server.close(resolve));

@@ -4,7 +4,7 @@
 // frontier product sites. Patterns are tagged by category, industry, and
 // layout role so the transform engine can assemble pages intelligently.
 
-import { REFERENCE_SITES as CORPUS_REFERENCE_SITES } from "./reference-corpus.js";
+import { REFERENCE_SITES as CORPUS_REFERENCE_SITES, getMergedReferenceCorpus } from "./reference-corpus.js";
 
 export { REFERENCE_SITES } from "./reference-corpus.js";
 
@@ -134,7 +134,8 @@ export function catalogSummary() {
   return {
     patterns: UI_PATTERN_CATALOG.length,
     categories: PATTERN_CATEGORIES.length,
-    referenceSites: REFERENCE_SITES.length,
+    referenceSites: getMergedReferenceCorpus().length,
+    curatedReferenceSites: REFERENCE_SITES.length,
     byCategory
   };
 }
@@ -156,7 +157,7 @@ export function findPatterns({ category = null, tags = [], limit = 12 } = {}) {
 export function matchReferenceSites(text) {
   const haystack = String(text ?? "").toLowerCase();
   const matches = [];
-  for (const site of REFERENCE_SITES) {
+  for (const site of getMergedReferenceCorpus()) {
     const hitTags = site.tags.filter((tag) => haystack.includes(tag));
     const hitName = haystack.includes(site.name.toLowerCase()) || haystack.includes(site.id);
     if (hitTags.length || hitName) {
@@ -199,6 +200,9 @@ export function selectPatternsForContent(content, archetype, options = {}) {
   }
 
   for (const patternId of options.retrievalHints?.patternHints ?? []) {
+    selected.add(patternId);
+  }
+  for (const patternId of options.referenceInsights?.patternIds ?? []) {
     selected.add(patternId);
   }
 

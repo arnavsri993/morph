@@ -801,7 +801,7 @@ export function landingHtml(config, session) {
       <div class="shell">
         <div class="section-head reveal">
           <span class="section-label">Demo</span>
-          <h2>From drift to merge-ready in Studio</h2>
+          <h2>See the full review loop</h2>
           <p class="section-desc">Connect a GitHub repo or paste a preview URL. morph runs the full review loop and shows exactly what changed.</p>
         </div>
 

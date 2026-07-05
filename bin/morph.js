@@ -35,6 +35,7 @@ function parseArgs(argv) {
     instructions: null,
     referenceImage: null,
     generateReference: false,
+    preserveIfGood: false,
     designVariance: null,
     motionIntensity: null,
     visualDensity: null,
@@ -63,6 +64,7 @@ function parseArgs(argv) {
     else if (arg === "--instructions") args.instructions = argv[++i];
     else if (arg === "--reference-image") args.referenceImage = argv[++i];
     else if (arg === "--generate-reference") args.generateReference = true;
+    else if (arg === "--preserve-if-good") args.preserveIfGood = true;
     else if (arg === "--design-variance") args.designVariance = argv[++i];
     else if (arg === "--motion-intensity") args.motionIntensity = argv[++i];
     else if (arg === "--visual-density") args.visualDensity = argv[++i];
@@ -87,7 +89,7 @@ Usage:
   morph transform (--input ./site | --repo owner/repo) [--output ./morph-output]
              [--profile aurora-dark] [--archetype landing-classic]
              [--instructions "..."] [--reference-image ./mockup.png]
-             [--generate-reference]
+             [--generate-reference] [--preserve-if-good]
              [--design-variance 1-10] [--motion-intensity 1-10] [--visual-density 1-10]
              [--composer] [--composer-target 98] [--composer-max-iters 4] [--composer-model composer-2.5]
              [--json]
@@ -197,6 +199,7 @@ async function main() {
       instructions: args.instructions,
       referenceImage: args.referenceImage,
       generateReference: args.generateReference,
+      preserveIfGood: Boolean(args.preserveIfGood),
       taste: Object.keys(taste).length ? taste : null
     });
     if (args.json) console.log(JSON.stringify(receipt, null, 2));

@@ -1,14 +1,14 @@
 {
   "version": "source_index_v2",
-  "builtAt": "2026-07-05T09:09:09.985Z",
-  "references": 4240,
-  "npmQueries": 5,
-  "npmAggregateTotal": 2417449,
+  "builtAt": "2026-07-05T09:10:24.897Z",
+  "references": 14363,
+  "npmQueries": 30,
+  "npmAggregateTotal": 10660442,
   "families": [
     {
       "id": "npm-ui-packages",
       "label": "npm UI & component packages",
-      "estimatedSources": 2417449,
+      "estimatedSources": 10660442,
       "trust": 0.88
     },
     {
@@ -78,5 +78,5 @@
       "trust": 0.93
     }
   ],
-  "estimatedSources": 9992449
+  "estimatedSources": 18235442
 }

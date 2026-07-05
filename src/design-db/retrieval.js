@@ -9,6 +9,8 @@ import { UI_PATTERN_CATALOG } from "./catalog.js";
 import { getProfile } from "./profiles.js";
 import { getArchetype } from "./archetypes.js";
 import { analyzeHighEndSignals, sourceIndexSummary } from "./source-index.js";
+import { synthesizeReferenceInsights } from "./reference-insights.js";
+import { RETRIEVAL_MATCH_LIMIT } from "./retrieval-config.js";
 
 const STOP_WORDS = new Set([
   "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
@@ -156,7 +158,7 @@ export function scoreReference(reference, tokens, signals, industryMatch) {
   return { reference, score, matchedTokens: [...new Set(matchedTokens)] };
 }
 
-export function retrieveReferences(text, content, { limit = 8 } = {}) {
+export function retrieveReferences(text, content, { limit = RETRIEVAL_MATCH_LIMIT } = {}) {
   const tokens = tokenize(text);
   const signals = analyzeContentSignals(content);
   const sourceSignals = analyzeHighEndSignals(text, signals);
@@ -245,7 +247,18 @@ export function buildRetrievalPlan(text, content) {
       archetypeHint: null,
       patternHints: contentPatternHints(signals),
       topReference: null,
-      confidence: 0
+      confidence: 0,
+      insights: synthesizeReferenceInsights({
+        matches: [],
+        matchedCount: 0,
+        industry,
+        signals,
+        sourceSignals,
+        corpusSize,
+        confidence: 0,
+        topReference: null,
+        patternHints: contentPatternHints(signals)
+      }, content)
     };
   }
 
@@ -258,6 +271,29 @@ export function buildRetrievalPlan(text, content) {
   const topMatch = matches[0];
   const profile = getProfile(hints.profileId);
   const archetype = getArchetype(hints.archetypeId);
+  const insights = synthesizeReferenceInsights({
+    matches: matches.map(({ reference, score, matchedTokens }) => ({
+      id: reference.id,
+      name: reference.name,
+      tier: reference.tier,
+      industry: reference.industry,
+      score: Math.round(score * 10) / 10,
+      matchedTokens
+    })),
+    matchedCount: matches.length,
+    industry,
+    signals,
+    sourceSignals,
+    corpusSize,
+    confidence: Math.min(1, topMatch.score / 30),
+    topReference: {
+      id: topMatch.reference.id,
+      name: topMatch.reference.name,
+      tier: topMatch.reference.tier,
+      score: Math.round(topMatch.score * 10) / 10
+    },
+    patternHints
+  }, content);
 
   return {
     matches: matches.map(({ reference, score, matchedTokens }) => ({
@@ -292,7 +328,8 @@ export function buildRetrievalPlan(text, content) {
       tier: topMatch.reference.tier,
       score: Math.round(topMatch.score * 10) / 10
     },
-    confidence: Math.min(1, topMatch.score / 30)
+    confidence: Math.min(1, topMatch.score / 30),
+    insights
   };
 }
 

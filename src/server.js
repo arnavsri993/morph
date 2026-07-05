@@ -1,11 +1,12 @@
 import { createServer } from "node:http";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   copyFixtureForDemo,
   createReport,
+  createRunId,
   listRuns,
   loadConfig,
   loopProject,
@@ -273,7 +274,9 @@ export async function createMorphHandler(config, options = {}) {
 
       if (request.method === "POST" && url.pathname === "/api/studio/review") {
         const body = await readJson(request);
+        const runId = createRunId("studio-review");
         const review = await runStudioReview(config, {
+          runId,
           source: body.source,
           previewUrl: body.previewUrl,
           githubRepo: body.githubRepo,
@@ -282,8 +285,15 @@ export async function createMorphHandler(config, options = {}) {
           referenceImage: body.referenceImage,
           generateReference: body.generateReference
         });
-        const stored = await storeRun(config, "studio-review", review);
+        const stored = await storeRun(config, "studio-review", { ...review, runId });
         return sendJson(response, 201, { run: stored });
+      }
+
+      if (request.method === "GET" && /^\/api\/runs\/[^/]+\/transformed(?:\/|$)/.test(url.pathname)) {
+        const segments = url.pathname.split("/").filter(Boolean);
+        const runId = decodeURIComponent(segments[2] ?? "");
+        const relative = decodeURIComponent(segments.slice(4).join("/")) || "index.html";
+        return serveRunTransformedFile(response, config, runId, relative);
       }
 
       if (request.method === "GET" && url.pathname.startsWith("/api/runs/")) {
@@ -340,12 +350,14 @@ const DEFAULT_REVIEW_FILE = "src/routes/settings/billing.tsx";
 async function runStudioReview(config, options = {}) {
   const instructions = String(options.instructions ?? "").trim();
   const targetFile = normalizeReviewTargetFile(options.targetFile);
+  const runId = options.runId ?? createRunId("studio-review");
   let source = String(options.source ?? "").trim();
 
   if (source !== "fixture") {
     const resolved = resolveStudioSource(options);
     if (resolved.source === "github" || resolved.source === "url") {
       return runTransformReview(config, {
+        runId,
         source: resolved.source,
         githubRepo: resolved.githubRepo,
         previewUrl: resolved.previewUrl,
@@ -444,6 +456,7 @@ async function runStudioReview(config, options = {}) {
 }
 
 async function runTransformReview(config, {
+  runId,
   source,
   githubRepo = null,
   previewUrl = null,
@@ -477,11 +490,15 @@ async function runTransformReview(config, {
       instructions,
       profile: null,
       referenceImage: referenceImage || null,
-      generateReference: Boolean(generateReference)
+      generateReference: Boolean(generateReference),
+      forceRerender: true
     });
   } catch (error) {
     throw new HttpError(422, "transform_failed", error.message);
   }
+
+  const transformedPreviewPath = `/api/runs/${runId}/transformed/index.html`;
+  await archiveRunTransform(config, runId, transformedRoot);
 
   const before = heuristicsAsReport(transform.before, transform.codeReview.file, config, { transformMode: true });
   const after = heuristicsAsReport(transform.after, "index.html", config, { transformMode: true });
@@ -492,9 +509,8 @@ async function runTransformReview(config, {
         "Research the live site: meta, audience, navigation, sections, events, partners, and social proof.",
         `Mapped ${transform.siteResearch?.cardCount ?? 0} content blocks and ${transform.siteResearch?.topics?.length ?? 0} key topics before redesign.`,
         `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
-        "Preserve visible preferences from the original site: color mode, brand colors, and content structure.",
         "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
-        `Possible score after redesign: ${after.score}/100. Preview at /transformed/index.html.`
+        `Possible score after redesign: ${after.score}/100. Preview at ${transformedPreviewPath}.`
       ]
     : [
         `Fetch live site at ${previewUrl}.`,
@@ -502,9 +518,8 @@ async function runTransformReview(config, {
         "Research the live site: meta, audience, navigation, sections, events, partners, and social proof.",
         `Mapped ${transform.siteResearch?.cardCount ?? 0} content blocks and ${transform.siteResearch?.topics?.length ?? 0} key topics before redesign.`,
         `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
-        "Preserve visible preferences from the original site: color mode, brand colors, and content structure.",
         "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
-        `Possible score after redesign: ${after.score}/100. Preview at /transformed/index.html.`
+        `Possible score after redesign: ${after.score}/100. Preview at ${transformedPreviewPath}.`
       ];
 
   return {
@@ -528,9 +543,10 @@ async function runTransformReview(config, {
       content: transform.content,
       siteResearch: transform.siteResearch,
       improvement: transform.improvement,
-      outputFiles: transform.output.files
+      outputFiles: transform.output.files,
+      preservedOriginal: transform.preservedOriginal
     },
-    transformedPreviewPath: "/transformed/index.html",
+    transformedPreviewPath,
     userJourney,
     before,
     repair: {
@@ -633,7 +649,22 @@ async function serveAsset(response, pathname) {
 
 async function serveTransformedFile(response, _config, pathname) {
   const transformedRoot = path.resolve(os.tmpdir(), ".studio-run/transformed");
-  const relative = decodeURIComponent(pathname.replace(/^\/transformed\/?/, "")) || "index.html";
+  return serveTransformedFileFromRoot(response, transformedRoot, pathname.replace(/^\/transformed\/?/, "") || "index.html");
+}
+
+async function serveRunTransformedFile(response, config, runId, relativePath) {
+  const transformedRoot = path.resolve(config.morphDir, "runs", runId, "transformed");
+  return serveTransformedFileFromRoot(response, transformedRoot, relativePath);
+}
+
+async function archiveRunTransform(config, runId, transformedRoot) {
+  const destination = path.join(config.morphDir, "runs", runId, "transformed");
+  await mkdir(path.dirname(destination), { recursive: true });
+  await cp(transformedRoot, destination, { recursive: true, force: true });
+  return destination;
+}
+
+async function serveTransformedFileFromRoot(response, transformedRoot, relative) {
   const target = path.resolve(transformedRoot, relative);
   if (!target.startsWith(transformedRoot + path.sep) && target !== transformedRoot) {
     return sendJson(response, 400, { error: "invalid_path" });
@@ -646,7 +677,7 @@ async function serveTransformedFile(response, _config, pathname) {
   } catch {
     return sendJson(response, 404, {
       error: "no_transformed_site",
-      message: "Run a GitHub review first — the transformed site will be served here."
+      message: "No transformed site is stored for this review run."
     });
   }
 }
@@ -1763,6 +1794,40 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       transform: translateY(-1px);
       box-shadow: var(--shadow-lg), 0 0 32px rgba(124, 124, 248, 0.22);
     }
+    .transform-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 18px 0 8px;
+    }
+    .transform-preview-pane {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--surface);
+      min-height: 280px;
+    }
+    .transform-preview-label {
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.02);
+    }
+    .transform-preview-pane img,
+    .transform-preview-pane iframe {
+      display: block;
+      width: 100%;
+      min-height: 320px;
+      border: 0;
+      background: #fff;
+    }
+    @media (max-width: 900px) {
+      .transform-preview-grid { grid-template-columns: 1fr; }
+    }
     .research-brief {
       margin: 0;
       padding: 14px 16px;
@@ -2089,7 +2154,12 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       }
       updateSourceBadge();
     });
-    githubRepoInput?.addEventListener("input", updateSourceBadge);
+    githubRepoInput?.addEventListener("input", () => {
+      if (isGithubRepoInput(githubRepoInput?.value)) {
+        activateSourceTab("github");
+      }
+      updateSourceBadge();
+    });
 
     document.querySelector("#previewForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -2109,18 +2179,20 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       const previewUrl = previewUrlInput?.value.trim() || "";
       const githubRepo = githubRepoInput?.value.trim() || "";
 
-      if (looksLikeHttpUrl(previewUrl)) {
-        return { source: "url", previewUrl, instructions };
+      if (activeSource === "github") {
+        if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo) or switch to Preview URL.");
+        if (looksLikeHttpUrl(githubRepo) && !isGithubRepoInput(githubRepo)) {
+          return { source: "url", previewUrl: githubRepo, instructions };
+        }
+        return { source: "github", githubRepo, instructions };
       }
-      if (looksLikeHttpUrl(githubRepo) && !isGithubRepoInput(githubRepo)) {
-        return { source: "url", previewUrl: githubRepo, instructions };
-      }
+
       if (activeSource === "url") {
         if (!previewUrl) throw new Error("Enter a web URL or switch to GitHub.");
         return { source: "url", previewUrl, instructions };
       }
-      if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo) or switch to Web URL.");
-      return { source: "github", githubRepo, instructions };
+
+      throw new Error("Choose GitHub or Preview URL.");
     }
 
     function renderPreviewCapture(preview) {
@@ -2241,8 +2313,27 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         html += '<div class="review-meta"><strong>Design profile:</strong> '
           + esc(p.transform.profile.name) + ' — ' + esc(p.transform.profile.inspiration || "") + '</div>';
       }
+      if (p.transform?.preservedOriginal) {
+        html += '<div class="review-meta"><strong>Note:</strong> morph preserved the original layout because it already met the quality bar. Re-run with force re-render to generate a new frontend.</div>';
+      }
+      if (p.engine === "design_db_transform" && p.transformedPreviewPath) {
+        html += '<div class="transform-preview-grid">';
+        if (p.preview?.screenshotBase64) {
+          html += '<div class="transform-preview-pane"><div class="transform-preview-label">Before (captured site)</div>'
+            + '<img alt="Captured site preview" src="data:image/png;base64,' + p.preview.screenshotBase64 + '"></div>';
+        }
+        const previewSrc = run?.id
+          ? '/api/runs/' + encodeURIComponent(run.id) + '/transformed/index.html'
+          : esc(p.transformedPreviewPath);
+        html += '<div class="transform-preview-pane"><div class="transform-preview-label">After redesign</div>'
+          + '<iframe title="Redesigned site preview" src="' + previewSrc + '" loading="lazy"></iframe></div>';
+        html += '</div>';
+      }
       if (p.transformedPreviewPath) {
-        html += '<div class="review-action"><a class="btn btn-primary btn-lg btn-transform-preview" href="' + esc(p.transformedPreviewPath) + '" target="_blank" rel="noreferrer">View transformed site ↗</a></div>';
+        const previewHref = run?.id
+          ? '/api/runs/' + encodeURIComponent(run.id) + '/transformed/index.html'
+          : esc(p.transformedPreviewPath);
+        html += '<div class="review-action"><a class="btn btn-primary btn-lg btn-transform-preview" href="' + previewHref + '" target="_blank" rel="noreferrer">View transformed site ↗</a></div>';
       }
       if (p.transform?.siteResearch?.summary) {
         html += '<details open><summary>Site research <span class="preview">before redesign</span></summary>';

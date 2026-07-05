@@ -19,17 +19,78 @@ function parsePreviewUrl(url) {
   return parsed;
 }
 
+const BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+export function assessCaptureQuality(html) {
+  const source = String(html ?? "");
+  const linkCount = (source.match(/<a\b/gi) ?? []).length;
+  const paragraphCount = (source.match(/<p\b/gi) ?? []).length;
+  const headingCount = (source.match(/<h[1-6]\b/gi) ?? []).length;
+  const captchaSignals = [
+    /opfcaptcha/i,
+    /captcha\.amazon/i,
+    /type=["']hidden["'][^>]*name=["']amzn/i,
+    /automated access to amazon/i
+  ];
+  const looksLikeBotWall = captchaSignals.some((pattern) => pattern.test(source))
+    || (/continue shopping/i.test(source) && linkCount < 10 && headingCount <= 2 && paragraphCount < 3);
+
+  if (looksLikeBotWall) {
+    return {
+      ok: false,
+      reason: "The site returned a bot-check page instead of real content. Try again or use a GitHub repo input."
+    };
+  }
+
+  if (linkCount < 3 && headingCount < 2 && paragraphCount < 2 && source.length < 8000) {
+    return {
+      ok: false,
+      reason: "The captured page looks empty — the site may have blocked automated access."
+    };
+  }
+
+  return { ok: true };
+}
+
+async function createBrowserContext(chromium) {
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"]
+  });
+  const context = await browser.newContext({
+    userAgent: BROWSER_USER_AGENT,
+    viewport: { width: 1440, height: 900 },
+    locale: "en-US",
+    timezoneId: "America/New_York",
+    extraHTTPHeaders: {
+      "Accept-Language": "en-US,en;q=0.9",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+    }
+  });
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+  });
+  return { browser, context };
+}
+
 async function captureWithPlaywright(parsed, options = {}) {
   const { chromium } = await import("playwright");
-  const browser = await chromium.launch({ headless: true });
+  const { browser, context } = await createBrowserContext(chromium);
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    const page = await context.newPage();
     await page.goto(parsed.href, {
       waitUntil: options.waitUntil ?? "domcontentloaded",
-      timeout: options.timeout ?? 30_000
+      timeout: options.timeout ?? 45_000
     });
     const title = await page.title();
     const html = await page.content();
+    const quality = assessCaptureQuality(html);
+    if (!quality.ok) {
+      const error = new Error(quality.reason);
+      error.code = "bot_wall";
+      throw error;
+    }
     const css = await page.evaluate(async () => {
       const chunks = [];
       for (const style of document.querySelectorAll("style")) {
@@ -50,6 +111,7 @@ async function captureWithPlaywright(parsed, options = {}) {
       : (await page.screenshot({ type: "png" })).toString("base64");
     return { title, html, css, screenshotBase64 };
   } finally {
+    await context.close();
     await browser.close();
   }
 }
@@ -126,7 +188,10 @@ async function captureWithFetch(parsed, options = {}) {
     const response = await fetch(parsed.href, {
       signal: controller.signal,
       redirect: "follow",
-      headers: { "user-agent": "morph-review/0.1 (+https://morph.dev)" }
+      headers: {
+        "user-agent": BROWSER_USER_AGENT,
+        "accept-language": "en-US,en;q=0.9"
+      }
     });
     if (!response.ok) {
       throw new Error(`Preview URL returned HTTP ${response.status}.`);
@@ -134,6 +199,10 @@ async function captureWithFetch(parsed, options = {}) {
     const html = await response.text();
     const css = await collectRemoteCss(html, parsed.href);
     const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? parsed.hostname;
+    const quality = assessCaptureQuality(html);
+    if (!quality.ok) {
+      throw new Error(quality.reason);
+    }
     return { title, html, css, screenshotBase64: null };
   } finally {
     clearTimeout(timeout);

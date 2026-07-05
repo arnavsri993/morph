@@ -994,7 +994,7 @@ OPENAI_API_KEY=
 `;
 }
 
-function createRunId(prefix) {
+export function createRunId(prefix) {
   return `${prefix}-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.random().toString(16).slice(2, 8)}`;
 }
 

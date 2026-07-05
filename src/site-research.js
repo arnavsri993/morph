@@ -1,6 +1,8 @@
 // Deep read of an incoming site before morph redesigns it.
 // Captures structure, audience signals, and content the shallow extractor misses.
 
+import { isAccessibilityNoise } from "./content-noise.js";
+
 const AUDIENCE_SIGNALS = [
   { id: "ai-community", words: ["ai", "artificial intelligence", "machine learning", "llm", "gpt", "agents", "builders", "hackathon"] },
   { id: "events", words: ["event", "events", "meetup", "conference", "summit", "festival", "ticket", "rsvp", "calendar"] },
@@ -100,7 +102,7 @@ export function enrichContent(content, research) {
     }
   }
   if (research.navLinks?.length > (enriched.nav?.length ?? 0)) {
-    enriched.nav = research.navLinks.slice(0, 6).map((link) => ({
+    enriched.nav = research.navLinks.map((link) => ({
       label: link.label,
       href: link.href
     }));
@@ -114,7 +116,6 @@ export function enrichContent(content, research) {
   );
   const existingFeatureTitles = new Set((enriched.features ?? []).map((feature) => feature.title.toLowerCase()));
   for (const card of research.cards ?? []) {
-    if ((enriched.features?.length ?? 0) >= 9) break;
     if (!card.title) continue;
     const titleKey = card.title.toLowerCase();
     if (existingFeatureTitles.has(titleKey) || skipTitles.has(titleKey)) continue;
@@ -128,7 +129,6 @@ export function enrichContent(content, research) {
 
   const existingSectionHeadings = new Set((enriched.sections ?? []).map((section) => section.heading.toLowerCase()));
   for (const event of research.events ?? []) {
-    if ((enriched.sections?.length ?? 0) >= 6) break;
     if (!event.title || existingSectionHeadings.has(event.title.toLowerCase())) continue;
     enriched.sections ??= [];
     enriched.sections.push({
@@ -140,7 +140,7 @@ export function enrichContent(content, research) {
   }
 
   if (research.partners?.length >= 3) {
-    enriched.logoPartners = research.partners.slice(0, 8);
+    enriched.logoPartners = research.partners;
   }
   if (!enriched.testimonial?.quote && research.quotes?.[0]) {
     enriched.testimonial = research.quotes[0];
@@ -193,7 +193,7 @@ function collectHeadings(html) {
     const pattern = new RegExp(`<h${level}\\b[^>]*>([\\s\\S]*?)<\\/h${level}>`, "gi");
     for (const match of html.matchAll(pattern)) {
       const text = cleanText(match[1]);
-      if (text) headings.push({ level, text, index: match.index ?? 0 });
+      if (text && !isAccessibilityNoise(text)) headings.push({ level, text, index: match.index ?? 0 });
     }
   }
   return headings.sort((left, right) => left.index - right.index);
@@ -209,7 +209,7 @@ function collectNavLinks(html) {
     for (const match of block.matchAll(/<a\b[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
       const label = cleanText(match[2]);
       const href = match[1];
-      if (!label || label.length > 40) continue;
+      if (!label || label.length > 40 || isAccessibilityNoise(label)) continue;
       if (/^(login|log in|sign in|sign up|get started)$/i.test(label)) continue;
       links.push({ label, href });
     }
