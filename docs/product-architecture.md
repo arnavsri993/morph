@@ -22,6 +22,11 @@ Morph is the verification layer between AI coding agents and frontend merges. Th
 - `morph demo` runs the Acme SaaS sample review without mutating the seeded fixture.
 - `morph serve` starts a dependency-free HTTP control plane.
 
+## Repository Fixtures
+
+- `morph.config.json` points at `fixtures/acme-saas-clean` and is the default product smoke gate. `npm run verify` should pass.
+- `morph.demo.config.json` points at `fixtures/acme-saas` and keeps the seeded drift fixture available for demos, tests, and repair receipts.
+
 ## Server API
 
 The built-in server stores run records under `.morph/runs` and exposes:
