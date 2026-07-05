@@ -20,12 +20,20 @@
   "keywords": [
     "design-system",
     "frontend",
-    "ci",
     "agents",
     "ci"
   ],
   "license": "MIT",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@buoy-design/core": "^0.3.38",
+    "@metamask/eslint-plugin-design-tokens": "^1.1.1",
+    "@typescript-eslint/parser": "^8.62.1",
+    "axe-core": "^4.12.1",
+    "eslint": "^10.6.0",
+    "eslint-plugin-tailwind-palette-guard": "^0.1.3",
+    "jsdom": "^29.1.1"
   }
 }

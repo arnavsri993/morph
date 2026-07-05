@@ -20,6 +20,7 @@ import {
   renderPage,
   renderStylesheet
 } from "./design-db/index.js";
+import { mergeUiQualityAssessments, assessCssHealth } from "./scanners/design-health.js";
 
 export async function transformSite(inputDir, outputDir, options = {}) {
   const entry = await findEntryHtml(inputDir);
@@ -29,7 +30,7 @@ export async function transformSite(inputDir, outputDir, options = {}) {
 
   const html = await readFile(entry, "utf8");
   const css = await collectCss(inputDir, entry, html);
-  const before = assessUiQuality(html, css);
+  const before = mergeUiQualityAssessments(assessUiQuality(html, css), assessCssHealth(html, css));
   const content = extractContent(html);
 
   const contentSummary = [
@@ -128,12 +129,15 @@ export async function transformSite(inputDir, outputDir, options = {}) {
       matchedTags: plan.archetype.matchedTags
     },
     retrieval: {
-      engine: "reference_corpus_v1",
+      engine: plan.retrieval.sourceIndex?.version ?? "reference_corpus_v2",
       corpusSize: plan.retrieval.corpusSize,
+      estimatedSourceSignals: plan.retrieval.sourceIndex?.estimatedSources ?? null,
       confidence: plan.retrieval.confidence,
       topReference: plan.retrieval.topReference,
       matchedReferences: (plan.retrieval.matches ?? []).slice(0, 5),
       industry: plan.retrieval.industry?.industry ?? null,
+      highEndDimensions: plan.retrieval.sourceSignals?.topDimensions ?? [],
+      matchedSourceFamilies: plan.retrieval.sourceSignals?.sourceFamilies ?? [],
       patternHints: plan.retrieval.patternHints?.length ?? 0
     },
     patterns: plan.patterns.map((pattern) => ({

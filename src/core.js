@@ -8,6 +8,13 @@ import {
   writeFile
 } from "node:fs/promises";
 import path from "node:path";
+import {
+  buildAgentRules,
+  dedupeIssues,
+  enrichGrammarFromTokens,
+  runExternalScanners,
+  writeAgentRules
+} from "./scanners/index.js";
 
 const SEVERITY_DEDUCTION = {
   high: 5.5,
@@ -54,15 +61,29 @@ export async function loadConfig(configPath, cwd = process.cwd()) {
 
 export async function createReport(config, options = {}) {
   const startedAt = new Date();
-  const grammar = await loadGrammar(config);
+  const baseGrammar = await loadGrammar(config);
+  const grammar = await enrichGrammarFromTokens(config, baseGrammar);
   const files = await findScanFiles(config);
-  const issues = [];
+  const scanFiles = files.map((absoluteFile) => ({
+    absolute: absoluteFile,
+    relative: path.relative(config.projectRoot, absoluteFile).split(path.sep).join("/")
+  }));
+  const nativeIssues = [];
 
-  for (const absoluteFile of files) {
-    const relativeFile = path.relative(config.projectRoot, absoluteFile);
-    const source = await readFile(absoluteFile, "utf8");
-    issues.push(...scanSource(relativeFile, source, grammar));
+  for (const file of scanFiles) {
+    const source = await readFile(file.absolute, "utf8");
+    nativeIssues.push(...scanSource(file.relative, source, grammar));
   }
+
+  const external = await runExternalScanners(config, scanFiles, grammar);
+  const filteredExternal = external.issues.filter((issue) => {
+    if (!/color|eslint|palette|hex/i.test(issue.id)) return true;
+    return !nativeIssues.some((nativeIssue) =>
+      nativeIssue.file === issue.file
+      && /color|palette|hex/i.test(nativeIssue.id)
+    );
+  });
+  const issues = dedupeIssues([...nativeIssues, ...filteredExternal]);
 
   const grade = calculateGrade(issues);
   const score = grade.score;
@@ -101,6 +122,12 @@ export async function createReport(config, options = {}) {
       filesScanned: files.length,
       globs: config.scan ?? ["src/**/*.{tsx,jsx,html}"]
     },
+    engines: {
+      morph: nativeIssues.length,
+      ...external.engines,
+      merged: issues.length
+    },
+    health: external.health,
     issues,
     remediation: buildRemediationPlan(issues),
     nextActions: issues.length
@@ -300,13 +327,30 @@ export async function initProject(targetDir = process.cwd(), options = {}) {
     created.push(".env.example");
   }
 
+  let agentFiles = [];
+  try {
+    const config = await loadConfig(configPath, absoluteTarget);
+    const grammar = await enrichGrammarFromTokens(config, await loadGrammar(config));
+    const rules = buildAgentRules({
+      projectName,
+      grammar,
+      componentImports: config.componentImports ?? {}
+    });
+    agentFiles = await writeAgentRules(absoluteTarget, rules);
+    created.push(...agentFiles);
+  } catch {
+    // Token files may not exist yet on first init.
+  }
+
   return {
     schemaVersion: "morph.init.v1",
     projectName,
     root: absoluteTarget,
     created,
+    agentRules: agentFiles,
     nextActions: [
       "Edit morph.config.json to point at your frontend and token files.",
+      "Review AGENTS.md and .cursor/rules/morph-design-system.mdc for agent guardrails.",
       "Run morph verify --json --store.",
       "Use morph loop --apply in CI on agent branches."
     ]

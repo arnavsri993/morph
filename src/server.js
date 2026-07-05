@@ -135,6 +135,12 @@ export async function serveMorph(config, options = {}) {
             configured: isGoogleConfigured(runtimeAuth),
             clientId: maskClientId(google.clientId)
           },
+          scanners: {
+            morph: "native drift + patch engine",
+            buoy: "@buoy-design/core health scoring",
+            eslint: "tailwind-palette-guard + metamask design-tokens",
+            axe: "axe-core accessibility (HTML)"
+          },
           stripe: {
             checkoutConfigured: billing.isCheckoutConfigured(),
             webhookConfigured: billing.isWebhookConfigured(),
@@ -1996,6 +2002,25 @@ function dashboardHtml(config, session) {
         html += '<div style="margin-bottom:10px;font-size:12px">';
         html += 'Merge gate: ' + badge(g.passed ? "passed" : "blocked", g.passed ? "pass" : "fail");
         html += ' &nbsp;threshold ' + esc(String(g.threshold)) + '/100';
+        html += '</div>';
+      }
+
+      if (report.health?.score != null) {
+        html += '<div style="margin-bottom:10px;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:12px">';
+        html += '<strong>Buoy health</strong> · ' + esc(String(report.health.score)) + '/100';
+        if (report.health.tier) html += ' · ' + esc(report.health.tier);
+        if (Array.isArray(report.health.suggestions) && report.health.suggestions.length) {
+          html += '<ul class="r-list" style="margin-top:6px">' + report.health.suggestions.slice(0, 3).map((item) => '<li>' + esc(item) + '</li>').join("") + '</ul>';
+        }
+        html += '</div>';
+      }
+
+      if (report.engines) {
+        html += '<div class="r-chips" style="margin-bottom:10px">';
+        for (const [engine, count] of Object.entries(report.engines)) {
+          if (engine === "merged") continue;
+          html += '<span class="r-chip">' + esc(engine) + ': ' + esc(String(count)) + '</span>';
+        }
         html += '</div>';
       }
 

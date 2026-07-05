@@ -8,6 +8,7 @@ import { INDUSTRY_VOCABULARY, UI_REFERENCE_CORPUS } from "./reference-corpus.js"
 import { UI_PATTERN_CATALOG } from "./catalog.js";
 import { getProfile } from "./profiles.js";
 import { getArchetype } from "./archetypes.js";
+import { analyzeHighEndSignals, sourceIndexSummary } from "./source-index.js";
 
 const STOP_WORDS = new Set([
   "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
@@ -158,6 +159,7 @@ export function scoreReference(reference, tokens, signals, industryMatch) {
 export function retrieveReferences(text, content, { limit = 8 } = {}) {
   const tokens = tokenize(text);
   const signals = analyzeContentSignals(content);
+  const sourceSignals = analyzeHighEndSignals(text, signals);
   const industryMatch = detectIndustry(tokens, signals);
 
   const scored = UI_REFERENCE_CORPUS
@@ -169,6 +171,7 @@ export function retrieveReferences(text, content, { limit = 8 } = {}) {
     matches: scored.slice(0, limit),
     industry: industryMatch,
     signals,
+    sourceSignals,
     corpusSize: UI_REFERENCE_CORPUS.length,
     searched: UI_REFERENCE_CORPUS.length
   };
@@ -225,14 +228,17 @@ function contentPatternHints(signals) {
 
 export function buildRetrievalPlan(text, content) {
   const retrieval = retrieveReferences(text, content);
-  const { matches, industry, signals, corpusSize, searched } = retrieval;
+  const { matches, industry, signals, sourceSignals, corpusSize, searched } = retrieval;
+  const sourceIndex = sourceIndexSummary();
 
   if (!matches.length) {
     return {
       matches: [],
       industry,
       signals,
+      sourceSignals,
       corpusSize,
+      sourceIndex,
       searched,
       profileHint: null,
       archetypeHint: null,
@@ -263,7 +269,9 @@ export function buildRetrievalPlan(text, content) {
     })),
     industry,
     signals,
+    sourceSignals,
     corpusSize,
+    sourceIndex,
     searched,
     profileHint: profile ? {
       id: profile.id,
@@ -288,10 +296,14 @@ export function buildRetrievalPlan(text, content) {
 }
 
 export function retrievalSummary() {
+  const sourceIndex = sourceIndexSummary();
   return {
-    engine: "reference_corpus_v1",
+    engine: "reference_corpus_v2",
     corpusSize: UI_REFERENCE_CORPUS.length,
+    estimatedSourceSignals: sourceIndex.estimatedSources,
+    sourceFamilies: sourceIndex.families,
+    highEndDimensions: sourceIndex.dimensions,
     industries: Object.keys(INDUSTRY_VOCABULARY).length,
-    scoring: "weighted_token_industry_tier"
+    scoring: "weighted_token_industry_tier_source_index"
   };
 }

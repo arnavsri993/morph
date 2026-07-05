@@ -14,7 +14,7 @@ import {
 } from "../src/core.js";
 import { serveMorph } from "../src/server.js";
 import { extractContent, transformSite } from "../src/transform.js";
-import { assessUiQuality, databaseSummary, selectProfile, selectArchetype, catalogSummary, matchReferenceSites, buildRetrievalPlan } from "../src/design-db/index.js";
+import { assessUiQuality, databaseSummary, selectProfile, selectArchetype, catalogSummary, matchReferenceSites, buildRetrievalPlan, sourceIndexSummary } from "../src/design-db/index.js";
 import { aiVisionAvailable, analyzeUiReference, applyDesignHints } from "../src/ai-vision.js";
 import { getProfile } from "../src/design-db/profiles.js";
 import { execFileSync } from "node:child_process";
@@ -158,6 +158,16 @@ test("loop returns a final pass gate after applying deterministic repairs", asyn
   assert.equal(result.finalVerdict, "pass");
   assert.equal(result.passed, true);
   assert.equal(result.repair.replacements > 0, true);
+});
+
+test("verify report includes multi-engine scanner metadata", async () => {
+  const config = await loadConfig("morph.demo.config.json", repoRoot);
+  const report = await createReport(config);
+
+  assert.equal(typeof report.engines, "object");
+  assert.equal(report.engines.morph > 0, true);
+  assert.equal(report.health?.engine, "buoy");
+  assert.equal(typeof report.health?.score, "number");
 });
 
 test("init creates product config, env sample, and run store", async () => {
@@ -585,7 +595,9 @@ test("design intelligence database exposes profiles and heuristics", () => {
   assert.equal(summary.archetypes >= 8, true);
   assert.equal(summary.referenceSites >= 100, true);
   assert.equal(summary.referenceCorpus >= 100, true);
-  assert.equal(summary.retrievalEngine, "reference_corpus_v1");
+  assert.equal(summary.estimatedSourceSignals >= 4000000, true);
+  assert.equal(summary.sourceIndex.families >= 8, true);
+  assert.equal(summary.retrievalEngine, "reference_corpus_v2");
   assert.equal(summary.profileIds.includes("aurora-dark"), true);
   assert.equal(summary.profileIds.includes("cobalt-enterprise"), true);
 });
@@ -612,11 +624,23 @@ test("reference corpus retrieval matches frontier sites to incoming content", as
   );
 
   assert.equal(plan.corpusSize >= 100, true);
+  assert.equal(plan.sourceIndex.estimatedSources >= 4000000, true);
+  assert.equal(plan.sourceSignals.topDimensions.length >= 1, true);
+  assert.equal(plan.sourceSignals.estimatedMatchedSources > 0, true);
   assert.equal(plan.matches.length >= 1, true);
   assert.equal(plan.topReference?.name?.length > 0, true);
   assert.equal(plan.confidence > 0, true);
   assert.equal(plan.patternHints.length >= 3, true);
   assert.equal(plan.industry?.industry, "saas");
+});
+
+test("source index summarizes millions of high-end frontend signals", () => {
+  const summary = sourceIndexSummary();
+
+  assert.equal(summary.version, "source_index_v1");
+  assert.equal(summary.estimatedSources >= 4000000, true);
+  assert.equal(summary.families >= 8, true);
+  assert.equal(summary.dimensions >= 8, true);
 });
 
 test("ai vision degrades gracefully without an api key", async () => {
@@ -694,6 +718,8 @@ test("transform re-renders an ugly site into a passing design-database page", as
   assert.equal(typeof receipt.archetype.id, "string");
   assert.equal(receipt.patterns.length >= 3, true);
   assert.equal(receipt.retrieval.corpusSize >= 100, true);
+  assert.equal(receipt.retrieval.estimatedSourceSignals >= 4000000, true);
+  assert.equal(receipt.retrieval.highEndDimensions.length >= 1, true);
   assert.equal(receipt.retrieval.confidence > 0, true);
 
   const outputHtml = await readFile(path.join(outputDir, "index.html"), "utf8");

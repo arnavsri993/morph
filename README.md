@@ -68,6 +68,8 @@ morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 - **Profiles** (`profiles.js`): complete design systems — color palette, font pairing, type scale, spacing rhythm, radii, shadows, gradients, and hero textures — distilled from the visual grammar of frontier product companies (Linear/Vercel-class dark developer sites, Stripe-class fintech, Notion-warm consumer, Apple-minimal monochrome, and more).
 - **Heuristics** (`heuristics.js`): 25 rules that fingerprint quickly-generated UI — missing viewport meta, default typography, raw saturated colors, no hover/focus states, no responsive rules, `<center>`-era markup — and produce a 0–100 UI quality score.
 - **Patterns** (`patterns.js`): the component library (glass nav, gradient hero, feature card grid, split sections, quote band, CTA band, footer) that re-renders extracted content into a finished page with reveal-on-scroll motion, `focus-visible` states, and `prefers-reduced-motion` support.
+- **Source index** (`source-index.js`): the scalable high-end frontend knowledge layer. It models 4M+ source signals across frontier product sites, public design systems, component libraries, award galleries, SaaS pages, commerce/editorial sites, mobile web screens, and accessibility exemplars without vendoring millions of copyrighted pages into the repo.
+- **Retrieval** (`retrieval.js`): combines named references with the source index to choose a profile, archetype, pattern set, source-family context, and high-end dimensions such as composition, visual system, typography, interaction, conversion, responsiveness, trust, and content intelligence.
 
 The Studio GitHub flow uses the same engine end to end: connect a repo, and Morph clones it, scores the incoming UI, transforms it, and serves the result at `/transformed/index.html` with a before/after receipt.
 
@@ -188,6 +190,21 @@ Cursor changes frontend -> Morph Studio review -> JSON findings + patches -> Mor
 
 Release and repository hygiene notes live in `docs/github-prep.md`.
 
+## Scanner engines
+
+Morph verify runs a multi-engine stack (all MIT-licensed, local, deterministic):
+
+| Engine | Package | Role |
+| --- | --- | --- |
+| **Morph** | built-in | Component grammar, focus/responsive drift, agent-native JSON patches |
+| **Buoy** | `@buoy-design/core` | Token enrichment, CSS health audit, 4-pillar health score |
+| **ESLint** | `eslint-plugin-tailwind-palette-guard`, `@metamask/eslint-plugin-design-tokens` | AST-based Tailwind palette and hex detection |
+| **axe** | `axe-core` + `jsdom` | WCAG accessibility on scanned HTML |
+
+`morph init` also writes `AGENTS.md`, `DESIGN_SYSTEM.md`, and `.cursor/rules/morph-design-system.mdc` — agent guardrails inspired by drift-guard.
+
+Transform uses Buoy CSS health heuristics on the **before** receipt; Morph's design-db still handles profile selection and re-render.
+
 ## Existing tools checked
 
-Chromatic, Loki, BackstopJS, stylelint, ESLint, and token linters cover pieces of this space. Morph's wedge is the agent-native loop: product grammar extraction, drift classification, and patch output designed for Cursor/Codex-style repair cycles.
+Chromatic, Loki, BackstopJS, stylelint, and Lyse cover adjacent pieces (visual regression, token linting, full audits). Morph integrates Buoy + ESLint token plugins directly and keeps its wedge: the agent-native verify → patch → re-verify loop with Studio before/after review.

@@ -409,26 +409,27 @@ MORPH_AUTH_MODE=oauth</pre>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Log in · morph</title>
-  <meta name="theme-color" content="#05060b">
+  <meta name="theme-color" content="#09090b">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
-      --bg: #05060b;
-      --ink: #eef2fc;
-      --muted: #98a3c1;
-      --faint: #67718e;
-      --line: rgba(148, 163, 199, 0.16);
-      --line-strong: rgba(148, 163, 199, 0.3);
-      --surface: rgba(14, 18, 30, 0.72);
-      --accent: #6d8dff;
-      --accent-2: #22d3ee;
-      --ok: #34d399;
-      --bad: #fb7185;
-      --display: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
+      --bg: #09090b;
+      --ink: #fafafa;
+      --muted: #a1a1aa;
+      --faint: #71717a;
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.14);
+      --surface: rgba(24, 24, 27, 0.65);
+      --brand-a: #818cf8;
+      --brand-b: #a78bfa;
+      --cyan: #22d3ee;
+      --ok: #4ade80;
+      --bad: #f87171;
       --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --radius: 24px;
     }
     * { box-sizing: border-box; }
     body {
@@ -439,161 +440,202 @@ MORPH_AUTH_MODE=oauth</pre>
       background: var(--bg);
       color: var(--ink);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      padding: 24px;
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 32px;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }
-    :focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 4px; }
+    :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 8px; }
     .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+    .aurora {
+      position: absolute;
+      width: 140%;
+      height: 140%;
+      left: -20%;
+      top: -30%;
+      background:
+        radial-gradient(ellipse 40% 35% at 20% 20%, rgba(129, 140, 248, 0.2), transparent 70%),
+        radial-gradient(ellipse 35% 30% at 80% 10%, rgba(167, 139, 250, 0.16), transparent 70%);
+      animation: aurora-drift 24s ease-in-out infinite alternate;
+    }
+    @keyframes aurora-drift { to { transform: translate3d(2%, 3%, 0) scale(1.04); } }
     .grid-bg {
-      position: absolute; inset: -2px;
-      background-image:
-        linear-gradient(rgba(151, 163, 192, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(151, 163, 192, 0.05) 1px, transparent 1px);
-      background-size: 44px 44px;
-      -webkit-mask-image: radial-gradient(ellipse 100% 70% at 50% 30%, black 30%, transparent 75%);
-      mask-image: radial-gradient(ellipse 100% 70% at 50% 30%, black 30%, transparent 75%);
+      position: absolute; inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+      background-size: 32px 32px;
+      opacity: 0.35;
     }
-    .orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.45; }
-    .orb-a { width: 520px; height: 520px; left: -160px; top: -180px; background: radial-gradient(circle at 35% 35%, rgba(91, 140, 255, 0.5), transparent 65%); }
-    .orb-b { width: 460px; height: 460px; right: -170px; bottom: -160px; background: radial-gradient(circle at 60% 40%, rgba(139, 92, 246, 0.38), transparent 65%); }
     .card {
-      width: min(430px, 100%);
+      position: relative;
+      overflow: hidden;
+      width: min(440px, 100%);
       background: var(--surface);
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--line-strong);
-      border-radius: 18px;
-      padding: 30px;
-      box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.85), 0 0 120px -50px rgba(91, 140, 255, 0.5);
+      -webkit-backdrop-filter: blur(20px) saturate(1.3);
+      backdrop-filter: blur(20px) saturate(1.3);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 40px;
+      box-shadow: 0 40px 100px -40px rgba(0, 0, 0, 0.8);
     }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(500px circle at var(--spot-x, 50%) var(--spot-y, 0%), rgba(129, 140, 248, 0.1), transparent 50%);
+      pointer-events: none;
+    }
+    .card > * { position: relative; z-index: 1; }
     .brand {
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-family: var(--display);
-      font-weight: 700;
-      margin-bottom: 22px;
+      gap: 12px;
+      font-weight: 600;
+      margin-bottom: 32px;
       color: inherit;
       text-decoration: none;
       width: fit-content;
+      font-size: 15px;
     }
     .mark {
       width: 32px; height: 32px;
-      border-radius: 9px;
+      border-radius: 10px;
       display: grid;
       place-items: center;
-      font-size: 15px;
-      font-weight: 800;
+      font-size: 14px;
+      font-weight: 700;
       color: #fff;
-      background: linear-gradient(135deg, #6d8dff 0%, #8b5cf6 55%, #22d3ee 130%);
-      box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.4), 0 6px 20px -6px rgba(91, 140, 255, 0.7);
+      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
+      box-shadow: 0 0 24px -4px rgba(129, 140, 248, 0.6);
     }
-    h1 { margin: 0 0 8px; font-family: var(--display); font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 700; }
-    .sub { margin: 0 0 22px; color: var(--muted); line-height: 1.55; font-size: 14.5px; }
-    .providers { display: grid; gap: 10px; }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 32px;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      font-weight: 600;
+      background: linear-gradient(to right, #fafafa, #a1a1aa 50%, #818cf8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .sub { margin: 0 0 32px; color: var(--muted); line-height: 1.75; font-size: 15px; }
+    .providers { display: grid; gap: 12px; }
     .provider {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      min-height: 46px;
-      border-radius: 10px;
+      gap: 12px;
+      min-height: 52px;
+      border-radius: 999px;
       border: 1px solid var(--line-strong);
-      background: rgba(151, 163, 192, 0.06);
+      background: rgba(255, 255, 255, 0.04);
       color: var(--ink);
       text-decoration: none;
-      font-weight: 650;
-      font-size: 14.5px;
-      transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+      font-weight: 500;
+      font-size: 15px;
+      transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
     }
-    .provider:hover { border-color: rgba(151, 163, 192, 0.55); background: rgba(151, 163, 192, 0.11); transform: translateY(-1px); }
-    .provider.github { background: #191d24; border-color: #2c333d; }
-    .provider.github:hover { background: #21262e; }
-    .provider.google { background: #f5f7fb; border-color: #f5f7fb; color: #101828; }
+    .provider:hover { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.07); transform: translateY(-2px); }
+    .provider.github { background: rgba(255, 255, 255, 0.06); }
+    .provider.google { background: #fafafa; border-color: #fafafa; color: #18181b; }
     .provider.google:hover { background: #fff; }
     .provider.continue {
       color: #fff;
-      background: linear-gradient(135deg, #6d8dff, #8b5cf6);
+      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
       border: 0;
-      box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.45) inset, 0 14px 34px -12px rgba(91, 140, 255, 0.65);
-      margin-top: 16px;
+      box-shadow: 0 0 40px -8px rgba(129, 140, 248, 0.7);
+      margin-top: 20px;
     }
-    .provider.continue:hover { box-shadow: 0 0 0 1px rgba(140, 160, 255, 0.6) inset, 0 18px 42px -12px rgba(91, 140, 255, 0.8); }
+    .provider.continue:hover { box-shadow: 0 0 56px -8px rgba(129, 140, 248, 0.85); }
     .error {
-      margin: 0 0 16px;
-      padding: 10px 13px;
-      border-radius: 10px;
-      background: rgba(251, 113, 133, 0.08);
-      border: 1px solid rgba(251, 113, 133, 0.4);
+      margin: 0 0 20px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: rgba(248, 113, 113, 0.08);
+      border: 1px solid rgba(248, 113, 113, 0.25);
       color: var(--bad);
-      font-size: 13.5px;
-      line-height: 1.5;
+      font-size: 14px;
+      line-height: 1.6;
     }
     .setup {
       border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(4, 6, 12, 0.55);
-      padding: 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      padding: 20px;
+      margin-bottom: 8px;
     }
     .setup-head {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 500;
       color: var(--ok);
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
     .setup-dot {
       width: 8px; height: 8px;
       border-radius: 50%;
       background: var(--ok);
-      box-shadow: 0 0 10px rgba(52, 211, 153, 0.8);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
     }
-    .setup-copy { margin: 0 0 12px; color: var(--muted); font-size: 13px; line-height: 1.55; }
-    .setup-copy code { font-family: var(--mono); font-size: 12px; color: var(--accent-2); }
+    .setup-copy { margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+    .setup-copy code { font-family: var(--mono); font-size: 13px; color: var(--cyan); }
     .setup-env {
       margin: 0;
       font-family: var(--mono);
       font-size: 12px;
-      line-height: 1.7;
+      line-height: 1.75;
       color: var(--muted);
-      background: rgba(151, 163, 192, 0.05);
+      background: rgba(255, 255, 255, 0.03);
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px 13px;
+      border-radius: 12px;
+      padding: 14px 16px;
       overflow-x: auto;
     }
-    .footnote { margin: 16px 0 0; font-size: 12.5px; color: var(--faint); }
-    .footnote code { font-family: var(--mono); font-size: 11.5px; }
+    .footnote { margin: 20px 0 0; font-size: 14px; color: var(--faint); line-height: 1.6; }
+    .footnote code { font-family: var(--mono); font-size: 13px; }
     .back {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      margin-top: 20px;
+      gap: 8px;
+      margin-top: 28px;
       color: var(--faint);
       text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
-      transition: color 0.15s ease;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s ease;
     }
     .back:hover { color: var(--ink); }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition-duration: 0.01ms !important; }
+    }
   </style>
 </head>
 <body>
   <div class="backdrop" aria-hidden="true">
+    <div class="aurora"></div>
     <div class="grid-bg"></div>
-    <div class="orb orb-a"></div>
-    <div class="orb orb-b"></div>
   </div>
-  <main class="card">
+  <main class="card" id="loginCard">
     <a class="brand" href="/"><span class="mark">m</span><span>morph</span></a>
-    <h1>Log in</h1>
-    <p class="sub">Access the morph review control plane — before/after reviews, repair loops, and stored receipts.</p>
+    <h1>Welcome back</h1>
+    <p class="sub">Sign in to open Studio — review agent UI, run repair loops, and store merge gate receipts.</p>
     ${errorBlock}
     ${providerSection}
-    <a class="back" href="/">← Back to morph landing page</a>
+    <a class="back" href="/">← Back to home</a>
   </main>
+  <script>
+    const card = document.getElementById("loginCard");
+    if (card) {
+      card.addEventListener("mousemove", (e) => {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty("--spot-x", ((e.clientX - rect.left) / rect.width * 100) + "%");
+        card.style.setProperty("--spot-y", ((e.clientY - rect.top) / rect.height * 100) + "%");
+      });
+    }
+  </script>
 </body>
 </html>`;
 }

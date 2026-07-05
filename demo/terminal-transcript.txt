@@ -6,7 +6,7 @@ $ npm test
 ✔ default brace scan globs include frontend files
 ✔ server exposes health, run storage, and invalid JSON errors
 
-$ npm run verify -- --json --no-fail --output demo/reports/seeded-drift.json
+$ npm run verify:demo -- --json --no-fail --output demo/reports/seeded-drift.json
 Acme Control Plane: FAIL (68/100)
 FAIL: score 68/100. 3 high, 4 medium, 2 low finding(s). Block merge until Morph repair or explicit grammar approval.
 

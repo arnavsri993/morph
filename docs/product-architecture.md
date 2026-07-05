@@ -27,6 +27,15 @@ Morph is the verification layer between AI coding agents and frontend merges. Th
 - `morph.config.json` points at `fixtures/acme-saas-clean` and is the default product smoke gate. `npm run verify` should pass.
 - `morph.demo.config.json` points at `fixtures/acme-saas` and keeps the seeded drift fixture available for demos, tests, and repair receipts.
 
+## Design Intelligence Database
+
+Morph uses two complementary context layers:
+
+- A named reference corpus of high-quality product sites with industry, tier, profile, archetype, keyword, and pattern hints.
+- A scalable source index that represents 4M+ aggregate frontend signals across source families such as frontier product sites, public design systems, component libraries, award galleries, SaaS landing pages, commerce/editorial surfaces, mobile web screens, and accessibility exemplars.
+
+The source index is intentionally compact. It gives the transform engine broad taste and scoring context without copying or shipping millions of third-party pages. Future crawler/export jobs can hydrate this layer into an external vector or document store while preserving the same retrieval contract.
+
 ## Server API
 
 The built-in server stores run records under `.morph/runs` and exposes:

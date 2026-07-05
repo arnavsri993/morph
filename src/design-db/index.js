@@ -8,6 +8,7 @@ import { LAYOUT_ARCHETYPES, selectArchetype, getArchetype } from "./archetypes.j
 import { applyDesignHints } from "../ai-vision.js";
 import { corpusSummary } from "./reference-corpus.js";
 import { buildRetrievalPlan, retrievalSummary } from "./retrieval.js";
+import { analyzeHighEndSignals, sourceIndexSummary } from "./source-index.js";
 
 export {
   DESIGN_PROFILES,
@@ -27,7 +28,9 @@ export {
   applyDesignHints,
   buildRetrievalPlan,
   retrievalSummary,
-  corpusSummary
+  corpusSummary,
+  analyzeHighEndSignals,
+  sourceIndexSummary
 };
 
 const RETRIEVAL_CONFIDENCE_THRESHOLD = 0.35;
@@ -114,6 +117,7 @@ export function databaseSummary() {
   const catalog = catalogSummary();
   const corpus = corpusSummary();
   const retrieval = retrievalSummary();
+  const sourceIndex = sourceIndexSummary();
   return {
     profiles: DESIGN_PROFILES.length,
     heuristics: UI_HEURISTICS.length,
@@ -121,6 +125,8 @@ export function databaseSummary() {
     archetypes: LAYOUT_ARCHETYPES.length,
     referenceSites: catalog.referenceSites,
     referenceCorpus: corpus.references,
+    sourceIndex,
+    estimatedSourceSignals: sourceIndex.estimatedSources,
     corpusTiers: corpus.tiers,
     corpusIndustries: corpus.industries,
     retrievalEngine: retrieval.engine,

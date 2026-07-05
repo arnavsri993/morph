@@ -1498,7 +1498,7 @@ export function landingHtml(config, session) {
         <div class="hero-copy">
           <div class="eyebrow reveal"><span>CI</span><strong>Agent UI firewall</strong><em style="font-style:normal;color:var(--dim)">design drift blocked before review</em></div>
           <h1 class="reveal" style="transition-delay:.05s">AI writes the UI. <span class="text-gradient">Morph makes it belong.</span></h1>
-          <p class="lede reveal" style="transition-delay:.1s">Morph is a CI gate for AI-generated frontend. It catches design-system drift, explains every violation, and emits deterministic patches your coding agent can apply before human review.</p>
+          <p class="lede reveal" style="transition-delay:.1s">Morph is a multi-engine CI gate for AI-generated frontend — Morph native rules, Buoy health scoring, ESLint token linting, and axe accessibility — catching drift, explaining every violation, and emitting deterministic patches your agent applies before human review.</p>
           <div class="cta-row reveal" style="transition-delay:.15s">
             <a class="btn btn-primary btn-lg" href="/studio">
               Launch Studio
@@ -1512,7 +1512,7 @@ export function landingHtml(config, session) {
           <div class="signal-row reveal" style="transition-delay:.2s">
             <div class="signal"><b><span class="fail">68</span> -&gt; <span class="pass">100</span></b><span>Failing agent output repaired into a passing gate.</span></div>
             <div class="signal"><b>9 patches</b><span>Exact replacements across one frontend file.</span></div>
-            <div class="signal"><b>JSON receipt</b><span>Audit trail for CI, agents, and humans.</span></div>
+            <div class="signal"><b>4 engines</b><span>Morph, Buoy, ESLint, and axe-core in one verify pass.</span></div>
           </div>
         </div>
 

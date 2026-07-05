@@ -1,11 +1,11 @@
 {
   "schemaVersion": "morph.report.v1",
-  "runId": "verify-20260705012034-8cf05c",
-  "generatedAt": "2026-07-05T01:20:34.337Z",
+  "runId": "verify-20260705045449-0dc37c",
+  "generatedAt": "2026-07-05T04:54:49.734Z",
   "durationMs": 2,
   "workspace": {
-    "id": "raise-demo-workspace",
-    "name": "RAISE Summit Demo Workspace",
+    "id": "morph-demo-workspace",
+    "name": "Morph Demo Workspace",
     "authMode": "dev"
   },
   "projectId": "acme-control-plane-demo",

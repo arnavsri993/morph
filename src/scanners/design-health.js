@@ -1,0 +1,124 @@
+import { parseCssValues, groupByCategory, countOccurrences } from "@buoy-design/core";
+
+const CSS_HEALTH_RULES = [
+  {
+    id: "css-hardcoded-color-density",
+    severity: "high",
+    weight: 8,
+    category: "color",
+    message: "Stylesheet relies on many hardcoded colors instead of CSS custom properties.",
+    test: ({ cssValues, css }) => {
+      const colors = cssValues.filter((value) => value.category === "color");
+      const rawColors = colors.filter((value) => !/^var\(/i.test(value.rawValue));
+      return rawColors.length >= 4 && !/--[a-z-]+\s*:/i.test(css);
+    }
+  },
+  {
+    id: "css-spacing-sprawl",
+    severity: "medium",
+    weight: 6,
+    category: "layout",
+    message: "Too many unique spacing values — spacing rhythm is inconsistent.",
+    test: ({ cssValues }) => {
+      const spacing = cssValues.filter((value) => value.context === "spacing" || value.category === "spacing");
+      const unique = new Set(spacing.map((value) => value.value));
+      return unique.size >= 8;
+    }
+  },
+  {
+    id: "css-magic-font-sizes",
+    severity: "medium",
+    weight: 5,
+    category: "typography",
+    message: "Typography uses many one-off font sizes instead of a type scale.",
+    test: ({ cssValues }) => {
+      const sizes = cssValues.filter((value) => value.category === "font-size");
+      const counts = countOccurrences(sizes);
+      return counts.size >= 6;
+    }
+  },
+  {
+    id: "css-no-custom-properties",
+    severity: "medium",
+    weight: 6,
+    category: "architecture",
+    message: "No CSS custom properties detected — colors and spacing are not tokenized.",
+    test: ({ css }) => !/--[a-z-]+\s*:/i.test(css)
+  },
+  {
+    id: "css-low-token-adoption",
+    severity: "low",
+    weight: 3,
+    category: "architecture",
+    message: "CSS values rarely reference design tokens (var(--*)).",
+    test: ({ cssValues }) => {
+      if (!cssValues.length) return false;
+      const tokenized = cssValues.filter((value) => /var\(--/i.test(value.rawValue)).length;
+      return tokenized / cssValues.length < 0.15;
+    }
+  }
+];
+
+export function assessCssHealth(html, css) {
+  const parsed = parseCssValues(String(css ?? ""));
+  const cssValues = parsed.values;
+  const grouped = groupByCategory(cssValues);
+  const context = { html: String(html ?? ""), css: String(css ?? ""), cssValues, grouped };
+  const findings = [];
+  let deduction = 0;
+
+  for (const rule of CSS_HEALTH_RULES) {
+    let hit = false;
+    try {
+      hit = Boolean(rule.test(context));
+    } catch {
+      hit = false;
+    }
+    if (!hit) continue;
+    deduction += rule.weight;
+    findings.push({
+      id: rule.id,
+      severity: rule.severity,
+      category: rule.category,
+      weight: rule.weight,
+      message: rule.message,
+      engine: "buoy-css-health"
+    });
+  }
+
+  return {
+    score: Math.max(0, 100 - deduction),
+    findings,
+    stats: {
+      cssValues: cssValues.length,
+      categories: Object.keys(grouped),
+      tokenizedRatio: cssValues.length
+        ? cssValues.filter((value) => /var\(--/i.test(value.rawValue)).length / cssValues.length
+        : 0
+    }
+  };
+}
+
+export function mergeUiQualityAssessments(base, cssHealth) {
+  const mergedFindings = [...base.findings];
+  const seen = new Set(base.findings.map((finding) => finding.id));
+  for (const finding of cssHealth.findings) {
+    if (seen.has(finding.id)) continue;
+    mergedFindings.push(finding);
+  }
+
+  const extraDeduction = cssHealth.findings.reduce((sum, finding) => sum + finding.weight, 0);
+  return {
+    ...base,
+    model: "morph.ui-quality.v2",
+    score: Math.max(0, base.score - extraDeduction),
+    findings: mergedFindings,
+    cssHealth: cssHealth.stats,
+    summary: {
+      total: mergedFindings.length,
+      high: mergedFindings.filter((finding) => finding.severity === "high").length,
+      medium: mergedFindings.filter((finding) => finding.severity === "medium").length,
+      low: mergedFindings.filter((finding) => finding.severity === "low").length
+    }
+  };
+}
