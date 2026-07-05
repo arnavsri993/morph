@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -329,7 +330,7 @@ async function runStudioReview(config, options = {}) {
     source = resolved.source;
   }
 
-  const studioRoot = path.join(config.configDir, ".studio-run");
+  const studioRoot = path.join(os.tmpdir(), ".studio-run");
   const studioProjectRoot = path.join(studioRoot, "project");
   const studioConfigPath = path.join(studioRoot, "morph.config.json");
 
@@ -395,7 +396,7 @@ async function runStudioReview(config, options = {}) {
       changed: codeBefore !== codeAfter
     },
     sourceProjectRoot: path.relative(config.configDir, config.projectRoot),
-    studioProjectRoot: path.relative(config.configDir, studioProjectRoot),
+    studioProjectRoot: path.relative(studioRoot, studioProjectRoot),
     userJourney,
     before,
     repair: {
@@ -423,7 +424,7 @@ async function runTransformReview(config, {
   referenceImage,
   generateReference
 }) {
-  const studioRoot = path.join(config.configDir, ".studio-run");
+  const studioRoot = path.join(os.tmpdir(), ".studio-run");
   const checkoutRoot = path.join(studioRoot, "checkout");
   const transformedRoot = path.join(studioRoot, "transformed");
   await mkdir(studioRoot, { recursive: true });
@@ -571,8 +572,8 @@ async function serveAsset(response, pathname) {
   }
 }
 
-async function serveTransformedFile(response, config, pathname) {
-  const transformedRoot = path.resolve(config.configDir, ".studio-run/transformed");
+async function serveTransformedFile(response, _config, pathname) {
+  const transformedRoot = path.resolve(os.tmpdir(), ".studio-run/transformed");
   const relative = decodeURIComponent(pathname.replace(/^\/transformed\/?/, "")) || "index.html";
   const target = path.resolve(transformedRoot, relative);
   if (!target.startsWith(transformedRoot + path.sep) && target !== transformedRoot) {
