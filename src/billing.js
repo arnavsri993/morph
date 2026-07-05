@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { brandLink, LOGO_URL } from "./brand.js";
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
@@ -747,6 +748,7 @@ export function billingPageHtml(options = {}) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Billing · morph</title>
   <meta name="theme-color" content="#050507">
+  <link rel="icon" href="${LOGO_URL}" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -811,22 +813,12 @@ export function billingPageHtml(options = {}) {
     .brand-mini {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      font-weight: 600;
-      font-size: 14px;
-      color: var(--ink);
       text-decoration: none;
     }
-    .brand-mini .mark {
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      display: grid;
-      place-items: center;
-      font-size: 13px;
-      font-weight: 700;
-      color: #fff;
-      background: linear-gradient(135deg, #818cf8, #a78bfa);
+    .brand-mini .logo {
+      display: block;
+      height: 24px;
+      width: auto;
     }
     ${billingStyles()}
   </style>
@@ -835,7 +827,7 @@ export function billingPageHtml(options = {}) {
   <div class="backdrop" aria-hidden="true"></div>
   <div class="page">
     <nav class="top-nav" aria-label="Billing navigation">
-      <a class="brand-mini" href="/studio"><span class="mark" aria-hidden="true">m</span><span>morph</span></a>
+      ${brandLink("/studio", { className: "brand-mini", height: 24 })}
       <a href="/studio">← Back to Studio</a>
     </nav>
     ${panel}

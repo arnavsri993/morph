@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   copyFixtureForDemo,
   createReport,
@@ -25,6 +26,7 @@ import {
   readBillingState,
   writeBillingState
 } from "./billing.js";
+import { brandLink, LOGO_URL } from "./brand.js";
 import { landingHtml } from "./landing.js";
 import { fetchPageForTransform } from "./preview.js";
 import { transformSite } from "./transform.js";
@@ -109,6 +111,10 @@ export async function serveMorph(config, options = {}) {
 
       if (request.method === "GET" && url.pathname === "/api/auth/providers") {
         return sendJson(response, 200, { providers: auth.getProviders() });
+      }
+
+      if (request.method === "GET" && url.pathname.startsWith("/assets/")) {
+        return serveAsset(response, url.pathname);
       }
 
       if (request.method === "GET" && url.pathname === "/") {
@@ -652,6 +658,27 @@ const TRANSFORMED_CONTENT_TYPES = {
   ".ico": "image/x-icon"
 };
 
+const ASSETS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "assets");
+
+async function serveAsset(response, pathname) {
+  const relative = decodeURIComponent(pathname.replace(/^\/assets\/?/, ""));
+  if (!relative || relative.includes("..")) {
+    return sendJson(response, 400, { error: "invalid_path" });
+  }
+  const target = path.resolve(ASSETS_DIR, relative);
+  if (!target.startsWith(ASSETS_DIR + path.sep)) {
+    return sendJson(response, 400, { error: "invalid_path" });
+  }
+  try {
+    const body = await readFile(target);
+    const type = TRANSFORMED_CONTENT_TYPES[path.extname(target).toLowerCase()] ?? "application/octet-stream";
+    response.writeHead(200, { "content-type": type, "cache-control": "public, max-age=86400" });
+    response.end(body);
+  } catch {
+    return sendJson(response, 404, { error: "not_found" });
+  }
+}
+
 async function serveTransformedFile(response, config, pathname) {
   const transformedRoot = path.resolve(config.configDir, ".studio-run/transformed");
   const relative = decodeURIComponent(pathname.replace(/^\/transformed\/?/, "")) || "index.html";
@@ -933,6 +960,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>morph Studio</title>
   <meta name="theme-color" content="#05060b">
+  <link rel="icon" href="${LOGO_URL}" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1055,24 +1083,14 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-weight: 600;
-      font-size: 15px;
-      letter-spacing: -0.02em;
       text-decoration: none;
       color: var(--ink);
       flex: none;
     }
-    .mark {
-      width: 32px; height: 32px;
-      border-radius: 10px;
-      display: grid;
-      place-items: center;
-      font-size: 14px;
-      font-weight: 700;
-      color: #fff;
-      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-      box-shadow: 0 0 24px -4px rgba(129, 140, 248, 0.6);
+    .logo {
+      display: block;
+      height: 28px;
+      width: auto;
     }
     .nav-links { display: flex; align-items: center; gap: 4px; }
     .nav-link {
@@ -1969,9 +1987,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
 
   <header class="nav">
     <div class="nav-left">
-      <a class="brand" href="/" title="Back to morph">
-        <span class="mark">m</span><span>morph</span>
-      </a>
+      ${brandLink("/")}
       <nav class="nav-links" aria-label="Studio sections">
         <a class="nav-link active" href="#overview" aria-current="page">Overview</a>
         <a class="nav-link" href="#history">History</a>

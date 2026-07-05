@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { brandLink, LOGO_URL } from "./brand.js";
 
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -78,6 +79,7 @@ export function createAuthManager(config, runtimeAuth) {
     if (pathname.startsWith("/auth/")) return true;
     if (pathname === "/api/health") return true;
     if (pathname === "/api/auth/providers" && method === "GET") return true;
+    if (pathname.startsWith("/assets/")) return true;
     return false;
   }
 
@@ -419,6 +421,7 @@ MORPH_AUTH_MODE=oauth</pre>
   <title>Log in · morph</title>
   <meta name="theme-color" content="#050507">
   <meta name="description" content="Sign in to Morph Studio — review agent UI, run repair loops, and store merge gate receipts.">
+  <link rel="icon" href="${LOGO_URL}" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -562,38 +565,18 @@ MORPH_AUTH_MODE=oauth</pre>
     .brand {
       display: inline-flex;
       align-items: center;
-      gap: 13px;
-      font-weight: 600;
       margin-bottom: clamp(24px, 5vw, 36px);
       color: inherit;
       text-decoration: none;
       width: fit-content;
-      font-size: 15px;
-      letter-spacing: -0.01em;
       transition: opacity 0.2s var(--ease);
     }
     .brand:hover { opacity: 0.88; }
     .brand:focus-visible { border-radius: 12px; }
-    .mark {
-      width: 36px;
-      height: 36px;
-      border-radius: 11px;
-      display: grid;
-      place-items: center;
-      font-size: 15px;
-      font-weight: 700;
-      color: #fff;
-      background: linear-gradient(145deg, var(--brand-a) 0%, var(--brand-c) 50%, var(--brand-b) 100%);
-      box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.12) inset,
-        0 0 32px -6px rgba(129, 140, 248, 0.75);
-      flex: none;
-    }
-    .wordmark {
-      background: linear-gradient(90deg, var(--ink) 0%, #d4d4d8 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+    .logo {
+      display: block;
+      height: 32px;
+      width: auto;
     }
     .card-head { margin-bottom: clamp(24px, 4vw, 32px); }
     h1 {
@@ -826,10 +809,7 @@ MORPH_AUTH_MODE=oauth</pre>
   </div>
   <div class="card-wrap">
     <main class="card" id="loginCard" aria-labelledby="loginTitle">
-      <a class="brand" href="/" aria-label="morph home">
-        <span class="mark" aria-hidden="true">m</span>
-        <span class="wordmark">morph</span>
-      </a>
+      ${brandLink("/", { height: 32 })}
       <header class="card-head">
         <h1 id="loginTitle">Welcome back</h1>
         <p class="sub">Sign in to open Studio — review agent UI, run repair loops, and store merge gate receipts.</p>
