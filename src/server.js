@@ -792,28 +792,30 @@ function dashboardHtml(config, session) {
   <meta name="theme-color" content="#05060b">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
-      --bg: #05060b;
-      --surface: rgba(14, 18, 30, 0.62);
-      --surface-solid: #0c101b;
-      --ink: #eef2fc;
-      --muted: #98a3c1;
-      --faint: #67718e;
-      --line: rgba(148, 163, 199, 0.13);
-      --line-strong: rgba(148, 163, 199, 0.26);
-      --brand-a: #6d8dff;
-      --brand-b: #8b5cf6;
+      --bg: #09090b;
+      --surface: rgba(24, 24, 27, 0.55);
+      --surface-solid: #18181b;
+      --ink: #fafafa;
+      --muted: #a1a1aa;
+      --faint: #71717a;
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.14);
+      --brand-a: #818cf8;
+      --brand-b: #a78bfa;
       --cyan: #22d3ee;
-      --ok: #34d399;
-      --bad: #fb7185;
+      --ok: #4ade80;
+      --bad: #f87171;
       --warn: #fbbf24;
       --font: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --display: "Space Grotesk", var(--font);
       --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      --radius: 14px;
+      --radius: 20px;
+      --radius-sm: 12px;
+      --page-pad: clamp(24px, 5vw, 64px);
+      --section-gap: 56px;
     }
     * { box-sizing: border-box; }
     body {
@@ -821,423 +823,434 @@ function dashboardHtml(config, session) {
       background: var(--bg);
       color: var(--ink);
       font-family: var(--font);
-      font-size: 15px;
-      line-height: 1.6;
+      font-size: 16px;
+      line-height: 1.7;
       -webkit-font-smoothing: antialiased;
     }
-    ::selection { background: rgba(109, 141, 255, 0.35); }
-    :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 6px; }
+    ::selection { background: rgba(129, 140, 248, 0.35); }
+    :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 8px; }
     a { color: inherit; }
-    code { font-family: var(--mono); font-size: 0.88em; color: var(--cyan); }
+    code { font-family: var(--mono); font-size: 0.86em; color: var(--cyan); }
 
     .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-    .grid-bg {
-      position: absolute; inset: -2px;
-      background-image:
-        linear-gradient(rgba(148, 163, 199, 0.045) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(148, 163, 199, 0.045) 1px, transparent 1px);
-      background-size: 42px 42px;
-      -webkit-mask-image: radial-gradient(ellipse 110% 65% at 50% 0%, black 25%, transparent 75%);
-      mask-image: radial-gradient(ellipse 110% 65% at 50% 0%, black 25%, transparent 75%);
-    }
-    .glow {
+    .aurora {
       position: absolute;
-      width: 760px; height: 520px;
-      left: 50%; top: -260px;
-      transform: translateX(-50%);
-      background: radial-gradient(ellipse at center, rgba(109, 141, 255, 0.16), transparent 65%);
-      filter: blur(50px);
+      width: 140%;
+      height: 140%;
+      left: -20%;
+      top: -30%;
+      background:
+        radial-gradient(ellipse 40% 35% at 20% 20%, rgba(129, 140, 248, 0.18), transparent 70%),
+        radial-gradient(ellipse 35% 30% at 80% 10%, rgba(167, 139, 250, 0.14), transparent 70%),
+        radial-gradient(ellipse 30% 25% at 60% 80%, rgba(34, 211, 238, 0.08), transparent 70%);
+      animation: aurora-drift 24s ease-in-out infinite alternate;
+    }
+    @keyframes aurora-drift {
+      to { transform: translate3d(2%, 3%, 0) scale(1.04); }
+    }
+    .grid-bg {
+      position: absolute; inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+      background-size: 32px 32px;
+      -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 20%, transparent 80%);
+      mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 20%, transparent 80%);
+      opacity: 0.35;
     }
 
-    /* ── App shell ─────────────────────────────────────────────────── */
-    .app { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100vh; }
-    .side {
+    /* ── Top nav ───────────────────────────────────────────────────── */
+    .nav {
       position: sticky;
       top: 0;
-      height: 100vh;
+      z-index: 40;
       display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding: 20px 14px;
-      border-right: 1px solid var(--line);
-      background: rgba(8, 10, 18, 0.72);
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      min-height: 72px;
+      padding: 0 var(--page-pad);
+      border-bottom: 1px solid var(--line);
+      background: rgba(9, 9, 11, 0.72);
+      -webkit-backdrop-filter: blur(20px) saturate(1.4);
+      backdrop-filter: blur(20px) saturate(1.4);
     }
+    .nav-left { display: flex; align-items: center; gap: 32px; min-width: 0; }
     .brand {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 4px 8px 16px;
-      font-family: var(--display);
-      font-weight: 700;
-      font-size: 16.5px;
-      letter-spacing: -0.01em;
+      gap: 12px;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.02em;
       text-decoration: none;
+      color: var(--ink);
+      flex: none;
     }
     .mark {
-      width: 30px; height: 30px;
-      border-radius: 9px;
+      width: 32px; height: 32px;
+      border-radius: 10px;
       display: grid;
       place-items: center;
       font-size: 14px;
       font-weight: 700;
       color: #fff;
-      background: linear-gradient(135deg, var(--brand-a) 0%, var(--brand-b) 90%);
-      box-shadow: 0 0 0 1px rgba(109, 141, 255, 0.35), 0 6px 18px -6px rgba(109, 141, 255, 0.65);
+      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
+      box-shadow: 0 0 24px -4px rgba(129, 140, 248, 0.6);
     }
-    .side-label {
-      padding: 14px 10px 6px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.09em;
-      text-transform: uppercase;
-      color: var(--faint);
-    }
-    .side-link {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      border-radius: 9px;
+    .nav-links { display: flex; align-items: center; gap: 4px; }
+    .nav-link {
       color: var(--muted);
       text-decoration: none;
-      font-size: 13.5px;
-      font-weight: 550;
-      transition: color 0.15s ease, background 0.15s ease;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: 999px;
+      transition: color 0.2s ease, background 0.2s ease;
     }
-    .side-link svg { flex: none; opacity: 0.85; }
-    .side-link:hover { color: var(--ink); background: rgba(148, 163, 199, 0.08); }
-    .side-link.active {
-      color: var(--ink);
-      background: linear-gradient(90deg, rgba(109, 141, 255, 0.16), rgba(139, 92, 246, 0.08));
-      box-shadow: inset 2px 0 0 var(--brand-a);
-    }
-    .side-foot {
-      margin-top: auto;
+    .nav-link:hover { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
+    .nav-link.active { color: var(--ink); background: rgba(255, 255, 255, 0.08); }
+    .nav-right { display: flex; align-items: center; gap: 16px; flex: none; }
+    .project-pill {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
       border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(14, 18, 30, 0.6);
-      padding: 12px 13px;
+      border-radius: 999px;
+      font-size: 13px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
     }
-    .side-foot .ws { font-size: 12px; color: var(--faint); margin-bottom: 2px; }
-    .side-foot .pr { font-size: 13px; font-weight: 650; }
-    .side-foot .fixture {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 8px;
-      font-family: var(--mono);
-      font-size: 10.5px;
-      color: var(--warn);
-      background: rgba(251, 191, 36, 0.08);
-      border: 1px solid rgba(251, 191, 36, 0.25);
-      border-radius: 6px;
-      padding: 3px 8px;
-    }
-
-    .main { min-width: 0; display: flex; flex-direction: column; }
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      min-height: 58px;
-      padding: 0 28px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(5, 6, 11, 0.8);
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
-    }
-    .crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--faint); min-width: 0; }
-    .crumbs .sep { opacity: 0.55; }
-    .crumbs b { color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .top-actions { display: flex; align-items: center; gap: 14px; }
+    .project-pill b { color: var(--ink); font-weight: 600; }
     .state-chip {
       display: inline-flex;
       align-items: center;
-      gap: 7px;
-      border: 1px solid var(--line-strong);
+      gap: 8px;
+      border: 1px solid var(--line);
       border-radius: 999px;
-      padding: 4px 12px;
-      font-size: 12.5px;
-      font-weight: 600;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
       color: var(--muted);
       white-space: nowrap;
+      background: rgba(255, 255, 255, 0.03);
     }
-    .state-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); transition: background 0.2s ease, box-shadow 0.2s ease; }
-    .state-chip[data-state="ok"] .state-dot { background: var(--ok); box-shadow: 0 0 8px rgba(52, 211, 153, 0.8); }
-    .state-chip[data-state="warn"] .state-dot { background: var(--warn); box-shadow: 0 0 8px rgba(251, 191, 36, 0.7); }
-    .state-chip[data-state="busy"] .state-dot { background: var(--cyan); box-shadow: 0 0 8px rgba(34, 211, 238, 0.8); animation: pulse 1s ease-in-out infinite; }
-    .state-chip[data-state="bad"] .state-dot { background: var(--bad); box-shadow: 0 0 8px rgba(251, 113, 133, 0.8); }
-    @keyframes pulse { 50% { opacity: 0.4; } }
-    .user-chip { display: flex; align-items: center; gap: 8px; }
+    .state-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); transition: background 0.2s ease, box-shadow 0.2s ease; }
+    .state-chip[data-state="ok"] .state-dot { background: var(--ok); box-shadow: 0 0 12px rgba(74, 222, 128, 0.7); }
+    .state-chip[data-state="warn"] .state-dot { background: var(--warn); box-shadow: 0 0 12px rgba(251, 191, 36, 0.6); }
+    .state-chip[data-state="busy"] .state-dot { background: var(--cyan); box-shadow: 0 0 12px rgba(34, 211, 238, 0.7); animation: pulse 1.2s ease-in-out infinite; }
+    .state-chip[data-state="bad"] .state-dot { background: var(--bad); box-shadow: 0 0 12px rgba(248, 113, 113, 0.7); }
+    @keyframes pulse { 50% { opacity: 0.35; } }
+    .user-chip { display: flex; align-items: center; gap: 10px; }
     .user-avatar {
-      width: 26px; height: 26px;
+      width: 32px; height: 32px;
       border-radius: 50%;
       display: grid;
       place-items: center;
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 13px;
+      font-weight: 600;
       color: #fff;
       background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
     }
-    .user-name { font-size: 13px; font-weight: 600; color: var(--muted); }
+    .user-name { font-size: 14px; font-weight: 500; color: var(--muted); }
     .top-link {
       color: var(--muted);
       text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
-      transition: color 0.15s ease;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s ease;
       white-space: nowrap;
     }
     .top-link:hover { color: var(--ink); }
 
-    .content { padding: 30px 28px 56px; display: grid; gap: 22px; width: 100%; max-width: 1220px; margin: 0 auto; }
+    .page { padding: 48px var(--page-pad) 96px; }
+    .content {
+      display: grid;
+      gap: var(--section-gap);
+      width: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+    }
 
     /* ── Page head ─────────────────────────────────────────────────── */
-    .page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px; }
-    h1 {
-      margin: 0 0 8px;
-      font-family: var(--display);
-      font-size: clamp(26px, 3vw, 34px);
-      line-height: 1.1;
-      letter-spacing: -0.02em;
-      font-weight: 700;
+    .page-head { display: grid; gap: 28px; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      width: fit-content;
+      padding: 6px 14px 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
     }
-    .lede { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.65; max-width: 640px; }
-    .lede code { font-size: 12.5px; }
-    h2 { margin: 0; font-family: var(--display); font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
-    h3 { margin: 0 0 6px; font-size: 14.5px; font-weight: 650; }
+    .eyebrow-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(36px, 5vw, 52px);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      font-weight: 600;
+    }
+    .title-gradient {
+      background: linear-gradient(to right, #fafafa, #a1a1aa 45%, #818cf8 80%, #a78bfa);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .lede { margin: 0; color: var(--muted); font-size: 17px; line-height: 1.75; max-width: 56ch; }
+    .lede code { font-size: 0.9em; }
+    h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+    h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
     p { margin: 0; color: var(--muted); }
 
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      min-height: 40px;
-      padding: 0 17px;
-      border-radius: 11px;
+      gap: 10px;
+      min-height: 48px;
+      padding: 0 22px;
+      border-radius: 999px;
       border: 1px solid transparent;
       font: inherit;
-      font-size: 13.5px;
-      font-weight: 650;
+      font-size: 15px;
+      font-weight: 500;
       cursor: pointer;
       text-decoration: none;
       white-space: nowrap;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
     .btn svg { flex: none; }
     .btn:active { transform: translateY(1px); }
     .btn-primary {
+      position: relative;
       color: #fff;
       background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-      box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.4) inset, 0 12px 30px -12px rgba(109, 141, 255, 0.7);
+      box-shadow: 0 0 40px -8px rgba(129, 140, 248, 0.7);
+      overflow: hidden;
     }
-    .btn-primary:hover { box-shadow: 0 0 0 1px rgba(140, 160, 255, 0.55) inset, 0 16px 38px -12px rgba(109, 141, 255, 0.85); transform: translateY(-1px); }
+    .btn-primary::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.5), transparent 50%, rgba(255,255,255,0.2));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 56px -8px rgba(129, 140, 248, 0.85); }
     .btn-ghost {
       color: var(--ink);
-      background: rgba(148, 163, 199, 0.06);
+      background: rgba(255, 255, 255, 0.04);
       border-color: var(--line-strong);
     }
-    .btn-ghost:hover { border-color: rgba(148, 163, 199, 0.5); background: rgba(148, 163, 199, 0.11); }
-    .btn[disabled] { opacity: 0.55; cursor: wait; }
+    .btn-ghost:hover { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.07); }
+    .btn[disabled] { opacity: 0.5; cursor: wait; transform: none !important; }
 
-    /* ── Panels & stats ────────────────────────────────────────────── */
+    /* ── Spotlight cards ───────────────────────────────────────────── */
+    .spotlight {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+    }
+    .spotlight::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(480px circle at var(--spot-x, 50%) var(--spot-y, 0%), rgba(129, 140, 248, 0.12), transparent 45%);
+      opacity: 0;
+      transition: opacity 0.45s ease;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .spotlight:hover::before { opacity: 1; }
+    .spotlight > * { position: relative; z-index: 1; }
+
     .panel {
+      position: relative;
+      overflow: hidden;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--surface);
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
     }
-    .panel-pad { padding: 20px; }
+    .panel-pad { padding: 32px; }
     .panel-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 14px 18px;
+      gap: 16px;
+      padding: 20px 28px;
       border-bottom: 1px solid var(--line);
     }
-    .panel-head .hint { font-size: 12px; color: var(--faint); }
+    .panel-head .hint { font-size: 13px; color: var(--faint); }
 
-    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
     .stat {
+      position: relative;
+      overflow: hidden;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--surface);
-      padding: 16px 18px 14px;
+      padding: 28px 32px;
       display: grid;
-      gap: 2px;
-      position: relative;
-      overflow: hidden;
+      gap: 8px;
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      transition: border-color 0.25s ease, transform 0.25s ease;
     }
     .stat::before {
       content: "";
       position: absolute;
-      inset: 0 auto 0 0;
-      width: 3px;
-      background: linear-gradient(180deg, var(--brand-a), var(--brand-b));
-      opacity: 0.55;
+      inset: 0;
+      background: radial-gradient(400px circle at var(--spot-x, 50%) var(--spot-y, 0%), rgba(129, 140, 248, 0.1), transparent 50%);
+      opacity: 0;
+      transition: opacity 0.45s ease;
+      pointer-events: none;
     }
-    .stat-label { font-size: 11.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); }
+    .stat:hover { border-color: rgba(255, 255, 255, 0.14); transform: translateY(-2px); }
+    .stat:hover::before { opacity: 1; }
+    .stat-label { font-size: 13px; font-weight: 500; color: var(--faint); }
     .stat-value {
-      font-family: var(--display);
-      font-size: 27px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.25;
+      font-size: 40px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
       font-variant-numeric: tabular-nums;
     }
     .stat-value.ok { color: var(--ok); }
     .stat-value.bad { color: var(--bad); }
-    .stat-sub { font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+    .stat-sub { font-size: 13px; color: var(--faint); font-family: var(--mono); }
 
-    /* ── Pipeline strip ────────────────────────────────────────────── */
     .pipeline {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 12px 18px;
-      padding: 15px 20px;
-      border: 1px solid rgba(109, 141, 255, 0.28);
+      gap: 16px 24px;
+      padding: 20px 28px;
+      border: 1px solid rgba(129, 140, 248, 0.2);
       border-radius: var(--radius);
-      background: linear-gradient(90deg, rgba(109, 141, 255, 0.09), rgba(139, 92, 246, 0.05));
+      background: linear-gradient(90deg, rgba(129, 140, 248, 0.06), rgba(167, 139, 250, 0.03));
     }
     .pipeline[hidden] { display: none; }
-    .pipe-stage { display: flex; align-items: baseline; gap: 8px; }
-    .pipe-k { font-size: 11.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); }
-    .pipe-v { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+    .pipe-stage { display: flex; align-items: baseline; gap: 10px; }
+    .pipe-k { font-size: 12px; font-weight: 500; color: var(--faint); text-transform: uppercase; letter-spacing: 0.06em; }
+    .pipe-v { font-family: var(--mono); font-size: 14px; font-weight: 600; }
     .pipe-v.ok { color: var(--ok); }
     .pipe-v.bad { color: var(--bad); }
     .pipe-v.warn { color: var(--warn); }
-    .pipe-arrow { color: var(--faint); }
-    .pipe-summary { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+    .pipe-arrow { color: var(--faint); font-size: 18px; }
+    .pipe-summary { margin-left: auto; font-size: 14px; color: var(--muted); }
 
-    /* ── Journey strip ─────────────────────────────────────────────── */
-    .journey { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-    .step {
-      display: flex;
-      gap: 11px;
-      padding: 13px 14px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(14, 18, 30, 0.4);
-    }
-    .step .n {
-      flex: none;
-      width: 22px; height: 22px;
-      border-radius: 7px;
-      display: grid;
-      place-items: center;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--brand-a);
-      background: rgba(109, 141, 255, 0.12);
-      border: 1px solid rgba(109, 141, 255, 0.3);
-      margin-top: 1px;
-    }
-    .step strong { display: block; font-size: 13px; margin-bottom: 1px; }
-    .step span { color: var(--faint); font-size: 12px; line-height: 1.5; display: block; }
-
-    /* ── Work grid: history + receipt ──────────────────────────────── */
-    .workgrid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; align-items: start; }
-    .history-list { max-height: 560px; overflow: auto; padding: 8px; }
+    .workgrid { display: grid; gap: 28px; }
+    .history-list { max-height: 420px; overflow: auto; padding: 12px; }
     .run {
       display: grid;
-      grid-template-columns: 34px minmax(0, 1fr) auto;
-      gap: 4px 12px;
+      grid-template-columns: 40px minmax(0, 1fr) auto;
+      gap: 6px 16px;
       align-items: center;
       width: 100%;
-      padding: 11px 12px;
+      padding: 16px 18px;
       border: 1px solid transparent;
-      border-radius: 11px;
+      border-radius: var(--radius-sm);
       background: transparent;
       color: inherit;
       font: inherit;
       text-align: left;
       cursor: pointer;
-      transition: background 0.15s ease, border-color 0.15s ease;
+      transition: background 0.2s ease, border-color 0.2s ease;
     }
-    .run:hover { background: rgba(148, 163, 199, 0.07); border-color: var(--line); }
-    .run.selected { background: rgba(109, 141, 255, 0.1); border-color: rgba(109, 141, 255, 0.35); }
+    .run:hover { background: rgba(255, 255, 255, 0.04); border-color: var(--line); }
+    .run.selected { background: rgba(129, 140, 248, 0.08); border-color: rgba(129, 140, 248, 0.25); }
     .run-icon {
       grid-row: span 2;
-      width: 34px; height: 34px;
-      border-radius: 10px;
+      width: 40px; height: 40px;
+      border-radius: 12px;
       display: grid;
       place-items: center;
       color: var(--brand-a);
-      background: rgba(109, 141, 255, 0.1);
-      border: 1px solid rgba(109, 141, 255, 0.22);
+      background: rgba(129, 140, 248, 0.1);
+      border: 1px solid rgba(129, 140, 248, 0.18);
     }
-    .run-kind { font-size: 13px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .run-meta { grid-column: 2 / 4; font-family: var(--mono); font-size: 10.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .run-kind { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .run-meta { grid-column: 2 / 4; font-family: var(--mono); font-size: 12px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .verdict {
       justify-self: end;
       font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
       border-radius: 999px;
-      padding: 2px 9px;
+      padding: 4px 12px;
     }
-    .verdict.pass { color: var(--ok); background: rgba(52, 211, 153, 0.12); }
-    .verdict.fail { color: var(--bad); background: rgba(251, 113, 133, 0.12); }
-    .verdict.stored { color: var(--muted); background: rgba(148, 163, 199, 0.12); }
+    .verdict.pass { color: var(--ok); background: rgba(74, 222, 128, 0.1); }
+    .verdict.fail { color: var(--bad); background: rgba(248, 113, 113, 0.1); }
+    .verdict.stored { color: var(--muted); background: rgba(255, 255, 255, 0.06); }
     .empty {
       display: grid;
       justify-items: center;
-      gap: 10px;
-      padding: 42px 20px;
+      gap: 14px;
+      padding: 64px 32px;
       text-align: center;
       color: var(--faint);
-      font-size: 13px;
+      font-size: 15px;
     }
-    .empty svg { opacity: 0.5; }
-    .empty b { color: var(--muted); font-weight: 650; }
+    .empty svg { opacity: 0.4; }
+    .empty b { color: var(--muted); font-weight: 500; }
 
     .seg {
       display: inline-flex;
-      gap: 3px;
-      padding: 3px;
+      gap: 4px;
+      padding: 4px;
       border: 1px solid var(--line);
-      border-radius: 9px;
-      background: rgba(5, 6, 11, 0.5);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
     }
     .seg button {
       border: 0;
-      border-radius: 7px;
+      border-radius: 999px;
       background: transparent;
       color: var(--muted);
       font: inherit;
-      font-size: 12px;
-      font-weight: 650;
-      padding: 4px 13px;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 16px;
       cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
+      transition: background 0.2s ease, color 0.2s ease;
     }
-    .seg button.active { background: rgba(109, 141, 255, 0.18); color: var(--ink); }
+    .seg button.active { background: rgba(255, 255, 255, 0.1); color: var(--ink); }
     .seg button:hover:not(.active) { color: var(--ink); }
 
     pre#output {
       overflow: auto;
       margin: 0;
-      min-height: 380px;
-      max-height: 560px;
-      padding: 18px 20px;
+      min-height: 360px;
+      max-height: 520px;
+      padding: 24px 28px;
       background: transparent;
-      color: #dbe4f8;
+      color: #e4e4e7;
       font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.7;
+      font-size: 13px;
+      line-height: 1.75;
       white-space: pre-wrap;
       word-break: break-word;
     }
@@ -1249,26 +1262,26 @@ function dashboardHtml(config, session) {
 
     .readable {
       overflow: auto;
-      min-height: 380px;
-      max-height: 560px;
-      font-size: 13px;
-      line-height: 1.55;
+      min-height: 360px;
+      max-height: 520px;
+      font-size: 14px;
+      line-height: 1.65;
     }
     .readable details { border-bottom: 1px solid var(--line); }
     .readable details:last-child { border-bottom: none; }
     .readable summary {
-      padding: 11px 18px;
+      padding: 16px 28px;
       cursor: pointer;
-      font-weight: 600;
-      font-size: 13px;
+      font-weight: 500;
+      font-size: 14px;
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 12px;
       user-select: none;
       list-style: none;
-      transition: background 0.15s ease;
+      transition: background 0.2s ease;
     }
-    .readable summary:hover { background: rgba(148, 163, 199, 0.05); }
+    .readable summary:hover { background: rgba(255, 255, 255, 0.03); }
     .readable summary::-webkit-details-marker { display: none; }
     .readable summary::before {
       content: "";
@@ -1281,7 +1294,7 @@ function dashboardHtml(config, session) {
     }
     .readable details[open] > summary::before { transform: rotate(45deg); }
     .readable summary .preview { color: var(--faint); font-weight: 450; font-size: 12px; }
-    .readable .detail-body { padding: 2px 18px 14px 34px; }
+    .readable .detail-body { padding: 4px 28px 20px 40px; }
     .r-badge {
       display: inline-block;
       border-radius: 999px;
@@ -1322,107 +1335,132 @@ function dashboardHtml(config, session) {
     .r-list li { margin-bottom: 4px; font-size: 12px; }
     .r-text { font-size: 12px; color: var(--muted); white-space: pre-wrap; word-break: break-word; }
 
-    /* ── Connect section ───────────────────────────────────────────── */
-    .section-title { margin: 10px 0 0; }
-    .section-title p { font-size: 13.5px; margin-top: 4px; }
+    /* ── Setup section ─────────────────────────────────────────────── */
+    .section-title { margin: 0; }
+    .section-title p { font-size: 15px; margin-top: 8px; line-height: 1.7; }
     .panel-tabs {
       display: inline-flex;
-      gap: 3px;
-      padding: 3px;
+      gap: 4px;
+      padding: 4px;
       border: 1px solid var(--line);
-      border-radius: 10px;
-      background: rgba(5, 6, 11, 0.5);
-      margin-bottom: 18px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+      margin-bottom: 32px;
     }
     .panel-tabs button {
       border: 0;
-      border-radius: 8px;
+      border-radius: 999px;
       background: transparent;
       color: var(--muted);
       font: inherit;
-      font-size: 12.5px;
-      font-weight: 650;
-      padding: 6px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 8px 20px;
       cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
+      transition: background 0.2s ease, color 0.2s ease;
     }
-    .panel-tabs button.active { background: rgba(109, 141, 255, 0.18); color: var(--ink); }
+    .panel-tabs button.active { background: rgba(255, 255, 255, 0.1); color: var(--ink); }
     .panel-tabs button:hover:not(.active) { color: var(--ink); }
     .tab-pane[hidden] { display: none; }
-    .pane-grid { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 26px; align-items: start; }
-    .pane-copy p { font-size: 13px; line-height: 1.6; }
-    .auth-form { display: grid; gap: 12px; }
-    .auth-form label { display: grid; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+    .setup-panel {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 36px 40px 40px;
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+    }
+    .setup-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(600px circle at var(--spot-x, 50%) var(--spot-y, 0%), rgba(129, 140, 248, 0.08), transparent 50%);
+      opacity: 0;
+      transition: opacity 0.45s ease;
+      pointer-events: none;
+    }
+    .setup-panel:hover::before { opacity: 1; }
+    .setup-head { margin-bottom: 28px; position: relative; display: grid; gap: 10px; }
+    .setup-head .source-badge { justify-self: start; margin-top: 4px; }
+    .project-pill .sep { opacity: 0.35; }
+    .setup-head h2 { margin: 0 0 10px; font-size: 22px; letter-spacing: -0.02em; }
+    .setup-head p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+    .setup-stack { display: grid; gap: 32px; position: relative; }
+    .source-pane { display: grid; gap: 20px; }
+    .source-pane[hidden] { display: none; }
+    .source-note { margin: 0; color: var(--faint); font-size: 14px; line-height: 1.7; }
+    .github-connect {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.02);
+      padding: 20px 24px;
+    }
+    .github-connect strong { display: block; font-size: 15px; margin-bottom: 4px; font-weight: 500; }
+    .github-connect span { color: var(--muted); font-size: 14px; }
+    .auth-form { display: grid; gap: 10px; }
+    .auth-form label { display: grid; gap: 10px; font-size: 14px; font-weight: 500; color: var(--muted); }
     .auth-form input {
-      min-height: 40px;
+      min-height: 52px;
       border: 1px solid var(--line-strong);
-      border-radius: 10px;
-      padding: 0 13px;
+      border-radius: var(--radius-sm);
+      padding: 0 18px;
       font: inherit;
-      font-size: 13.5px;
+      font-size: 15px;
       color: var(--ink);
-      background: rgba(5, 6, 11, 0.55);
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      background: rgba(9, 9, 11, 0.6);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
     .auth-form input::placeholder { color: var(--faint); }
     .auth-form input:focus {
       outline: none;
       border-color: var(--brand-a);
-      box-shadow: 0 0 0 3px rgba(109, 141, 255, 0.18);
+      box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.15);
     }
     .auth-form .btn { justify-self: start; }
-    .auth-status { font-size: 12.5px; margin-top: 10px; display: flex; align-items: center; gap: 7px; }
-    .auth-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none; }
+    .auth-status { font-size: 14px; display: flex; align-items: center; gap: 8px; }
+    .auth-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex: none; }
     .auth-status.ready { color: var(--ok); }
-    .auth-status.ready::before { background: var(--ok); box-shadow: 0 0 8px rgba(52, 211, 153, 0.7); }
+    .auth-status.ready::before { background: var(--ok); box-shadow: 0 0 12px rgba(74, 222, 128, 0.6); }
     .auth-status.pending { color: var(--warn); }
-    .auth-status.pending::before { background: var(--warn); box-shadow: 0 0 8px rgba(251, 191, 36, 0.6); }
-
-    .setup-panel {
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: linear-gradient(180deg, rgba(14, 18, 30, 0.72), rgba(14, 18, 30, 0.38));
-      padding: 22px 24px 24px;
-    }
-    .setup-head { margin-bottom: 18px; }
-    .setup-head h2 { margin: 0 0 6px; font-family: var(--display); font-size: 18px; letter-spacing: -0.01em; }
-    .setup-head p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
-    .setup-grid { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 22px; align-items: start; }
-    .source-pane { display: grid; gap: 12px; }
-    .source-pane[hidden] { display: none; }
-    .source-note { margin: 0; color: var(--faint); font-size: 12.5px; line-height: 1.55; }
-    .github-connect {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(5, 6, 11, 0.45);
-      padding: 14px 16px;
-    }
-    .github-connect strong { display: block; font-size: 13.5px; margin-bottom: 2px; }
-    .github-connect span { color: var(--muted); font-size: 12.5px; }
-    .instructions-field { display: grid; gap: 8px; }
-    .instructions-field label { font-size: 12.5px; font-weight: 650; color: var(--muted); }
+    .auth-status.pending::before { background: var(--warn); box-shadow: 0 0 12px rgba(251, 191, 36, 0.5); }
+    .instructions-field { display: grid; gap: 12px; }
+    .instructions-field label { font-size: 14px; font-weight: 500; color: var(--muted); }
     .instructions-field textarea {
-      min-height: 132px;
+      min-height: 160px;
       resize: vertical;
       border: 1px solid var(--line-strong);
-      border-radius: 12px;
-      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      padding: 18px 20px;
       font: inherit;
-      font-size: 13.5px;
-      line-height: 1.55;
+      font-size: 15px;
+      line-height: 1.65;
       color: var(--ink);
-      background: rgba(5, 6, 11, 0.55);
+      background: rgba(9, 9, 11, 0.6);
     }
     .instructions-field textarea::placeholder { color: var(--faint); }
     .instructions-field textarea:focus {
       outline: none;
       border-color: var(--brand-a);
-      box-shadow: 0 0 0 3px rgba(109, 141, 255, 0.18);
+      box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.15);
+    }
+    .source-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--warn);
+      background: rgba(251, 191, 36, 0.08);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      border-radius: 999px;
+      padding: 6px 14px;
     }
     .code-editor textarea {
       min-height: 280px;
@@ -1487,141 +1525,74 @@ function dashboardHtml(config, session) {
       .code-diff { grid-template-columns: 1fr; }
     }
     .preview-frame {
-      margin-top: 4px;
+      margin-top: 8px;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: var(--radius-sm);
       overflow: hidden;
-      background: rgba(5, 6, 11, 0.55);
+      background: rgba(9, 9, 11, 0.5);
     }
     .preview-frame img { display: block; width: 100%; height: auto; }
     .preview-meta {
-      padding: 10px 12px;
+      padding: 14px 18px;
       border-top: 1px solid var(--line);
       font-family: var(--mono);
-      font-size: 11px;
+      font-size: 12px;
       color: var(--faint);
       word-break: break-all;
     }
     .preview-empty {
-      padding: 18px 14px;
+      padding: 24px 20px;
       color: var(--faint);
-      font-size: 12.5px;
-      line-height: 1.55;
+      font-size: 14px;
+      line-height: 1.7;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-sm);
+      text-align: center;
     }
 
     .foot-note {
       display: flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--faint);
-      font-size: 12.5px;
-      padding-bottom: 8px;
-    }
-    .foot-note code { font-size: 11.5px; }
-
-    .demo-banner {
-      display: flex;
       align-items: flex-start;
-      gap: 14px;
-      padding: 16px 18px;
-      border: 1px solid rgba(109, 141, 255, 0.35);
-      border-radius: var(--radius);
-      background: linear-gradient(90deg, rgba(109, 141, 255, 0.12), rgba(139, 92, 246, 0.06));
+      gap: 12px;
+      color: var(--faint);
+      font-size: 14px;
+      line-height: 1.7;
+      padding: 20px 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.02);
     }
-    .demo-banner-icon {
-      flex: none;
-      width: 36px; height: 36px;
-      border-radius: 10px;
-      display: grid;
-      place-items: center;
-      color: var(--brand-a);
-      background: rgba(109, 141, 255, 0.15);
-      border: 1px solid rgba(109, 141, 255, 0.3);
-    }
-    .demo-banner strong { display: block; font-size: 14px; margin-bottom: 4px; }
-    .demo-banner p { font-size: 13px; line-height: 1.6; color: var(--muted); }
-    .demo-banner kbd {
-      display: inline-block;
-      font-family: var(--mono);
-      font-size: 11.5px;
-      padding: 2px 8px;
-      border-radius: 6px;
-      border: 1px solid var(--line-strong);
-      background: rgba(5, 6, 11, 0.5);
-      color: var(--ink);
-    }
+    .foot-note code { font-size: 13px; }
+    .foot-note svg { flex: none; margin-top: 3px; opacity: 0.5; }
 
     .welcome {
-      padding: 28px 24px;
+      padding: 56px 40px;
       text-align: center;
     }
     .welcome-icon {
-      width: 48px; height: 48px;
-      margin: 0 auto 16px;
-      border-radius: 14px;
+      width: 56px; height: 56px;
+      margin: 0 auto 20px;
+      border-radius: 16px;
       display: grid;
       place-items: center;
       color: var(--brand-a);
-      background: rgba(109, 141, 255, 0.12);
-      border: 1px solid rgba(109, 141, 255, 0.28);
+      background: rgba(129, 140, 248, 0.1);
+      border: 1px solid rgba(129, 140, 248, 0.2);
     }
-    .welcome h3 { margin: 0 0 8px; font-family: var(--display); font-size: 18px; }
-    .welcome p { max-width: 420px; margin: 0 auto 18px; font-size: 13.5px; line-height: 1.65; }
-    .welcome-steps {
-      display: flex;
-      justify-content: center;
-      gap: 24px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-    }
-    .welcome-step {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12.5px;
-      color: var(--muted);
-    }
-    .welcome-step .n {
-      width: 20px; height: 20px;
-      border-radius: 6px;
-      display: grid;
-      place-items: center;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--brand-a);
-      background: rgba(109, 141, 255, 0.12);
-      border: 1px solid rgba(109, 141, 255, 0.25);
-    }
+    .welcome h3 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
+    .welcome p { max-width: 440px; margin: 0 auto 24px; font-size: 15px; line-height: 1.7; }
 
-    @media (max-width: 1080px) {
-      .stats { grid-template-columns: 1fr 1fr; }
-      .journey { grid-template-columns: 1fr 1fr; }
-      .workgrid { grid-template-columns: 1fr; }
-      .history-list { max-height: 320px; }
+    @media (min-width: 900px) {
+      .project-pill { display: inline-flex; }
     }
-    @media (max-width: 900px) {
-      .app { grid-template-columns: 1fr; }
-      .side {
-        position: static;
-        height: auto;
-        flex-direction: row;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 2px 4px;
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
-        padding: 10px 16px;
-      }
-      .brand { padding: 4px 8px; }
-      .side-label { display: none; }
-      .side-foot { display: none; }
-      .content { padding: 22px 16px 44px; }
-      .topbar { padding: 0 16px; }
-      .crumbs { display: none; }
-      .topbar { justify-content: flex-end; }
+    @media (max-width: 720px) {
+      .stats { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      .user-name { display: none; }
+      .setup-panel { padding: 28px 24px; }
+      .panel-head { padding: 16px 20px; }
     }
     @media (max-width: 640px) {
-      .stats, .journey, .pane-grid, .setup-grid { grid-template-columns: 1fr; }
       .pipe-summary { margin-left: 0; width: 100%; }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -1631,164 +1602,129 @@ function dashboardHtml(config, session) {
 </head>
 <body>
   <div class="backdrop" aria-hidden="true">
+    <div class="aurora"></div>
     <div class="grid-bg"></div>
-    <div class="glow"></div>
   </div>
 
-  <div class="app">
-    <aside class="side">
-      <a class="brand" href="/" title="Back to the morph landing page">
+  <header class="nav">
+    <div class="nav-left">
+      <a class="brand" href="/" title="Back to morph">
         <span class="mark">m</span><span>morph</span>
       </a>
-      <span class="side-label">Review</span>
-      <a class="side-link active" href="#overview">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-        Overview
-      </a>
-      <a class="side-link" href="#history">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-        Runs &amp; receipts
-      </a>
-      <span class="side-label">Resources</span>
-      <a class="side-link" href="/">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 9.5V21h14V9.5"/></svg>
-        Landing page
-      </a>
-      <a class="side-link" href="https://github.com/arnavsri993/morph" target="_blank" rel="noreferrer">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.72.5.1.68-.22.68-.49v-1.7c-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.9-.64.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.7 0 0 .84-.28 2.75 1.05a9.4 9.4 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.4.2 2.44.1 2.7.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9v2.82c0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2z"/></svg>
-        GitHub
-      </a>
-      <a class="side-link" href="/api/health" target="_blank" rel="noreferrer">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 8-6-16-3 8H2"/></svg>
-        API health
-      </a>
-      <div class="side-foot">
-        <div class="ws">${workspaceName}</div>
-        <div class="pr">${projectName}</div>
-        <span class="fixture" id="sourceBadge">● local project</span>
-      </div>
-    </aside>
-
-    <div class="main">
-      <header class="topbar">
-        <div class="crumbs"><span>${workspaceName}</span><span class="sep">/</span><b>${projectName}</b></div>
-        <div class="top-actions">
-          <span class="state-chip" id="stateChip" data-state="idle"><span class="state-dot"></span><span id="reviewState">Idle</span></span>
-          ${userBlock}
-        </div>
-      </header>
-
-      <main class="content">
-        <section class="page-head" id="overview">
-          <div>
-            <h1>Agent branch review</h1>
-            <p class="lede">Connect a GitHub repo or give morph a live preview URL, add agent instructions, then run a full review with deterministic repairs and a merge gate verdict.</p>
-          </div>
-          <div class="actions">
-            <button class="btn btn-primary" data-action="studio-review" id="runReviewBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-              Run full review
-            </button>
-          </div>
-        </section>
-
-        <section class="setup-panel" aria-label="Project source and agent instructions">
-          <div class="setup-head">
-            <h2>Project source</h2>
-            <p>Point morph at the agent output you want reviewed. A GitHub repo or preview URL is required before you can run a review.</p>
-          </div>
-          <div class="panel-tabs" role="tablist" aria-label="Project source">
-            <button type="button" class="active" data-source-tab="github" role="tab" aria-selected="true">Connect GitHub</button>
-            <button type="button" data-source-tab="url" role="tab" aria-selected="false">Preview URL</button>
-          </div>
-          <div class="setup-grid">
-            <div>
-              <div class="source-pane" data-source-pane="github">
-                <div class="github-connect">
-                  <div>
-                    <strong id="githubStatusLabel">${githubConnected ? "GitHub connected" : "Connect GitHub"}</strong>
-                    <span id="githubStatusText">${githubConnected ? githubLabel : "Sign in with GitHub to review agent branches from your repos."}</span>
-                  </div>
-                  ${githubConnected
-                    ? `<span class="auth-status ready">Connected</span>`
-                    : `<a class="btn btn-ghost" href="/auth/github?returnTo=%2Fstudio">Connect GitHub</a>`}
-                </div>
-                <label class="auth-form" for="githubRepo">
-                  <span>Repository</span>
-                  <input id="githubRepo" name="githubRepo" type="text" required autocomplete="off" placeholder="owner/repo or https://github.com/owner/repo">
-                </label>
-                <p class="source-note">morph clones the repo, scores the UI against its design intelligence database, and re-renders the site with a frontier-grade design profile. The result is served at <code>/transformed</code>.</p>
-              </div>
-              <div class="source-pane" data-source-pane="url" hidden>
-                <form class="auth-form" id="previewForm" onsubmit="return false">
-                  <label for="previewUrl">Live preview URL</label>
-                  <input id="previewUrl" name="previewUrl" type="url" inputmode="url" autocomplete="url" required placeholder="https://your-app.vercel.app/settings/billing">
-                  <p class="source-note">morph uses Playwright to open the page, capture a screenshot, and attach it to the review receipt before scanning for drift.</p>
-                </form>
-                <div class="preview-frame" id="previewFrame" hidden>
-                  <img id="previewImage" alt="Playwright preview capture">
-                  <div class="preview-meta" id="previewMeta"></div>
-                </div>
-                <div class="preview-empty" id="previewPlaceholder">Run a review with a preview URL to see the Playwright capture here.</div>
-              </div>
-            </div>
-            <div class="instructions-field">
-              <label for="agentInstructions">Agent instructions</label>
-              <textarea id="agentInstructions" name="instructions" placeholder="Tell morph what the agent was asked to build and what to focus on in the review. Example: Review the billing settings screen Cursor generated on this branch. Flag token drift, raw button markup, missing focus states, and mobile overflow risk."></textarea>
-            </div>
-          </div>
-        </section>
-
-        <section class="stats" aria-label="Review metrics">
-          <div class="stat"><span class="stat-label">Review score</span><span class="stat-value" id="score">–</span><span class="stat-sub">out of 100 · gate ≥ 95</span></div>
-          <div class="stat"><span class="stat-label">Merge gate</span><span class="stat-value" id="gate">–</span><span class="stat-sub">block_on_any_drift</span></div>
-          <div class="stat"><span class="stat-label">Fixes applied</span><span class="stat-value" id="fixes">–</span><span class="stat-sub">deterministic patches</span></div>
-          <div class="stat"><span class="stat-label">Runs stored</span><span class="stat-value" id="runs">0</span><span class="stat-sub">.morph/runs receipts</span></div>
-        </section>
-
-        <section class="pipeline" id="pipeline" hidden aria-label="Latest review pipeline">
-          <div class="pipe-stage"><span class="pipe-k">Before</span><span class="pipe-v" id="pipeBefore">–</span></div>
-          <span class="pipe-arrow" aria-hidden="true">→</span>
-          <div class="pipe-stage"><span class="pipe-k">Repair</span><span class="pipe-v warn" id="pipeFixes">–</span></div>
-          <span class="pipe-arrow" aria-hidden="true">→</span>
-          <div class="pipe-stage"><span class="pipe-k">After</span><span class="pipe-v" id="pipeAfter">–</span></div>
-          <span class="pipe-summary" id="pipeSummary"></span>
-        </section>
-
-        <section class="journey" aria-label="How a review works">
-          <div class="step"><span class="n">1</span><div><strong>Choose a source</strong><span>Connect GitHub with a repo, or paste a live preview URL for morph to capture with Playwright.</span></div></div>
-          <div class="step"><span class="n">2</span><div><strong>Add agent instructions</strong><span>Tell morph what the agent built and what matters for this review.</span></div></div>
-          <div class="step"><span class="n">3</span><div><strong>Run full review</strong><span>morph scans for drift, applies fixes on an isolated copy, and stores JSON receipts.</span></div></div>
-          <div class="step"><span class="n">4</span><div><strong>Gate verdict</strong><span>Score, merge gate, and before/after proof — ready for a human or CI to decide.</span></div></div>
-        </section>
-
-        <section class="workgrid" id="history">
-          <div class="panel">
-            <div class="panel-head">
-              <h2>Review history</h2>
-              <span class="hint" id="historyHint">stored locally</span>
-            </div>
-            <div class="history-list" id="runList">Loading…</div>
-          </div>
-          <div class="panel" aria-live="polite">
-            <div class="panel-head">
-              <h2>Receipt</h2>
-              <div class="seg" role="tablist" aria-label="Receipt format">
-                <button id="toggleReadable" class="active" data-mode="readable" role="tab" aria-selected="true">Readable</button>
-                <button id="toggleJson" data-mode="json" role="tab">JSON</button>
-              </div>
-            </div>
-            <pre id="output" style="display:none">Loading…</pre>
-            <div id="outputReadable" class="readable"></div>
-          </div>
-        </section>
-
-        <p class="foot-note">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Full reviews repair an isolated <code>.studio-run</code> copy. A GitHub repo or preview URL is required — morph will not run on a blank or seeded fallback.
-        </p>
-      </main>
+      <nav class="nav-links" aria-label="Studio">
+        <a class="nav-link active" href="#overview">Overview</a>
+        <a class="nav-link" href="#history">History</a>
+      </nav>
     </div>
+    <div class="nav-right">
+      <span class="project-pill"><span>${workspaceName}</span><span class="sep">/</span><b>${projectName}</b></span>
+      <span class="state-chip" id="stateChip" data-state="idle"><span class="state-dot"></span><span id="reviewState">Idle</span></span>
+      ${userBlock}
+    </div>
+  </header>
+
+  <div class="page">
+    <main class="content">
+      <section class="page-head" id="overview">
+        <div class="eyebrow"><span class="eyebrow-dot"></span> Morph Studio</div>
+        <h1><span class="title-gradient">Review agent UI</span><br>before it ships.</h1>
+        <p class="lede">Connect a repo or preview URL, describe what the agent built, and get a deterministic drift scan with repairs and a merge gate verdict.</p>
+        <div class="actions">
+          <button class="btn btn-primary" data-action="studio-review" id="runReviewBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            Run full review
+          </button>
+        </div>
+      </section>
+
+      <section class="setup-panel spotlight" aria-label="Project source and agent instructions">
+        <div class="setup-head">
+          <h2>Project source</h2>
+          <p>Point morph at the agent output you want reviewed.</p>
+          <span class="source-badge" id="sourceBadge">local project</span>
+        </div>
+        <div class="panel-tabs" role="tablist" aria-label="Project source">
+          <button type="button" class="active" data-source-tab="github" role="tab" aria-selected="true">GitHub</button>
+          <button type="button" data-source-tab="url" role="tab" aria-selected="false">Preview URL</button>
+        </div>
+        <div class="setup-stack">
+          <div class="source-pane" data-source-pane="github">
+            <div class="github-connect">
+              <div>
+                <strong id="githubStatusLabel">${githubConnected ? "GitHub connected" : "Connect GitHub"}</strong>
+                <span id="githubStatusText">${githubConnected ? githubLabel : "Sign in to review agent branches from your repos."}</span>
+              </div>
+              ${githubConnected
+                ? `<span class="auth-status ready">Connected</span>`
+                : `<a class="btn btn-ghost" href="/auth/github?returnTo=%2Fstudio">Connect GitHub</a>`}
+            </div>
+            <label class="auth-form" for="githubRepo">
+              <span>Repository</span>
+              <input id="githubRepo" name="githubRepo" type="text" required autocomplete="off" placeholder="owner/repo">
+            </label>
+            <p class="source-note">morph clones the repo, scores UI drift, and can re-render with a frontier design profile at <code>/transformed</code>.</p>
+          </div>
+          <div class="source-pane" data-source-pane="url" hidden>
+            <form class="auth-form" id="previewForm" onsubmit="return false">
+              <label for="previewUrl">Live preview URL</label>
+              <input id="previewUrl" name="previewUrl" type="url" inputmode="url" autocomplete="url" required placeholder="https://your-app.vercel.app/page">
+            </form>
+            <p class="source-note">morph captures a Playwright screenshot and attaches it to the review receipt.</p>
+            <div class="preview-frame" id="previewFrame" hidden>
+              <img id="previewImage" alt="Playwright preview capture">
+              <div class="preview-meta" id="previewMeta"></div>
+            </div>
+            <div class="preview-empty" id="previewPlaceholder">Run a review to see the capture here.</div>
+          </div>
+          <div class="instructions-field">
+            <label for="agentInstructions">Agent instructions</label>
+            <textarea id="agentInstructions" name="instructions" placeholder="What did the agent build? What should morph focus on — token drift, components, focus states, layout?"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats" aria-label="Review metrics">
+        <div class="stat spotlight"><span class="stat-label">Review score</span><span class="stat-value" id="score">–</span><span class="stat-sub">out of 100 · gate ≥ 95</span></div>
+        <div class="stat spotlight"><span class="stat-label">Merge gate</span><span class="stat-value" id="gate">–</span><span class="stat-sub">block_on_any_drift</span></div>
+        <div class="stat spotlight"><span class="stat-label">Fixes applied</span><span class="stat-value" id="fixes">–</span><span class="stat-sub">deterministic patches</span></div>
+        <div class="stat spotlight"><span class="stat-label">Runs stored</span><span class="stat-value" id="runs">0</span><span class="stat-sub">.morph/runs receipts</span></div>
+      </section>
+
+      <section class="pipeline spotlight" id="pipeline" hidden aria-label="Latest review pipeline">
+        <div class="pipe-stage"><span class="pipe-k">Before</span><span class="pipe-v" id="pipeBefore">–</span></div>
+        <span class="pipe-arrow" aria-hidden="true">→</span>
+        <div class="pipe-stage"><span class="pipe-k">Repair</span><span class="pipe-v warn" id="pipeFixes">–</span></div>
+        <span class="pipe-arrow" aria-hidden="true">→</span>
+        <div class="pipe-stage"><span class="pipe-k">After</span><span class="pipe-v" id="pipeAfter">–</span></div>
+        <span class="pipe-summary" id="pipeSummary"></span>
+      </section>
+
+      <section class="workgrid" id="history">
+        <div class="panel spotlight">
+          <div class="panel-head">
+            <h2>Review history</h2>
+            <span class="hint" id="historyHint">stored locally</span>
+          </div>
+          <div class="history-list" id="runList">Loading…</div>
+        </div>
+        <div class="panel spotlight" aria-live="polite">
+          <div class="panel-head">
+            <h2>Receipt</h2>
+            <div class="seg" role="tablist" aria-label="Receipt format">
+              <button id="toggleReadable" class="active" data-mode="readable" role="tab" aria-selected="true">Readable</button>
+              <button id="toggleJson" data-mode="json" role="tab">JSON</button>
+            </div>
+          </div>
+          <pre id="output" style="display:none">Loading…</pre>
+          <div id="outputReadable" class="readable"></div>
+        </div>
+      </section>
+
+      <p class="foot-note">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Full reviews repair an isolated <code>.studio-run</code> copy. A GitHub repo or preview URL is required.</span>
+      </p>
+    </main>
   </div>
   <script>
     const output = document.querySelector("#output");
@@ -1835,10 +1771,10 @@ function dashboardHtml(config, session) {
       if (!sourceBadge) return;
       if (activeSource === "url") {
         const url = previewUrlInput?.value.trim();
-        sourceBadge.textContent = url ? "● preview url" : "● preview url (required)";
+        sourceBadge.textContent = url ? "preview url · " + url : "preview url required";
       } else {
         const repo = githubRepoInput?.value.trim();
-        sourceBadge.textContent = repo ? "● github · " + repo : "● github (repo required)";
+        sourceBadge.textContent = repo ? "github · " + repo : "github repo required";
       }
     }
 
@@ -2139,12 +2075,8 @@ function dashboardHtml(config, session) {
       outputReadable.innerHTML = '<div class="welcome">'
         + '<div class="welcome-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>'
         + '<h3>Ready to review</h3>'
-        + '<p>Connect a GitHub repo or paste a preview URL, add agent instructions, then click <strong>Run full review</strong>.</p>'
-        + '<div class="welcome-steps">'
-        + '<span class="welcome-step"><span class="n">1</span> Choose source</span>'
-        + '<span class="welcome-step"><span class="n">2</span> Add instructions</span>'
-        + '<span class="welcome-step"><span class="n">3</span> Gate verdict</span>'
-        + '</div></div>';
+        + '<p>Connect a source, add instructions, then run a full review to see your receipt here.</p>'
+        + '</div>';
     }
 
     async function api(path, options) {
@@ -2300,6 +2232,14 @@ function dashboardHtml(config, session) {
       } finally {
         trigger.disabled = false;
       }
+    });
+
+    document.querySelectorAll(".spotlight, .stat, .setup-panel").forEach((el) => {
+      el.addEventListener("mousemove", (e) => {
+        const rect = el.getBoundingClientRect();
+        el.style.setProperty("--spot-x", ((e.clientX - rect.left) / rect.width * 100) + "%");
+        el.style.setProperty("--spot-y", ((e.clientY - rect.top) / rect.height * 100) + "%");
+      });
     });
 
     async function boot() {
