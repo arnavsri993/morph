@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@buoy-design/core": "^0.3.38",
+    "@cursor/sdk": "^1.0.23",
     "@metamask/eslint-plugin-design-tokens": "^1.1.1",
     "@typescript-eslint/parser": "^8.62.1",
     "axe-core": "^4.12.1",

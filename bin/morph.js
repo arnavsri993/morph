@@ -11,6 +11,7 @@ import {
 } from "../src/core.js";
 import { serveMorph } from "../src/server.js";
 import { transformSite } from "../src/transform.js";
+import { transformWithComposer, composerAvailable } from "../src/composer-loop.js";
 import { cloneRepo } from "../src/github.js";
 import path from "node:path";
 
@@ -36,7 +37,11 @@ function parseArgs(argv) {
     generateReference: false,
     designVariance: null,
     motionIntensity: null,
-    visualDensity: null
+    visualDensity: null,
+    composer: false,
+    composerTarget: null,
+    composerMaxIters: null,
+    composerModel: null
   };
 
   for (let i = 3; i < argv.length; i += 1) {
@@ -61,6 +66,10 @@ function parseArgs(argv) {
     else if (arg === "--design-variance") args.designVariance = argv[++i];
     else if (arg === "--motion-intensity") args.motionIntensity = argv[++i];
     else if (arg === "--visual-density") args.visualDensity = argv[++i];
+    else if (arg === "--composer") args.composer = true;
+    else if (arg === "--composer-target") args.composerTarget = argv[++i];
+    else if (arg === "--composer-max-iters") args.composerMaxIters = argv[++i];
+    else if (arg === "--composer-model") args.composerModel = argv[++i];
     else if (arg === "--help" || arg === "-h") args.command = "help";
   }
 
@@ -80,6 +89,7 @@ Usage:
              [--instructions "..."] [--reference-image ./mockup.png]
              [--generate-reference]
              [--design-variance 1-10] [--motion-intensity 1-10] [--visual-density 1-10]
+             [--composer] [--composer-target 98] [--composer-max-iters 4] [--composer-model composer-2.5]
              [--json]
   morph demo
   morph serve --config morph.config.json [--host 127.0.0.1] [--port 4177]
@@ -90,7 +100,9 @@ Commands:
   repair     Generate or apply deterministic patch suggestions from the report.
   loop       Verify, repair, verify again, and emit a final pass/fail gate.
   transform  Re-render an arbitrary site with a frontier-grade design profile
-             selected from morph's design intelligence database.
+             selected from morph's design intelligence database. Add --composer
+             to let Cursor Composer 2.5 make the design decisions and iterate
+             until the UI-quality score stops improving (needs CURSOR_API_KEY).
   demo       Run the bundled Acme SaaS judge demo.
   serve      Start the local morph control plane and JSON API.
 `);
@@ -143,6 +155,42 @@ async function main() {
     if (args.designVariance) taste.designVariance = Number(args.designVariance);
     if (args.motionIntensity) taste.motionIntensity = Number(args.motionIntensity);
     if (args.visualDensity) taste.visualDensity = Number(args.visualDensity);
+
+    if (args.composer) {
+      if (!composerAvailable()) {
+        console.error("morph transform --composer needs CURSOR_API_KEY to be set. Add it to .env or your shell.");
+        process.exitCode = 1;
+        return;
+      }
+      const composerRun = await transformWithComposer(inputDir, outputDir, {
+        profile: args.profile,
+        archetype: args.archetype,
+        instructions: args.instructions,
+        referenceImage: args.referenceImage,
+        generateReference: args.generateReference,
+        taste: Object.keys(taste).length ? taste : null,
+        targetScore: args.composerTarget ? Number(args.composerTarget) : undefined,
+        maxIterations: args.composerMaxIters ? Number(args.composerMaxIters) : undefined,
+        model: args.composerModel
+      });
+      if (args.json) console.log(JSON.stringify(composerRun, null, 2));
+      else {
+        const receipt = composerRun.receipt;
+        console.log(receipt.summary);
+        console.log(`Composer 2.5: ${composerRun.composer.iterations} iteration(s), best score ${composerRun.best.score}/100 on iteration ${composerRun.best.iteration + 1}.`);
+        for (const iter of composerRun.iterations) {
+          const label = iter.decision ? `${iter.decision.profileId ?? "?"}/${iter.decision.archetypeId ?? "?"}` : "fallback";
+          console.log(`  iter ${iter.iteration + 1}: ${iter.score}/100 (${label}, ${iter.findingCount} finding(s))`);
+        }
+        console.log(`Profile: ${receipt.profile.name} (${receipt.profile.inspiration})`);
+        console.log(`Layout: ${receipt.archetype.name} — ${receipt.patterns.length} UI pattern(s)`);
+        console.log(`Before: ${receipt.before.score}/100 → After: ${receipt.after.score}/100.`);
+        console.log(`Output: ${outputDir}`);
+        for (const file of receipt.output.files) console.log(`- ${file}`);
+      }
+      return;
+    }
+
     const receipt = await transformSite(inputDir, outputDir, {
       profile: args.profile,
       archetype: args.archetype,

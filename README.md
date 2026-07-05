@@ -49,6 +49,7 @@ morph repair --config morph.config.json --apply --json
 morph loop --config morph.config.json --apply --store
 morph transform --repo owner/repo --output ./morph-output
 morph transform --input ./my-ugly-site --profile aurora-dark
+morph transform --input ./my-ugly-site --composer --composer-target 98
 morph demo
 morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 ```
@@ -57,7 +58,7 @@ morph serve --config morph.config.json --host 127.0.0.1 --port 4177
 - `verify` scans frontend source and emits JSON plus a human report.
 - `repair` generates deterministic replacements and can apply them.
 - `loop` runs verify, repair, verify again, then returns a final CI gate.
-- `transform` clones (or reads) an arbitrary site, scores it against the design-quality heuristics, selects the best-matching design profile, and re-renders the whole site — polished HTML plus a generated `morph-theme.css` design system.
+- `transform` clones (or reads) an arbitrary site, scores it against the design-quality heuristics, selects the best-matching design profile, and re-renders the whole site — polished HTML plus a generated `morph-theme.css` design system. Add `--composer` to hand the design decisions to Cursor Composer 2.5: it picks the profile, archetype, palette, typography, and taste dials, morph scores the render, and the leftover UI-quality findings are fed back to Composer for the next iteration until the score hits the target (default 98) or `--composer-max-iters` runs out. The best-scoring render wins. Requires `CURSOR_API_KEY`.
 - `demo` copies the seeded fixture, repairs the copy, and writes review receipts.
 - `serve` starts the morph web app: the landing page at `/`, morph Studio at `/studio`, and the API backed by `.morph/runs`. Studio full reviews run on `.studio-run/project` so the seeded fixture stays reusable.
 
