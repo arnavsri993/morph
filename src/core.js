@@ -962,8 +962,7 @@ function defaultConfig(projectName) {
       sessionCookieName: "morph_session"
     },
     billing: {
-      provider: "stripe",
-      mode: "stub"
+      mode: "local"
     }
   };
 }
@@ -979,12 +978,6 @@ GITHUB_CLIENT_SECRET=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
-# Stripe billing stubs. Never commit real values.
-STRIPE_SECRET_KEY=sk_test_replace_me
-STRIPE_WEBHOOK_SECRET=whsec_replace_me
-STRIPE_PRICE_ID=price_replace_me
-
-# Optional product URL used by checkout redirects
 MORPH_APP_URL=http://localhost:3000
 
 # Optional AI vision for design-db transform (reference images / mockup generation)

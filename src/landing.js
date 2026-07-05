@@ -1091,7 +1091,7 @@ export function landingHtml(config, session) {
             <ul>
               <li>Collaborative Studio reviews</li>
               <li>GitHub and Google SSO</li>
-              <li>Stripe-ready checkout</li>
+              <li>Team usage limits</li>
             </ul>
             <a class="btn btn-primary" href="/studio">Launch Studio</a>
           </div>

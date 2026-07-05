@@ -126,4 +126,4 @@ If the browser or server is acting up, the CLI demo is enough:
 npm test && npm run demo
 ```
 
-The core loop is dependency-free and does not require network, API keys, Stripe, OAuth, screenshots, or LLM calls.
+The core loop is dependency-free and does not require network, API keys, OAuth, screenshots, or LLM calls.

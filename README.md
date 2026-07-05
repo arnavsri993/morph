@@ -120,20 +120,12 @@ The source fixture remains seeded so the sample review can be replayed.
 - `POST /api/studio/review`
 - `POST /api/auth/github` (save GitHub OAuth credentials at runtime)
 - `POST /api/auth/google` (save Google OAuth credentials at runtime)
-- `POST /api/billing/stripe` (save Stripe keys at runtime)
-- `POST /api/billing/checkout` (live Stripe Checkout session, or stub guidance until configured)
-- `POST /api/webhooks/stripe` (signature-verified when `STRIPE_WEBHOOK_SECRET` is set)
 
 Runs are stored as JSON under `.morph/runs`. The API is auth-ready rather than auth-fake: development mode is explicit and production secrets live in environment variables.
 
-## Auth and billing setup
+## Auth setup
 
-Google and GitHub sign-in are fully wired. Add credentials either through `.env` or live from the Studio `Connect` panel (GitHub / Google / Billing tabs) — saved credentials enable the SSO buttons on `/login` immediately, no restart needed. Set `MORPH_AUTH_MODE=oauth` to require a signed session for Studio and the API.
-
-Stripe billing has two modes:
-
-- **Stub mode** (default): `POST /api/billing/checkout` returns setup guidance, webhooks acknowledge without verification. No fake charges.
-- **Live mode**: once `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID` are set (via `.env` or the Studio Billing tab), `Upgrade to Team` creates a real Stripe Checkout session and redirects the browser. With `STRIPE_WEBHOOK_SECRET` set, `POST /api/webhooks/stripe` verifies the `Stripe-Signature` header (HMAC, timestamp tolerance) and updates the workspace plan in `.morph/billing.json`.
+Google and GitHub sign-in are fully wired. Add credentials either through `.env` or live from the Studio `Connect` panel — saved credentials enable the SSO buttons on `/login` immediately, no restart needed. Set `MORPH_AUTH_MODE=oauth` to require a signed session for Studio and the API.
 
 Copy `.env.example` to `.env` for local product-shell work. Do not commit real secrets.
 
@@ -144,9 +136,6 @@ Required production-style variables:
 - `GITHUB_CLIENT_SECRET`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PRICE_ID`
 - `MORPH_APP_URL`
 
 See `docs/product-architecture.md` for the workspace/project/run model and deployment notes.

@@ -53,13 +53,10 @@ The built-in server stores run records under `.morph/runs` and exposes:
 - `POST /api/studio/review`
 - `GET /api/billing`
 - `POST /api/auth/github` / `POST /api/auth/google` (runtime OAuth credential entry)
-- `POST /api/billing/stripe` (runtime Stripe key entry)
-- `POST /api/billing/checkout`
-- `POST /api/webhooks/stripe`
 
-Billing degrades gracefully. Without Stripe keys, checkout returns stub guidance and webhooks acknowledge without verification. With `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID`, checkout creates a real Stripe Checkout session (subscription mode, success/cancel URLs back to `/studio`). With `STRIPE_WEBHOOK_SECRET`, webhook payloads are verified against the `Stripe-Signature` header — HMAC-SHA256 over `timestamp.body`, constant-time comparison, five-minute timestamp tolerance — and `checkout.session.completed` / `customer.subscription.*` events update the workspace plan stored in `.morph/billing.json`.
+Billing UI is local-only for now: `GET /api/billing` returns the workspace plan stored in `.morph/billing.json`. Paid checkout is not wired up yet.
 
-## Auth And Billing Readiness
+## Auth Readiness
 
 `.env.example` documents the production secrets without including secrets:
 
@@ -68,9 +65,6 @@ Billing degrades gracefully. Without Stripe keys, checkout returns stub guidance
 - `GITHUB_CLIENT_SECRET`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PRICE_ID`
 
 Development mode is explicit through `MORPH_AUTH_MODE=dev`. A production deployment should set `MORPH_AUTH_MODE=oauth`, require a signed session cookie, and scope all run reads/writes by workspace membership.
 
@@ -99,4 +93,4 @@ cp .env.example .env
 npm run serve -- --host 0.0.0.0 --port 4177
 ```
 
-For production, place it behind TLS, set strong env secrets, verify Stripe webhooks, require auth for all non-health routes, and persist `.morph/runs` or replace it with a database-backed run store.
+For production, place it behind TLS, set strong env secrets, require auth for all non-health routes, and persist `.morph/runs` or replace it with a database-backed run store.

@@ -17,14 +17,11 @@ import {
   loadEnvFile
 } from "./auth.js";
 import {
-  BillingError,
   billingPageHtml,
   billingPanelHtml,
   billingStyles,
   createBillingManager,
-  maskSecret,
-  readBillingState,
-  writeBillingState
+  readBillingState
 } from "./billing.js";
 import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
 import { landingHtml } from "./landing.js";
@@ -44,13 +41,8 @@ export async function createMorphHandler(config, options = {}) {
     googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || null,
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || null
   };
-  const runtimeBilling = {
-    stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || null,
-    stripePriceId: process.env.STRIPE_PRICE_ID?.trim() || null,
-    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || null
-  };
   const auth = createAuthManager(config, runtimeAuth);
-  const billing = createBillingManager(config, runtimeBilling);
+  const billing = createBillingManager(config);
 
   return async (request, response) => {
     let url;
@@ -128,10 +120,7 @@ export async function createMorphHandler(config, options = {}) {
       if (request.method === "GET" && url.pathname === "/billing") {
         const billingState = await readBillingState(config);
         return sendHtml(response, billingPageHtml({
-          subscription: billingState.subscription ?? {},
-          billingMode: billing.getBillingMode(),
-          checkoutConfigured: billing.isCheckoutConfigured(),
-          webhookConfigured: billing.isWebhookConfigured()
+          subscription: billingState
         }));
       }
 
@@ -159,11 +148,6 @@ export async function createMorphHandler(config, options = {}) {
             buoy: "@buoy-design/core health scoring",
             eslint: "tailwind-palette-guard + metamask design-tokens",
             axe: "axe-core accessibility (HTML)"
-          },
-          stripe: {
-            checkoutConfigured: billing.isCheckoutConfigured(),
-            webhookConfigured: billing.isWebhookConfigured(),
-            priceId: maskSecret(billing.getStripeCredentials().priceId)
           }
         });
       }
@@ -214,41 +198,10 @@ export async function createMorphHandler(config, options = {}) {
         });
       }
 
-      if (request.method === "POST" && url.pathname === "/api/billing/stripe") {
-        if (auth.isAuthRequired() && !session) throw new HttpError(401, "unauthorized", "Sign in required.");
-        const body = await readJson(request);
-        const secretKey = String(body.secretKey ?? "").trim();
-        const priceId = String(body.priceId ?? "").trim();
-        const webhookSecret = String(body.webhookSecret ?? "").trim();
-        if (!secretKey || !priceId) {
-          throw new HttpError(400, "missing_credentials", "Stripe secret key and price ID are required.");
-        }
-        runtimeBilling.stripeSecretKey = secretKey;
-        runtimeBilling.stripePriceId = priceId;
-        process.env.STRIPE_SECRET_KEY = secretKey;
-        process.env.STRIPE_PRICE_ID = priceId;
-        if (webhookSecret) {
-          runtimeBilling.stripeWebhookSecret = webhookSecret;
-          process.env.STRIPE_WEBHOOK_SECRET = webhookSecret;
-        }
-        return sendJson(response, 200, {
-          ok: true,
-          billingMode: billing.getBillingMode(),
-          stripe: {
-            checkoutConfigured: billing.isCheckoutConfigured(),
-            webhookConfigured: billing.isWebhookConfigured(),
-            secretKey: maskSecret(secretKey),
-            priceId: maskSecret(priceId)
-          }
-        });
-      }
-
       if (request.method === "GET" && url.pathname === "/api/billing") {
         const state = await readBillingState(config);
         return sendJson(response, 200, {
           billingMode: billing.getBillingMode(),
-          checkoutConfigured: billing.isCheckoutConfigured(),
-          webhookConfigured: billing.isWebhookConfigured(),
           subscription: state
         });
       }
@@ -304,56 +257,6 @@ export async function createMorphHandler(config, options = {}) {
         });
         const stored = await storeRun(config, "studio-review", review);
         return sendJson(response, 201, { run: stored });
-      }
-
-      if (request.method === "POST" && url.pathname === "/api/billing/checkout") {
-        if (!billing.isCheckoutConfigured()) {
-          return sendJson(response, 200, {
-            mode: "stub",
-            provider: "stripe",
-            message: "Checkout is stubbed until STRIPE_SECRET_KEY and STRIPE_PRICE_ID are configured. Save them in Studio or .env, then retry.",
-            envRequired: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "MORPH_APP_URL"]
-          });
-        }
-        const checkout = await billing.createCheckoutSession({
-          appUrl,
-          customerEmail: session?.email ?? null
-        });
-        return sendJson(response, 200, {
-          mode: "live",
-          provider: "stripe",
-          sessionId: checkout.id,
-          url: checkout.url,
-          message: "Redirect the browser to url to complete Stripe Checkout."
-        });
-      }
-
-      if (request.method === "POST" && url.pathname === "/api/webhooks/stripe") {
-        const body = await readBody(request);
-        if (!billing.isWebhookConfigured()) {
-          return sendJson(response, 200, {
-            received: true,
-            mode: "stub",
-            bytes: Buffer.byteLength(body),
-            verification: "Set STRIPE_WEBHOOK_SECRET to enable Stripe-Signature verification."
-          });
-        }
-        billing.verifyWebhookSignature(body, request.headers["stripe-signature"]);
-        let event;
-        try {
-          event = JSON.parse(body);
-        } catch {
-          throw new HttpError(400, "invalid_json", "Webhook body must be valid JSON.");
-        }
-        const state = billing.applyWebhookEvent(await readBillingState(config), event);
-        await writeBillingState(config, state);
-        return sendJson(response, 200, {
-          received: true,
-          mode: "live",
-          verified: true,
-          eventType: event.type ?? null,
-          subscription: state
-        });
       }
 
       if (request.method === "GET" && url.pathname.startsWith("/api/runs/")) {
@@ -858,9 +761,6 @@ function publicConfig(config, runtimeAuth, billing) {
       }
     },
     billing: {
-      provider: "stripe",
-      configured: billing.isCheckoutConfigured(),
-      webhookConfigured: billing.isWebhookConfigured(),
       mode: billing.getBillingMode()
     }
   };
@@ -910,10 +810,7 @@ function renderGithubConnectBlock({ githubConnected, githubLabel, githubConfigur
 async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
   const billingState = await readBillingState(config);
   const billingBlock = billingPanelHtml({
-    subscription: billingState.subscription ?? {},
-    billingMode: billing.getBillingMode(),
-    checkoutConfigured: billing.isCheckoutConfigured(),
-    webhookConfigured: billing.isWebhookConfigured()
+    subscription: billingState
   });
   const githubConnected = session?.provider === "github";
   const githubLabel = githubConnected ? escapeHtml(session.name || session.email || "GitHub account") : "";
@@ -2565,65 +2462,12 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       output.textContent = text;
     }
 
-    const billingStripeForm = document.querySelector("#billingStripeForm");
-    const billingStripeStatus = document.querySelector("#billingStripeStatus");
-    billingStripeForm?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const secretKey = document.querySelector("#stripeSecretKey")?.value.trim() || "";
-      const priceId = document.querySelector("#stripePriceId")?.value.trim() || "";
-      const webhookSecret = document.querySelector("#stripeWebhookSecret")?.value.trim() || "";
-      if (!secretKey || !priceId) {
-        if (billingStripeStatus) {
-          billingStripeStatus.hidden = false;
-          billingStripeStatus.textContent = "Secret key and price ID are required.";
-        }
-        return;
-      }
-      if (billingStripeStatus) {
-        billingStripeStatus.hidden = false;
-        billingStripeStatus.textContent = "Saving credentials…";
-      }
-      try {
-        await api("/api/billing/stripe", {
-          method: "POST",
-          body: JSON.stringify({ secretKey, priceId, webhookSecret: webhookSecret || undefined })
-        });
-        window.location.href = "/studio?billing=saved#billing";
-      } catch (error) {
-        if (billingStripeStatus) {
-          billingStripeStatus.textContent = error.message || "Could not save Stripe credentials.";
-        }
-      }
-    });
-
     document.addEventListener("click", async (event) => {
       const trigger = event.target instanceof Element ? event.target.closest("[data-action]") : null;
       if (!trigger) return;
 
       const action = trigger.dataset.action;
       if (!action) return;
-      if (action === "billing-checkout") {
-        trigger.disabled = true;
-        try {
-          const checkout = await api("/api/billing/checkout", { method: "POST", body: "{}" });
-          if (checkout.url) {
-            window.location.href = checkout.url;
-            return;
-          }
-          if (billingStripeStatus) {
-            billingStripeStatus.hidden = false;
-            billingStripeStatus.textContent = checkout.message || "Checkout is stubbed until Stripe credentials are saved.";
-          }
-        } catch (error) {
-          if (billingStripeStatus) {
-            billingStripeStatus.hidden = false;
-            billingStripeStatus.textContent = error.message || "Checkout failed.";
-          }
-        } finally {
-          trigger.disabled = false;
-        }
-        return;
-      }
       if (action === "studio-review") {
         outputReadable.innerHTML = '<div class="welcome"><p>Running full review…</p></div>';
         output.style.display = "none";

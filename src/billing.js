@@ -1,183 +1,21 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
 
-const STRIPE_API_BASE = "https://api.stripe.com/v1";
-const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
-
-export class BillingError extends Error {
-  constructor(statusCode, code, message) {
-    super(message);
-    this.statusCode = statusCode;
-    this.code = code;
-  }
-}
-
-export function createBillingManager(config, runtimeBilling) {
-  function getStripeCredentials() {
-    return {
-      secretKey: runtimeBilling.stripeSecretKey || process.env.STRIPE_SECRET_KEY?.trim() || "",
-      priceId: runtimeBilling.stripePriceId || process.env.STRIPE_PRICE_ID?.trim() || "",
-      webhookSecret: runtimeBilling.stripeWebhookSecret || process.env.STRIPE_WEBHOOK_SECRET?.trim() || ""
-    };
-  }
-
-  function isPlaceholder(value) {
-    return /replace[_-]?me/i.test(value);
-  }
-
-  function isCheckoutConfigured() {
-    const { secretKey, priceId } = getStripeCredentials();
-    return Boolean(secretKey && priceId && !isPlaceholder(secretKey) && !isPlaceholder(priceId));
-  }
-
-  function isWebhookConfigured() {
-    const { webhookSecret } = getStripeCredentials();
-    return Boolean(webhookSecret && !isPlaceholder(webhookSecret));
-  }
-
+export function createBillingManager(config) {
   function getBillingMode() {
-    return isCheckoutConfigured() ? "live" : config.billing?.mode ?? "stub";
+    return config.billing?.mode ?? "local";
   }
 
-  async function createCheckoutSession({ appUrl, customerEmail }) {
-    const { secretKey, priceId } = getStripeCredentials();
-    const body = new URLSearchParams({
-      mode: "subscription",
-      "line_items[0][price]": priceId,
-      "line_items[0][quantity]": "1",
-      success_url: `${appUrl}/studio?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/studio?billing=cancelled`,
-      "subscription_data[metadata][product]": "morph-team",
-      allow_promotion_codes: "true"
-    });
-    if (customerEmail) body.set("customer_email", customerEmail);
-
-    let response;
-    let payload;
-    try {
-      response = await fetch(`${STRIPE_API_BASE}/checkout/sessions`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${secretKey}`,
-          "content-type": "application/x-www-form-urlencoded"
-        },
-        body
-      });
-      payload = await response.json();
-    } catch (error) {
-      throw new BillingError(502, "stripe_unreachable", `Could not reach Stripe: ${error.message}`);
-    }
-
-    if (!response.ok) {
-      throw new BillingError(
-        502,
-        "stripe_checkout_error",
-        payload?.error?.message || "Stripe checkout session creation failed."
-      );
-    }
-
-    return {
-      id: payload.id,
-      url: payload.url,
-      mode: "live",
-      provider: "stripe"
-    };
-  }
-
-  function verifyWebhookSignature(rawBody, signatureHeader, { toleranceSeconds = SIGNATURE_TOLERANCE_SECONDS, now = Date.now() } = {}) {
-    const { webhookSecret } = getStripeCredentials();
-    if (!webhookSecret) {
-      throw new BillingError(503, "webhook_not_configured", "STRIPE_WEBHOOK_SECRET is not configured.");
-    }
-    if (!signatureHeader) {
-      throw new BillingError(400, "missing_signature", "Missing Stripe-Signature header.");
-    }
-
-    let timestamp = null;
-    const candidateSignatures = [];
-    for (const part of String(signatureHeader).split(",")) {
-      const [key, value] = part.split("=").map((piece) => piece?.trim());
-      if (key === "t") timestamp = Number(value);
-      if (key === "v1" && value) candidateSignatures.push(value);
-    }
-
-    if (!timestamp || !candidateSignatures.length) {
-      throw new BillingError(400, "invalid_signature_header", "Stripe-Signature header is malformed.");
-    }
-
-    const ageSeconds = Math.abs(now / 1000 - timestamp);
-    if (ageSeconds > toleranceSeconds) {
-      throw new BillingError(400, "signature_expired", "Stripe-Signature timestamp is outside the tolerance window.");
-    }
-
-    const expected = createHmac("sha256", webhookSecret)
-      .update(`${timestamp}.${rawBody}`, "utf8")
-      .digest("hex");
-    const expectedBuffer = Buffer.from(expected, "utf8");
-
-    const matches = candidateSignatures.some((candidate) => {
-      const candidateBuffer = Buffer.from(candidate, "utf8");
-      return candidateBuffer.length === expectedBuffer.length && timingSafeEqual(candidateBuffer, expectedBuffer);
-    });
-
-    if (!matches) {
-      throw new BillingError(400, "signature_mismatch", "Stripe-Signature verification failed.");
-    }
-
-    return true;
-  }
-
-  function applyWebhookEvent(state, event) {
-    const next = { ...state, lastEventId: event.id ?? null, lastEventType: event.type ?? null, updatedAt: new Date().toISOString() };
-    const object = event.data?.object ?? {};
-
-    if (event.type === "checkout.session.completed") {
-      return {
-        ...next,
-        plan: "team",
-        status: "active",
-        stripeCustomerId: object.customer ?? next.stripeCustomerId ?? null,
-        stripeSubscriptionId: object.subscription ?? next.stripeSubscriptionId ?? null,
-        customerEmail: object.customer_details?.email ?? next.customerEmail ?? null
-      };
-    }
-    if (event.type === "customer.subscription.updated") {
-      return {
-        ...next,
-        plan: object.status === "active" || object.status === "trialing" ? "team" : next.plan,
-        status: object.status ?? next.status,
-        stripeSubscriptionId: object.id ?? next.stripeSubscriptionId ?? null
-      };
-    }
-    if (event.type === "customer.subscription.deleted") {
-      return { ...next, plan: "local", status: "cancelled" };
-    }
-    return next;
-  }
-
-  return {
-    getStripeCredentials,
-    isCheckoutConfigured,
-    isWebhookConfigured,
-    getBillingMode,
-    createCheckoutSession,
-    verifyWebhookSignature,
-    applyWebhookEvent
-  };
+  return { getBillingMode };
 }
 
 export function defaultBillingState() {
   return {
     plan: "local",
     status: "free",
-    stripeCustomerId: null,
-    stripeSubscriptionId: null,
     customerEmail: null,
-    lastEventId: null,
-    lastEventType: null,
     updatedAt: null
   };
 }
@@ -201,13 +39,6 @@ export async function writeBillingState(config, state) {
 
 function billingStateFile(config) {
   return path.join(config.morphDir, "billing.json");
-}
-
-export function maskSecret(value) {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) return null;
-  if (trimmed.length <= 8) return trimmed;
-  return `${trimmed.slice(0, 7)}...${trimmed.slice(-4)}`;
 }
 
 export function billingStyles() {
@@ -285,11 +116,6 @@ export function billingStyles() {
       color: var(--ok, #4ade80);
       border-color: rgba(74, 222, 128, 0.25);
       background: rgba(74, 222, 128, 0.08);
-    }
-    .billing-badge.stub {
-      color: #fbbf24;
-      border-color: rgba(251, 191, 36, 0.25);
-      background: rgba(251, 191, 36, 0.08);
     }
     .billing-badge.team {
       color: var(--brand-a, #818cf8);
@@ -462,41 +288,6 @@ export function billingStyles() {
       font-size: 13px;
       color: var(--faint, #71717a);
     }
-    .billing-form {
-      display: grid;
-      gap: 14px;
-      padding: 20px;
-    }
-    .billing-form label {
-      display: grid;
-      gap: 7px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--muted, #a1a1aa);
-    }
-    .billing-form input {
-      width: 100%;
-      min-height: 44px;
-      padding: 0 14px;
-      border-radius: 12px;
-      border: 1px solid var(--line-strong, rgba(255, 255, 255, 0.13));
-      background: rgba(0, 0, 0, 0.28);
-      color: var(--ink, #fafafa);
-      font: inherit;
-      font-size: 14px;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    .billing-form input::placeholder { color: var(--faint, #71717a); }
-    .billing-form input:hover { border-color: rgba(255, 255, 255, 0.2); }
-    .billing-form input:focus {
-      outline: none;
-      border-color: rgba(34, 211, 238, 0.45);
-      box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
-    }
-    .billing-form input[aria-invalid="true"] {
-      border-color: rgba(248, 113, 113, 0.45);
-      box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.1);
-    }
     .billing-table-wrap {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -537,41 +328,10 @@ export function billingStyles() {
       font-size: 14px;
       line-height: 1.6;
     }
-    .billing-alert {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 14px 16px;
-      border-radius: 14px;
-      border: 1px solid rgba(251, 191, 36, 0.22);
-      background: rgba(251, 191, 36, 0.07);
-      color: #fde68a;
-      font-size: 14px;
-      line-height: 1.55;
-    }
-    .billing-alert svg { flex: none; margin-top: 1px; }
-    .billing-alert.success {
-      border-color: rgba(74, 222, 128, 0.22);
-      background: rgba(74, 222, 128, 0.07);
-      color: #86efac;
-    }
-    .billing-alert.error {
-      border-color: rgba(248, 113, 113, 0.22);
-      background: rgba(248, 113, 113, 0.07);
-      color: #fca5a5;
-    }
     .billing-foot {
       font-size: 13px;
       color: var(--faint, #71717a);
       line-height: 1.6;
-    }
-    .billing-foot code {
-      font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      font-size: 12px;
-      color: var(--cyan, #22d3ee);
-      background: rgba(34, 211, 238, 0.06);
-      padding: 2px 6px;
-      border-radius: 6px;
     }
     @media (max-width: 640px) {
       .billing-table th, .billing-table td { padding: 12px 14px; font-size: 13px; }
@@ -583,40 +343,18 @@ export function billingStyles() {
   `;
 }
 
-export function billingPanelHtml({
-  subscription = {},
-  billingMode = "stub",
-  checkoutConfigured = false,
-  webhookConfigured = false
-} = {}) {
+export function billingPanelHtml({ subscription = {} } = {}) {
   const plan = subscription.plan ?? "local";
   const status = subscription.status ?? "free";
   const email = subscription.customerEmail ?? null;
   const isTeam = plan === "team" && (status === "active" || status === "trialing");
-  const isLive = billingMode === "live" && checkoutConfigured;
-  const modeBadge = isLive
-    ? `<span class="billing-badge live"><span class="dot"></span>Live checkout</span>`
-    : `<span class="billing-badge stub"><span class="dot"></span>Stub mode</span>`;
   const planBadge = isTeam
     ? `<span class="billing-badge team"><span class="dot"></span>Team plan</span>`
     : `<span class="billing-badge"><span class="dot"></span>Local plan</span>`;
-  const webhookBadge = webhookConfigured
-    ? `<span class="billing-badge live"><span class="dot"></span>Webhooks verified</span>`
-    : `<span class="billing-badge stub"><span class="dot"></span>Webhooks stubbed</span>`;
 
   const upgradeBtn = isTeam
     ? `<button type="button" class="billing-btn ghost" disabled aria-disabled="true">Current plan</button>`
-    : `<button type="button" class="billing-btn primary" id="billingUpgradeBtn" data-action="billing-checkout">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        Upgrade to Team
-      </button>`;
-
-  const setupAlert = isLive
-    ? ""
-    : `<div class="billing-alert" role="status">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
-        <span>Checkout is stubbed until <code>STRIPE_SECRET_KEY</code> and <code>STRIPE_PRICE_ID</code> are configured below or in <code>.env</code>.</span>
-      </div>`;
+    : `<button type="button" class="billing-btn primary" disabled aria-disabled="true">Team checkout coming soon</button>`;
 
   const usageRows = isTeam
     ? `<tr><td>Studio reviews</td><td class="mono">42</td><td>Unlimited</td></tr>
@@ -626,20 +364,7 @@ export function billingPanelHtml({
        <tr><td>Repair loops</td><td class="mono">3</td><td>5 / mo</td></tr>
        <tr><td>Stored runs</td><td class="mono">24</td><td>50 max</td></tr>`;
 
-  const invoiceRows = isTeam
-    ? `<tr>
-         <td class="mono">Jun 1, 2026</td>
-         <td>Team subscription</td>
-         <td class="amount">$29.00</td>
-         <td><span class="billing-badge live"><span class="dot"></span>Paid</span></td>
-       </tr>
-       <tr>
-         <td class="mono">May 1, 2026</td>
-         <td>Team subscription</td>
-         <td class="amount">$29.00</td>
-         <td><span class="billing-badge live"><span class="dot"></span>Paid</span></td>
-       </tr>`
-    : `<tr><td colspan="4"><div class="billing-empty">No invoices yet — upgrade to Team for shared Studio reviews and billing.</div></td></tr>`;
+  const invoiceRows = `<tr><td colspan="4"><div class="billing-empty">No invoices yet — team billing is not enabled in this build.</div></td></tr>`;
 
   const emailLine = email
     ? `<p class="billing-lede">Billing contact: <strong>${escapeBillingHtml(email)}</strong></p>`
@@ -649,15 +374,12 @@ export function billingPanelHtml({
     <header class="billing-head">
       <div class="billing-eyebrow"><span class="billing-eyebrow-dot"></span> Workspace billing</div>
       <h2 class="billing-title" id="billingTitle">Plans &amp; usage</h2>
-      <p class="billing-lede">Manage your Morph workspace plan, Stripe checkout, and subscription receipts.</p>
+      <p class="billing-lede">Manage your Morph workspace plan and usage limits. Paid checkout is not wired up yet.</p>
       ${emailLine}
       <div class="billing-status" aria-label="Billing status">
         ${planBadge}
-        ${modeBadge}
-        ${webhookBadge}
       </div>
     </header>
-    ${setupAlert}
     <div class="billing-plans" role="list" aria-label="Available plans">
       <article class="plan-card${!isTeam ? " current" : ""}" role="listitem">
         <div class="plan-top">
@@ -683,11 +405,11 @@ export function billingPanelHtml({
           </div>
           ${isTeam ? `<span class="billing-badge team"><span class="dot"></span>Active</span>` : `<span class="billing-badge"><span class="dot"></span>Recommended</span>`}
         </div>
-        <p class="plan-copy">Shared Studio reviews, live Stripe checkout, webhook-verified subscriptions, and team billing receipts.</p>
+        <p class="plan-copy">Shared Studio reviews, higher limits, and team billing receipts when checkout ships.</p>
         <ul class="plan-features">
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Unlimited reviews &amp; loops</li>
-          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Stripe Checkout &amp; webhooks</li>
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Shared workspace billing</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Priority support</li>
         </ul>
         ${upgradeBtn}
       </article>
@@ -707,7 +429,7 @@ export function billingPanelHtml({
     <div class="billing-panel" aria-labelledby="billingInvoiceTitle">
       <div class="billing-panel-head">
         <h3 id="billingInvoiceTitle">Invoices</h3>
-        <span class="hint">Powered by Stripe</span>
+        <span class="hint">Local workspace</span>
       </div>
       <div class="billing-table-wrap">
         <table class="billing-table" aria-label="Invoice history">
@@ -716,26 +438,6 @@ export function billingPanelHtml({
         </table>
       </div>
     </div>
-    <div class="billing-panel" aria-labelledby="billingStripeTitle">
-      <div class="billing-panel-head">
-        <h3 id="billingStripeTitle">Stripe configuration</h3>
-        <span class="hint">Saved at runtime or via <code>.env</code></span>
-      </div>
-      <form class="billing-form" id="billingStripeForm" aria-label="Stripe credentials">
-        <label for="stripeSecretKey">Secret key
-          <input id="stripeSecretKey" name="secretKey" type="password" autocomplete="off" placeholder="sk_live_… or sk_test_…" aria-describedby="stripeSecretHint">
-        </label>
-        <label for="stripePriceId">Price ID
-          <input id="stripePriceId" name="priceId" type="text" autocomplete="off" placeholder="price_…" aria-describedby="stripePriceHint">
-        </label>
-        <label for="stripeWebhookSecret">Webhook secret <span style="font-weight:400;color:var(--faint,#71717a)">(optional)</span>
-          <input id="stripeWebhookSecret" name="webhookSecret" type="password" autocomplete="off" placeholder="whsec_…">
-        </label>
-        <button type="submit" class="billing-btn primary" id="billingStripeSave">Save Stripe credentials</button>
-        <p class="billing-foot" id="billingStripeStatus" role="status" hidden></p>
-      </form>
-    </div>
-    <p class="billing-foot">Webhook endpoint: <code>POST /api/webhooks/stripe</code> · Checkout: <code>POST /api/billing/checkout</code></p>
   </section>`;
 }
 

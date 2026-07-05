@@ -43,8 +43,7 @@ await writeFile(demoConfigPath, `${JSON.stringify({
     mode: "dev"
   },
   billing: {
-    provider: "stripe",
-    mode: "stub"
+    mode: "local"
   }
 }, null, 2)}\n`);
 
@@ -87,7 +86,7 @@ const transcript = [
     ok: true,
     product: "Morph",
     authMode: "dev",
-    billingMode: "stub"
+    billingMode: "local"
   }, null, 2),
   ""
 ].join("\n");

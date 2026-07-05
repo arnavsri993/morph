@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -413,92 +412,6 @@ test("google credentials save at runtime and enable the login provider", async (
 
     const login = await (await fetch(`${url}/login?returnTo=%2Fstudio`)).text();
     assert.equal(login.includes("Continue with Google"), true);
-  } finally {
-    await new Promise((resolve) => server.close(resolve));
-    for (const [key, value] of Object.entries(savedEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  }
-});
-
-test("stripe checkout stays stubbed until configured and webhooks verify signatures", async () => {
-  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-stripe-"));
-  const fixtureRoot = path.join(tempRoot, "acme-saas");
-  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
-
-  const configPath = path.join(tempRoot, "morph.config.json");
-  await writeFile(configPath, `${JSON.stringify({
-    projectName: "Acme Stripe",
-    projectRoot: "acme-saas",
-    morphDir: ".morph",
-    tokenFiles: ["design-system/tokens.css"],
-    scan: ["src/**/*.tsx"]
-  }, null, 2)}\n`);
-
-  const savedEnv = {
-    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-    STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
-    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET
-  };
-  delete process.env.STRIPE_SECRET_KEY;
-  delete process.env.STRIPE_PRICE_ID;
-  delete process.env.STRIPE_WEBHOOK_SECRET;
-
-  const config = await loadConfig(configPath, tempRoot);
-  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
-
-  try {
-    const stubCheckout = await fetch(`${url}/api/billing/checkout`, { method: "POST" });
-    assert.equal(stubCheckout.status, 200);
-    assert.equal((await stubCheckout.json()).mode, "stub");
-
-    const stubWebhook = await fetch(`${url}/api/webhooks/stripe`, {
-      method: "POST",
-      body: JSON.stringify({ type: "checkout.session.completed" })
-    });
-    assert.equal((await stubWebhook.json()).mode, "stub");
-
-    const webhookSecret = "whsec_morph_test_secret";
-    const saveResponse = await fetch(`${url}/api/billing/stripe`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ secretKey: "sk_test_morph123", priceId: "price_morph123", webhookSecret })
-    });
-    assert.equal(saveResponse.status, 200);
-    const saved = await saveResponse.json();
-    assert.equal(saved.stripe.checkoutConfigured, true);
-    assert.equal(saved.stripe.webhookConfigured, true);
-
-    const event = JSON.stringify({
-      id: "evt_test_1",
-      type: "checkout.session.completed",
-      data: { object: { customer: "cus_123", subscription: "sub_123", customer_details: { email: "dev@acme.test" } } }
-    });
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = createHmac("sha256", webhookSecret).update(`${timestamp}.${event}`, "utf8").digest("hex");
-
-    const verifiedResponse = await fetch(`${url}/api/webhooks/stripe`, {
-      method: "POST",
-      headers: { "stripe-signature": `t=${timestamp},v1=${signature}` },
-      body: event
-    });
-    assert.equal(verifiedResponse.status, 200);
-    const verified = await verifiedResponse.json();
-    assert.equal(verified.verified, true);
-    assert.equal(verified.subscription.plan, "team");
-    assert.equal(verified.subscription.status, "active");
-
-    const badResponse = await fetch(`${url}/api/webhooks/stripe`, {
-      method: "POST",
-      headers: { "stripe-signature": `t=${timestamp},v1=${"0".repeat(64)}` },
-      body: event
-    });
-    assert.equal(badResponse.status, 400);
-    assert.equal((await badResponse.json()).error, "signature_mismatch");
-
-    const billingState = await fetchJson(`${url}/api/billing`);
-    assert.equal(billingState.subscription.plan, "team");
   } finally {
     await new Promise((resolve) => server.close(resolve));
     for (const [key, value] of Object.entries(savedEnv)) {

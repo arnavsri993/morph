@@ -34,14 +34,6 @@
     "sessionCookieName": "morph_session"
   },
   "billing": {
-    "provider": "stripe",
-    "mode": "stub",
-    "plans": [
-      {
-        "id": "team",
-        "name": "Team",
-        "stripePriceEnv": "STRIPE_PRICE_ID"
-      }
-    ]
+    "mode": "local"
   }
 }
