@@ -1,0 +1,16 @@
+---
+description: Commit and push to GitHub immediately after making changes
+alwaysApply: true
+---
+
+# Sync GitHub After Every Change
+
+After making any code, config, or doc change in this repo:
+
+1. **Commit immediately** — do not leave work uncommitted at the end of a task.
+2. **Push immediately** — run `git push` right after a successful commit so `origin` stays current.
+3. **One logical commit per task** — group related edits; split only when changes are clearly separate concerns.
+4. **Never commit secrets** — skip `.env`, credentials, and API keys; use `.env.example` for templates.
+5. **Verify sync** — run `git status` after push; branch should be up to date with `origin/main`.
+
+Do not wait for the user to ask. Treat GitHub sync as part of finishing the work, not an optional follow-up.
