@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "builtAt": "2026-07-05T09:09:09.985Z",
+  "references": 4240,
+  "npmAggregateTotal": 2417449,
+  "estimatedSources": 9992449,
+  "estimatedSourcesLabel": "10M+",
+  "sources": {
+    "npmQueries": 30,
+    "awesomeLists": 3
+  }
+}

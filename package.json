@@ -14,6 +14,7 @@
     "verify:demo": "node ./bin/morph.js verify --config morph.demo.config.json",
     "repair:demo": "node ./bin/morph.js repair --config morph.demo.config.json",
     "demo": "node ./scripts/demo.mjs",
+    "build:design-db": "node ./scripts/build-design-database.mjs",
     "serve": "node ./bin/morph.js serve --config morph.config.json",
     "test": "node --test"
   },

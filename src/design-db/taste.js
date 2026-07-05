@@ -6,8 +6,8 @@ const DIAL_MIN = 1;
 const DIAL_MAX = 10;
 
 export const DEFAULT_TASTE = {
-  designVariance: 5,
-  motionIntensity: 3,
+  designVariance: 6,
+  motionIntensity: 4,
   visualDensity: 4
 };
 
@@ -64,15 +64,18 @@ export function normalizeTaste(taste) {
 export function tasteRenderFlags(taste) {
   const normalized = normalizeTaste(taste);
   return {
-    showEyebrow: normalized.visualDensity >= 8,
-    showSectionKickers: normalized.designVariance >= 9,
-    showScrollReveal: normalized.motionIntensity >= 5,
-    showFeatureIcons: normalized.designVariance >= 8 && normalized.visualDensity >= 8,
+    showEyebrow: normalized.visualDensity >= 7,
+    showSectionKickers: normalized.designVariance >= 8,
+    showScrollReveal: normalized.motionIntensity >= 4,
+    showHeroFadeUp: normalized.motionIntensity >= 3,
+    showPageBackdrop: true,
+    showSpotlight: normalized.motionIntensity >= 5 && normalized.designVariance >= 5,
+    showFeatureIcons: normalized.designVariance >= 7 && normalized.visualDensity >= 7,
     heroCentered: normalized.designVariance <= 5,
     motionScale: normalized.motionIntensity / DEFAULT_TASTE.motionIntensity,
     sectionPaddingScale: normalized.visualDensity <= 4 ? 1.15 : normalized.visualDensity >= 8 ? 0.85 : 1,
-    hoverLift: normalized.motionIntensity >= 5 ? "-4px" : normalized.motionIntensity >= 3 ? "-2px" : "0",
-    revealDurationMs: normalized.motionIntensity >= 7 ? 480 : normalized.motionIntensity >= 5 ? 360 : 0
+    hoverLift: normalized.motionIntensity >= 6 ? "-4px" : normalized.motionIntensity >= 4 ? "-2px" : "0",
+    revealDurationMs: normalized.motionIntensity >= 7 ? 480 : normalized.motionIntensity >= 4 ? 360 : 0
   };
 }
 

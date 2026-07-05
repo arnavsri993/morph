@@ -5,7 +5,21 @@
 // single self-contained HTML document plus a generated design-system
 // stylesheet (morph-theme.css).
 
-import { componentStyles, renderCatalogSections, renderHeroSplit } from "./components.js";
+import { componentStyles, renderCatalogSections, renderHeroSplit, renderHeroBento, renderHeroEditorial, renderHeroMinimal, renderIconRowFeatures } from "./components.js";
+import {
+  footerVariantStyles,
+  heroAnimationStyles,
+  mobileNavStyles,
+  navVariantStyles,
+  pageScripts,
+  profileBackdropHtml,
+  profileBackdropStyles,
+  renderSiteFooter,
+  renderSiteNav,
+  resolveFooterVariant,
+  resolveNavVariant,
+  spotlightStyles
+} from "./site-chrome.js";
 import { tasteRenderFlags } from "./taste.js";
 
 export function renderStylesheet(profile, options = {}) {
@@ -538,10 +552,15 @@ ${texture}
 
 @media (max-width: 720px) {
   .nav-links { display: none; }
-  .nav-cta { display: inline-flex; margin-left: auto; }
   .hero-ctas .btn { width: 100%; max-width: 340px; }
   .site-nav .container { gap: var(--space-4); }
 }
+${profileBackdropStyles(profile, flags)}
+${heroAnimationStyles(flags)}
+${navVariantStyles(options.navVariant ?? "glass", profile)}
+${mobileNavStyles()}
+${footerVariantStyles()}
+${flags.showSpotlight ? spotlightStyles() : ""}
 ${extra}
 `;
 }
@@ -574,20 +593,23 @@ function textureLayer(profile) {
 }
 
 export function renderPage(content, profile, options = {}) {
-  const brand = escapeHtml(content.brand || "Product");
-  const navLinks = (content.nav ?? []).slice(0, 5);
   const primaryCta = content.hero?.ctas?.[0] ?? { label: "Get started", href: "#" };
-  const secondaryCta = content.hero?.ctas?.[1] ?? null;
   const archetype = options.archetype ?? null;
   const heroVariant = archetype?.heroVariant ?? "centered";
   const patterns = options.patterns ?? [];
   const sectionOrder = archetype?.sectionOrder ?? ["hero", "stats", "features", "splits", "social", "extras", "cta"];
   const flags = options.renderFlags ?? tasteRenderFlags(options.taste ?? {});
   const revealClass = flags.showScrollReveal ? "reveal" : "";
+  const navVariant = resolveNavVariant(patterns);
+  const footerVariant = resolveFooterVariant(patterns);
+  const patternIds = new Set(patterns.map((pattern) => pattern.id));
+  const heroOptions = { revealClass, flags };
+  const useIconRows = patternIds.has("features-icon-rows");
+  const useBentoFeatures = patternIds.has("features-bento-grid");
 
   const sections = [];
   const catalogSections = renderCatalogSections(content, profile, patterns, {
-    sectionOrder: ["logos", "bento", "integrations", "pricing", "faq", "trust"],
+    sectionOrder: ["logos", "bento", "integrations", "pricing", "faq", "trust", "prose"],
     renderFlags: flags
   });
   const catalogByKey = {
@@ -596,7 +618,8 @@ export function renderPage(content, profile, options = {}) {
     integrations: catalogSections.find((section) => section.includes("integrations")) ?? "",
     pricing: catalogSections.find((section) => section.includes('id="pricing"')) ?? "",
     faq: catalogSections.find((section) => section.includes('id="faq"')) ?? "",
-    trust: catalogSections.find((section) => section.includes("trust-badge")) ?? ""
+    trust: catalogSections.find((section) => section.includes("trust-badge")) ?? "",
+    prose: catalogSections.find((section) => section.includes('id="story"')) ?? ""
   };
 
   if (content.stats?.length) {
@@ -610,17 +633,27 @@ ${content.stats.slice(0, 4).map((stat) => `      <div class="${revealClass}">
   </section>` });
   }
 
-  if (content.features?.length && heroVariant !== "bento") {
-    const kickerHtml = flags.showSectionKickers
-      ? `        <div class="kicker">Why ${brand}</div>\n`
-      : "";
-    sections.push({ key: "features", html: `  <section class="section" id="features">
+  if (content.features?.length && heroVariant !== "bento" && !useBentoFeatures) {
+    const brand = escapeHtml(content.brand || "Product");
+    if (useIconRows) {
+      sections.push({
+        key: "features",
+        html: renderIconRowFeatures(content, {
+          revealClass,
+          showSectionKickers: flags.showSectionKickers
+        })
+      });
+    } else {
+      const kickerHtml = flags.showSectionKickers
+        ? `        <div class="kicker">Why ${brand}</div>\n`
+        : "";
+      sections.push({ key: "features", html: `  <section class="section" id="features">
     <div class="container">
       <div class="section-head centered ${revealClass}">
 ${kickerHtml}        <h2>${escapeHtml(content.featuresHeading || "Everything you need, nothing you don't")}</h2>
       </div>
       <div class="card-grid">
-${content.features.slice(0, 9).map((feature, index) => `        <article class="card ${revealClass}">
+${content.features.slice(0, 9).map((feature) => `        <article class="card ${revealClass}">
           ${flags.showFeatureIcons
     ? `<div class="card-accent" aria-hidden="true"></div>`
     : ""}
@@ -630,6 +663,7 @@ ${content.features.slice(0, 9).map((feature, index) => `        <article class="
       </div>
     </div>
   </section>` });
+    }
   }
 
   const splitSections = [];
@@ -661,13 +695,14 @@ ${items.map((item) => `          <li>${escapeHtml(item)}</li>`).join("\n")}
   </section>` });
   }
 
-  for (const key of ["logos", "bento", "integrations", "pricing", "faq", "trust"]) {
+  for (const key of ["logos", "bento", "integrations", "pricing", "faq", "trust", "prose"]) {
     if (catalogByKey[key]) sections.push({ key, html: catalogByKey[key] });
   }
 
+  const brandName = escapeHtml(content.brand || "Product");
   sections.push({ key: "cta", html: `  <section class="cta-band" id="get-started">
     <div class="container">
-      <div class="inner ${revealClass}">
+      <div class="inner ${revealClass}${flags.showSpotlight ? " spotlight-target" : ""}">
         <h2>${escapeHtml(content.cta?.headline || `Start building with ${content.brand || "us"} today`)}</h2>
         ${content.cta?.subhead ? `<p>${escapeHtml(content.cta.subhead)}</p>` : ""}
         <div class="hero-ctas">
@@ -678,9 +713,26 @@ ${items.map((item) => `          <li>${escapeHtml(item)}</li>`).join("\n")}
   </section>` });
 
   const orderedHtml = orderSections(sections, sectionOrder);
-  const heroHtml = heroVariant === "split"
-    ? renderHeroSplit(content, profile, renderHeadline, { revealClass, flags })
-    : buildCenteredHero(content, brand, primaryCta, secondaryCta, { revealClass, flags });
+  const heroHtml = (() => {
+    switch (heroVariant) {
+      case "split":
+        return renderHeroSplit(content, profile, renderHeadline, heroOptions);
+      case "bento":
+        return renderHeroBento(content, profile, renderHeadline, heroOptions);
+      case "editorial":
+        return renderHeroEditorial(content, profile, renderHeadline, heroOptions);
+      case "minimal":
+        return renderHeroMinimal(content, profile, renderHeadline, heroOptions);
+      default:
+        return buildCenteredHero(content, brandName, primaryCta, content.hero?.ctas?.[1] ?? null, heroOptions);
+    }
+  })();
+
+  const navHtml = renderSiteNav(content, profile, {
+    navVariant,
+    showHeroFadeUp: flags.showHeroFadeUp
+  });
+  const footerHtml = renderSiteFooter(content, profile, { footerVariant });
 
   return `<!doctype html>
 <html lang="en">
@@ -689,23 +741,15 @@ ${items.map((item) => `          <li>${escapeHtml(item)}</li>`).join("\n")}
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(content.title || content.brand || "Home")}</title>
   <meta name="description" content="${escapeAttr(content.description || content.hero?.subhead || "")}">
+  <meta name="theme-color" content="${escapeAttr(profile.colors.bg)}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="${profile.fonts.googleImport}" rel="stylesheet">
   <link rel="stylesheet" href="morph-theme.css">
 </head>
 <body>
-  <header class="site-nav">
-    <div class="container">
-      <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"></span>${brand}</a>
-      ${navLinks.length ? `<nav aria-label="Primary">
-        <ul class="nav-links">
-${navLinks.map((link) => `          <li><a href="${escapeAttr(link.href)}">${escapeHtml(link.label)}</a></li>`).join("\n")}
-        </ul>
-      </nav>` : ""}
-      <a class="btn btn-primary nav-cta" href="${escapeAttr(primaryCta.href)}">${escapeHtml(primaryCta.label)}</a>
-    </div>
-  </header>
+${flags.showPageBackdrop ? profileBackdropHtml() : ""}
+${navHtml}
 
   <main>
 ${heroHtml}
@@ -713,35 +757,10 @@ ${heroHtml}
 ${orderedHtml.join("\n\n")}
   </main>
 
-  <footer class="site-footer">
-    <div class="container">
-      <div class="top">
-        <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"></span>${brand}</a>
-        ${navLinks.length ? `<ul class="footer-links">
-${navLinks.map((link) => `          <li><a href="${escapeAttr(link.href)}">${escapeHtml(link.label)}</a></li>`).join("\n")}
-        </ul>` : ""}
-      </div>
-      <p class="legal">© ${new Date().getFullYear()} ${brand}. ${escapeHtml(content.footerText || "All rights reserved.")}</p>
-    </div>
-  </footer>
+${footerHtml}
 
   <script>
-    (function () {
-      var revealEnabled = ${flags.showScrollReveal ? "true" : "false"};
-      if (!revealEnabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
-        return;
-      }
-      var observer = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("in");
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.12 });
-      document.querySelectorAll(".reveal").forEach(function (el) { observer.observe(el); });
-    })();
+    ${pageScripts(flags, profile)}
   </script>
 </body>
 </html>
@@ -750,12 +769,13 @@ ${navLinks.map((link) => `          <li><a href="${escapeAttr(link.href)}">${esc
 
 function buildCenteredHero(content, brand, primaryCta, secondaryCta, options = {}) {
   const { revealClass = "reveal", flags = {} } = options;
+  const anim = (index) => (flags.showHeroFadeUp ? ` fade-up fade-up-${index}` : "");
   return `  <section class="hero">
     <div class="container">
-      ${flags.showEyebrow && content.hero?.eyebrow ? `<div class="eyebrow ${revealClass}">${escapeHtml(content.hero.eyebrow)}</div>` : ""}
-      <h1 class="${revealClass}">${renderHeadline(content.hero?.headline || brand || "Welcome")}</h1>
-      ${content.hero?.subhead ? `<p class="lede ${revealClass}">${escapeHtml(content.hero.subhead)}</p>` : ""}
-      <div class="hero-ctas ${revealClass}">
+      ${flags.showEyebrow && content.hero?.eyebrow ? `<div class="eyebrow ${revealClass}${anim(1)}">${escapeHtml(content.hero.eyebrow)}</div>` : ""}
+      <h1 class="${revealClass}${anim(2)}">${renderHeadline(content.hero?.headline || brand || "Welcome")}</h1>
+      ${content.hero?.subhead ? `<p class="lede ${revealClass}${anim(3)}">${escapeHtml(content.hero.subhead)}</p>` : ""}
+      <div class="hero-ctas ${revealClass}${anim(4)}">
         <a class="btn btn-primary btn-lg" href="${escapeAttr(primaryCta.href)}">${escapeHtml(primaryCta.label)}</a>
         ${secondaryCta ? `<a class="btn btn-ghost btn-lg" href="${escapeAttr(secondaryCta.href)}">${escapeHtml(secondaryCta.label)}</a>` : ""}
       </div>
@@ -764,7 +784,7 @@ function buildCenteredHero(content, brand, primaryCta, secondaryCta, options = {
 }
 
 function orderSections(sections, order) {
-  const extras = ["logos", "bento", "integrations", "pricing", "faq", "trust"];
+  const extras = ["logos", "bento", "integrations", "pricing", "faq", "trust", "prose"];
   const sequence = [...order];
   for (const key of extras) {
     if (!sequence.includes(key)) sequence.push(key);

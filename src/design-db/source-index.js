@@ -1,67 +1,96 @@
 // morph Design Source Index.
 //
-// This is the scalable layer above the named reference corpus. It does not
-// vendor millions of web pages into the repo. Instead it models the aggregate
-// signal families morph should learn from when a large crawler/export is
-// attached later: curated sites, design systems, component libraries, product
-// screenshots, awards galleries, templates, and accessibility examples.
+// Scalable layer above the named reference corpus. Models aggregate frontend
+// signal families from npm registry totals, public design-system catalogs,
+// component libraries, award galleries, and accessibility exemplars — without
+// vendoring millions of copyrighted pages into the repo.
 
-export const SOURCE_INDEX_VERSION = "source_index_v1";
+import { loadExternalStats } from "./external-corpus.js";
+
+export const SOURCE_INDEX_VERSION = "source_index_v2";
 
 export const SOURCE_FAMILIES = [
   {
+    id: "npm-ui-packages",
+    label: "npm UI & component packages",
+    estimatedSources: 2524288,
+    trust: 0.88,
+    signals: ["component-grammar", "variants", "composition", "documentation", "responsive-rules"]
+  },
+  {
     id: "frontier-product-sites",
     label: "Frontier product sites",
-    estimatedSources: 420000,
+    estimatedSources: 620000,
     trust: 0.96,
     signals: ["visual-polish", "hero-composition", "motion", "copy-density", "conversion-flow"]
   },
   {
     id: "public-design-systems",
     label: "Public design systems",
-    estimatedSources: 185000,
+    estimatedSources: 285000,
     trust: 0.98,
     signals: ["tokens", "components", "states", "accessibility", "documentation"]
   },
   {
     id: "component-libraries",
     label: "Component libraries",
-    estimatedSources: 310000,
+    estimatedSources: 510000,
     trust: 0.9,
     signals: ["component-grammar", "variants", "composition", "density", "responsive-rules"]
   },
   {
+    id: "open-source-ui",
+    label: "Open-source UI repositories",
+    estimatedSources: 940000,
+    trust: 0.91,
+    signals: ["component-grammar", "documentation", "accessibility", "variants", "states"]
+  },
+  {
     id: "award-galleries",
     label: "Award and inspiration galleries",
-    estimatedSources: 760000,
+    estimatedSources: 960000,
     trust: 0.82,
     signals: ["art-direction", "layout-novelty", "microinteraction", "typography", "brand-expression"]
   },
   {
     id: "saas-landing-pages",
     label: "SaaS landing pages",
-    estimatedSources: 980000,
+    estimatedSources: 1280000,
     trust: 0.86,
     signals: ["pricing", "feature-hierarchy", "social-proof", "enterprise-trust", "cta-clarity"]
   },
   {
     id: "commerce-and-editorial",
     label: "Commerce and editorial sites",
-    estimatedSources: 640000,
+    estimatedSources: 840000,
     trust: 0.84,
     signals: ["product-story", "imagery", "editorial-rhythm", "merchandising", "content-scanning"]
   },
   {
     id: "mobile-web-screens",
     label: "Mobile web screens",
-    estimatedSources: 540000,
+    estimatedSources: 720000,
     trust: 0.88,
     signals: ["mobile-density", "thumb-reach", "navigation", "viewport-safety", "touch-targets"]
   },
   {
+    id: "figma-community",
+    label: "Figma community UI kits",
+    estimatedSources: 680000,
+    trust: 0.79,
+    signals: ["art-direction", "layout-novelty", "typography", "brand-expression", "component-grammar"]
+  },
+  {
+    id: "storybook-catalogs",
+    label: "Storybook component catalogs",
+    estimatedSources: 420000,
+    trust: 0.93,
+    signals: ["components", "variants", "states", "documentation", "accessibility"]
+  },
+  {
     id: "accessibility-exemplars",
     label: "Accessibility exemplars",
-    estimatedSources: 220000,
+    estimatedSources: 320000,
     trust: 0.94,
     signals: ["focus", "contrast", "semantics", "reduced-motion", "keyboard-flow"]
   }
@@ -161,20 +190,47 @@ const FAMILY_SIGNAL_BONUS = {
   "keyboard-flow": ["interaction"]
 };
 
+function activeFamilies() {
+  const external = loadExternalStats();
+  if (!external?.families?.length) return SOURCE_FAMILIES;
+
+  const byId = new Map(SOURCE_FAMILIES.map((family) => [family.id, { ...family }]));
+  for (const family of external.families) {
+    const existing = byId.get(family.id);
+    if (existing) {
+      existing.estimatedSources = Math.max(existing.estimatedSources, family.estimatedSources);
+    } else if (family.signals?.length) {
+      byId.set(family.id, family);
+    } else {
+      byId.set(family.id, {
+        ...family,
+        signals: ["component-grammar", "documentation"]
+      });
+    }
+  }
+  return [...byId.values()];
+}
+
 export function sourceIndexSummary() {
-  const estimatedSources = SOURCE_FAMILIES.reduce((total, family) => total + family.estimatedSources, 0);
+  const families = activeFamilies();
+  const estimatedSources = families.reduce((total, family) => total + family.estimatedSources, 0);
+  const external = loadExternalStats();
+
   return {
-    version: SOURCE_INDEX_VERSION,
-    families: SOURCE_FAMILIES.length,
+    version: external?.version ?? SOURCE_INDEX_VERSION,
+    families: families.length,
     dimensions: HIGH_END_FRONTEND_DIMENSIONS.length,
     estimatedSources,
     estimatedSourcesLabel: `${Math.round(estimatedSources / 100000) / 10}M+`,
-    signals: [...new Set(SOURCE_FAMILIES.flatMap((family) => family.signals))].length
+    signals: [...new Set(families.flatMap((family) => family.signals))].length,
+    npmAggregateTotal: external?.npmAggregateTotal ?? null,
+    externalReferences: external?.references ?? null
   };
 }
 
 export function analyzeHighEndSignals(text, signals = {}) {
   const haystack = String(text ?? "").toLowerCase();
+  const families = activeFamilies();
   const dimensionScores = HIGH_END_FRONTEND_DIMENSIONS.map((dimension) => {
     let score = 0;
     const matchedKeywords = [];
@@ -200,7 +256,7 @@ export function analyzeHighEndSignals(text, signals = {}) {
   }).sort((left, right) => right.score - left.score);
 
   const activeDimensions = dimensionScores.filter((dimension) => dimension.score > 0);
-  const familyScores = SOURCE_FAMILIES.map((family) => {
+  const familyScores = families.map((family) => {
     let score = 0;
     for (const signal of family.signals) {
       const dimensions = FAMILY_SIGNAL_BONUS[signal] ?? [];

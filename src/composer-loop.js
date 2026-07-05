@@ -170,6 +170,8 @@ function buildDecisionPrompt(context) {
     `Valid profileId values: ${database.profileIds.join(", ")}.`,
     `Valid archetypeId values: ${database.archetypeIds.join(", ")}.`,
     "Taste dials are integers 1-10 (designVariance, motionIntensity, visualDensity).",
+    "Pick a profile + archetype combo that looks NOTHING like a generic AI landing page.",
+    "Vary nav patterns (nav-floating-pill, nav-minimal-logo, nav-split-actions) and hero layouts across iterations.",
     "",
     "Respond with ONLY a JSON object, no prose, no code fences:",
     "{",

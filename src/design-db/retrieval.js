@@ -4,7 +4,7 @@
 // select profile, archetype, and pattern combinations that match the visual
 // grammar of frontier and Fortune-class product sites.
 
-import { INDUSTRY_VOCABULARY, UI_REFERENCE_CORPUS } from "./reference-corpus.js";
+import { INDUSTRY_VOCABULARY, getMergedReferenceCorpus } from "./reference-corpus.js";
 import { UI_PATTERN_CATALOG } from "./catalog.js";
 import { getProfile } from "./profiles.js";
 import { getArchetype } from "./archetypes.js";
@@ -162,7 +162,8 @@ export function retrieveReferences(text, content, { limit = 8 } = {}) {
   const sourceSignals = analyzeHighEndSignals(text, signals);
   const industryMatch = detectIndustry(tokens, signals);
 
-  const scored = UI_REFERENCE_CORPUS
+  const corpus = getMergedReferenceCorpus();
+  const scored = corpus
     .map((reference) => scoreReference(reference, tokens, signals, industryMatch))
     .filter((entry) => entry.score > 0)
     .sort((left, right) => right.score - left.score);
@@ -172,8 +173,8 @@ export function retrieveReferences(text, content, { limit = 8 } = {}) {
     industry: industryMatch,
     signals,
     sourceSignals,
-    corpusSize: UI_REFERENCE_CORPUS.length,
-    searched: UI_REFERENCE_CORPUS.length
+    corpusSize: corpus.length,
+    searched: corpus.length
   };
 }
 
@@ -297,9 +298,10 @@ export function buildRetrievalPlan(text, content) {
 
 export function retrievalSummary() {
   const sourceIndex = sourceIndexSummary();
+  const corpus = getMergedReferenceCorpus();
   return {
-    engine: "reference_corpus_v2",
-    corpusSize: UI_REFERENCE_CORPUS.length,
+    engine: "reference_corpus_v3",
+    corpusSize: corpus.length,
     estimatedSourceSignals: sourceIndex.estimatedSources,
     sourceFamilies: sourceIndex.families,
     highEndDimensions: sourceIndex.dimensions,

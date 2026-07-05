@@ -121,6 +121,10 @@ export async function createMorphHandler(config, options = {}) {
         return serveAsset(response, url.pathname);
       }
 
+      if (request.method === "GET" && (url.pathname === "/demo/agent-landing" || url.pathname === "/demo/agent-landing/")) {
+        return serveDemoLanding(response);
+      }
+
       if (request.method === "GET" && url.pathname === "/") {
         return sendHtml(response, landingHtml(config, session));
       }
@@ -594,6 +598,19 @@ const TRANSFORMED_CONTENT_TYPES = {
 };
 
 const ASSETS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "assets");
+const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const DEMO_LANDING_DIR = path.join(REPO_ROOT, "fixtures/codex-landing");
+
+async function serveDemoLanding(response) {
+  const target = path.join(DEMO_LANDING_DIR, "index.html");
+  try {
+    const body = await readFile(target);
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=3600" });
+    response.end(body);
+  } catch {
+    return sendJson(response, 404, { error: "demo_not_found", message: "Demo landing page is unavailable." });
+  }
+}
 
 async function serveAsset(response, pathname) {
   const relative = decodeURIComponent(pathname.replace(/^\/assets\/?/, ""));
@@ -843,21 +860,26 @@ function renderGithubConnectBlock({ githubConnected, githubLabel, githubConfigur
   if (!githubConfigured) {
     return `<div class="github-connect">
               <div>
-                <strong>Enable GitHub sign-in</strong>
-                <span>Save OAuth credentials below, then connect your GitHub account for private repos.</span>
+                <strong>Public repos work without sign-in</strong>
+                <span>Paste any public <code>owner/repo</code> below. OAuth is only needed for private repos.</span>
               </div>
             </div>
-            <form class="auth-form" id="githubOAuthForm">
-              <label for="githubClientId">GitHub OAuth Client ID
-                <input id="githubClientId" name="clientId" type="text" required autocomplete="off" placeholder="Iv1.…">
-              </label>
-              <label for="githubClientSecret">GitHub OAuth Client Secret
-                <input id="githubClientSecret" name="clientSecret" type="password" required autocomplete="off" placeholder="••••••••">
-              </label>
-              <button type="submit" class="btn btn-ghost">Save credentials</button>
-              <p class="auth-status pending" id="githubOAuthStatus" hidden></p>
-            </form>
-            <p class="github-setup-note">Create an OAuth App at <a href="https://github.com/settings/developers" target="_blank" rel="noreferrer">github.com/settings/developers</a> with callback <code>${appUrl}/auth/github/callback</code>. Public repos work without sign-in.</p>`;
+            <details class="oauth-setup">
+              <summary>Set up GitHub OAuth (optional)</summary>
+              <div class="oauth-setup-body">
+                <form class="auth-form" id="githubOAuthForm">
+                  <label for="githubClientId">GitHub OAuth Client ID
+                    <input id="githubClientId" name="clientId" type="text" required autocomplete="off" placeholder="Iv1.…">
+                  </label>
+                  <label for="githubClientSecret">GitHub OAuth Client Secret
+                    <input id="githubClientSecret" name="clientSecret" type="password" required autocomplete="off" placeholder="••••••••">
+                  </label>
+                  <button type="submit" class="btn btn-ghost">Save credentials</button>
+                  <p class="auth-status pending" id="githubOAuthStatus" hidden></p>
+                </form>
+                <p class="github-setup-note">Create an OAuth App at <a href="https://github.com/settings/developers" target="_blank" rel="noreferrer">github.com/settings/developers</a> with callback <code>${appUrl}/auth/github/callback</code>.</p>
+              </div>
+            </details>`;
   }
 
   return `<div class="github-connect">
@@ -1458,6 +1480,21 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     .github-setup-note a { color: var(--cyan); text-decoration: none; }
     .github-setup-note a:hover { text-decoration: underline; }
     .github-setup-note code { font-size: 12px; word-break: break-all; }
+    .oauth-setup {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .oauth-setup summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      list-style: none;
+    }
+    .oauth-setup summary::-webkit-details-marker { display: none; }
+    .oauth-setup-body { display: grid; gap: 14px; padding: 0 18px 18px; }
     .auth-form { display: grid; gap: 10px; }
     .auth-form label { display: grid; gap: 10px; font-size: 14px; font-weight: 500; color: var(--muted); }
     .auth-form input {
@@ -1493,6 +1530,12 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       flex-wrap: wrap;
     }
     .instructions-field label { font-size: 14px; font-weight: 500; color: var(--muted); margin: 0; }
+    .field-optional {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--faint);
+      text-transform: lowercase;
+    }
     .receipt-tools {
       display: flex;
       align-items: center;
@@ -1847,19 +1890,23 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
           </div>
           <div class="instructions-field">
             <div class="instructions-toolbar">
-              <label for="agentInstructions">Agent instructions</label>
+              <label for="agentInstructions">Agent instructions <span class="field-optional">optional</span></label>
               <button type="button" class="btn btn-ghost voice-btn" id="voiceInputBtn" aria-label="Dictate instructions" aria-pressed="false">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                 Dictate
               </button>
             </div>
-            <textarea id="agentInstructions" name="instructions" placeholder="What did the agent build? What should morph focus on — token drift, components, focus states, layout? Or tap Dictate and say it aloud."></textarea>
+            <textarea id="agentInstructions" name="instructions" placeholder="Optional — describe what the agent built or what morph should focus on (token drift, components, focus states, layout). Or tap Dictate and say it aloud."></textarea>
+            <p class="source-note">Leave blank for a general UI review. Add instructions when you want morph to prioritize specific agent output or concerns.</p>
             <p class="voice-hint" id="voiceInputStatus" hidden aria-live="polite"></p>
           </div>
           <div class="actions">
             <button type="button" class="btn btn-primary" data-action="studio-review" id="runReviewBtn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
               Run full review
+            </button>
+            <button type="button" class="btn btn-ghost" id="runDemoBtn">
+              Try demo site
             </button>
           </div>
         </div>
@@ -1961,9 +2008,31 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       });
     });
 
-    const initialSource = new URLSearchParams(window.location.search).get("source");
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialSource = urlParams.get("source");
     if (initialSource === "github" || initialSource === "url") {
       activateSourceTab(initialSource);
+    }
+
+    const DEMO_INSTRUCTIONS = "Agent-built landing page with inline styles, default fonts, and no design system. Focus on typography, color tokens, layout, and accessibility.";
+
+    function applyDemoDefaults() {
+      const demoUrl = window.location.origin + "/demo/agent-landing";
+      if (previewUrlInput) previewUrlInput.value = demoUrl;
+      if (agentInstructionsInput && !agentInstructionsInput.value.trim()) {
+        agentInstructionsInput.value = DEMO_INSTRUCTIONS;
+      }
+      activateSourceTab("url");
+      updateSourceBadge();
+    }
+
+    document.querySelector("#runDemoBtn")?.addEventListener("click", () => {
+      applyDemoDefaults();
+      document.querySelector("#runReviewBtn")?.click();
+    });
+
+    if (urlParams.get("demo") === "1" || urlParams.get("demo") === "true") {
+      applyDemoDefaults();
     }
 
     const githubOAuthForm = document.querySelector("#githubOAuthForm");
@@ -2378,7 +2447,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       outputReadable.innerHTML = '<div class="welcome">'
         + '<div class="welcome-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>'
         + '<h3>Ready to review</h3>'
-        + '<p>Connect a GitHub repo or enter a preview URL, then click <strong>Run full review</strong> to score your site, see the redesign delta, and get the merge gate. Use <strong>Dictate</strong> for voice instructions or <strong>Narrate review</strong> to hear findings aloud.</p>'
+        + '<p>Click <strong>Try demo site</strong> for a one-click walkthrough, or connect a GitHub repo / preview URL and hit <strong>Run full review</strong>.</p>'
         + '</div>';
       updateNarrateButton();
     }

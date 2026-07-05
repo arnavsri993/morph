@@ -281,8 +281,9 @@ test("landing page is served at / and the studio dashboard at /studio", async ()
     assert.equal(studioResponse.status, 200);
     const studio = await studioResponse.text();
     assert.equal(studio.includes("Run full review"), true);
+    assert.equal(studio.includes("Try demo site"), true);
     assert.equal(studio.includes("Review history"), true);
-    assert.equal(studio.includes("Enable GitHub sign-in"), true);
+    assert.equal(studio.includes("Set up GitHub OAuth (optional)"), true);
     assert.equal(studio.includes("Save credentials"), true);
     assert.equal(studio.includes("Agent instructions"), true);
     assert.equal(studio.includes("Preview URL"), true);

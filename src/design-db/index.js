@@ -9,6 +9,7 @@ import { applyDesignHints } from "../ai-vision.js";
 import { corpusSummary } from "./reference-corpus.js";
 import { buildRetrievalPlan, retrievalSummary } from "./retrieval.js";
 import { analyzeHighEndSignals, sourceIndexSummary } from "./source-index.js";
+import { externalCorpusSummary } from "./external-corpus.js";
 import { alignProfileToPreferences } from "./visual-preferences.js";
 import { resolveTaste, tasteRenderFlags } from "./taste.js";
 
@@ -33,6 +34,7 @@ export {
   corpusSummary,
   analyzeHighEndSignals,
   sourceIndexSummary,
+  externalCorpusSummary,
   alignProfileToPreferences,
   resolveTaste,
   tasteRenderFlags
@@ -129,6 +131,7 @@ export function databaseSummary() {
   const corpus = corpusSummary();
   const retrieval = retrievalSummary();
   const sourceIndex = sourceIndexSummary();
+  const external = externalCorpusSummary();
   return {
     profiles: DESIGN_PROFILES.length,
     heuristics: UI_HEURISTICS.length,
@@ -136,8 +139,11 @@ export function databaseSummary() {
     archetypes: LAYOUT_ARCHETYPES.length,
     referenceSites: catalog.referenceSites,
     referenceCorpus: corpus.references,
+    curatedReferences: corpus.curated,
+    externalReferences: corpus.external,
     sourceIndex,
     estimatedSourceSignals: sourceIndex.estimatedSources,
+    npmAggregateTotal: external.npmAggregateTotal,
     corpusTiers: corpus.tiers,
     corpusIndustries: corpus.industries,
     retrievalEngine: retrieval.engine,

@@ -5,6 +5,8 @@
 // match incoming agent-generated sites to the visual language of billion-dollar
 // companies — without copying layouts or assets directly.
 
+import { externalCorpusSummary, mergeReferenceCorpus } from "./external-corpus.js";
+
 export const CORPUS_TIERS = ["startup", "growth", "enterprise", "fortune500", "iconic"];
 
 export const INDUSTRY_VOCABULARY = {
@@ -630,18 +632,28 @@ export const REFERENCE_SITES = UI_REFERENCE_CORPUS.map((entry) => ({
   tags: entry.tags
 }));
 
+export function getMergedReferenceCorpus() {
+  return mergeReferenceCorpus(UI_REFERENCE_CORPUS);
+}
+
 export function corpusSummary() {
+  const merged = getMergedReferenceCorpus();
+  const external = externalCorpusSummary();
   const byTier = {};
   const byIndustry = {};
-  for (const entry of UI_REFERENCE_CORPUS) {
+  for (const entry of merged) {
     byTier[entry.tier] = (byTier[entry.tier] ?? 0) + 1;
     byIndustry[entry.industry] = (byIndustry[entry.industry] ?? 0) + 1;
   }
   return {
-    references: UI_REFERENCE_CORPUS.length,
+    references: merged.length,
+    curated: UI_REFERENCE_CORPUS.length,
+    external: external.references,
     tiers: CORPUS_TIERS.length,
     industries: Object.keys(INDUSTRY_VOCABULARY).length,
     byTier,
-    byIndustry
+    byIndustry,
+    npmAggregateTotal: external.npmAggregateTotal,
+    builtAt: external.builtAt
   };
 }

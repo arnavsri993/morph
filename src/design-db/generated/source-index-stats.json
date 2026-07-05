@@ -1,0 +1,82 @@
+{
+  "version": "source_index_v2",
+  "builtAt": "2026-07-05T09:09:09.985Z",
+  "references": 4240,
+  "npmQueries": 5,
+  "npmAggregateTotal": 2417449,
+  "families": [
+    {
+      "id": "npm-ui-packages",
+      "label": "npm UI & component packages",
+      "estimatedSources": 2417449,
+      "trust": 0.88
+    },
+    {
+      "id": "frontier-product-sites",
+      "label": "Frontier product sites",
+      "estimatedSources": 620000,
+      "trust": 0.96
+    },
+    {
+      "id": "public-design-systems",
+      "label": "Public design systems",
+      "estimatedSources": 285000,
+      "trust": 0.98
+    },
+    {
+      "id": "component-libraries",
+      "label": "Component libraries",
+      "estimatedSources": 510000,
+      "trust": 0.9
+    },
+    {
+      "id": "award-galleries",
+      "label": "Award and inspiration galleries",
+      "estimatedSources": 960000,
+      "trust": 0.82
+    },
+    {
+      "id": "saas-landing-pages",
+      "label": "SaaS landing pages",
+      "estimatedSources": 1280000,
+      "trust": 0.86
+    },
+    {
+      "id": "commerce-and-editorial",
+      "label": "Commerce and editorial sites",
+      "estimatedSources": 840000,
+      "trust": 0.84
+    },
+    {
+      "id": "mobile-web-screens",
+      "label": "Mobile web screens",
+      "estimatedSources": 720000,
+      "trust": 0.88
+    },
+    {
+      "id": "accessibility-exemplars",
+      "label": "Accessibility exemplars",
+      "estimatedSources": 320000,
+      "trust": 0.94
+    },
+    {
+      "id": "open-source-ui",
+      "label": "Open-source UI repositories",
+      "estimatedSources": 940000,
+      "trust": 0.91
+    },
+    {
+      "id": "figma-community",
+      "label": "Figma community UI kits",
+      "estimatedSources": 680000,
+      "trust": 0.79
+    },
+    {
+      "id": "storybook-catalogs",
+      "label": "Storybook component catalogs",
+      "estimatedSources": 420000,
+      "trust": 0.93
+    }
+  ],
+  "estimatedSources": 9992449
+}

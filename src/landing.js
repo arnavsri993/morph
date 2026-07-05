@@ -726,11 +726,11 @@ export function landingHtml(config, session) {
         <h1>AI writes the UI. <span class="accent">morph makes it belong.</span></h1>
         <p class="lede">Connect a repo or preview URL in Studio. morph scans for drift, shows before/after, and applies deterministic repairs — no terminal required.</p>
         <div class="hero-actions">
-          <a class="btn btn-primary btn-lg" href="/studio">
-            Launch Studio
+          <a class="btn btn-primary btn-lg" href="/studio?demo=1">
+            Try live demo
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </a>
-          <a class="btn btn-ghost btn-lg" href="#demo">See how it works</a>
+          <a class="btn btn-ghost btn-lg" href="/studio">Launch Studio</a>
         </div>
 
         <div class="studio-mock" id="heroMock" aria-label="morph Studio review preview">

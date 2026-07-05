@@ -213,12 +213,142 @@ export function componentStyles(profile) {
   position: relative;
   overflow: hidden;
 }
+.hero-panel.spotlight-target::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -30%;
+  width: 24%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 10%, transparent), transparent);
+  animation: panel-sweep 5.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+@keyframes panel-sweep {
+  0%, 15% { transform: translateX(0); opacity: 0; }
+  25% { opacity: 1; }
+  65% { opacity: 1; }
+  80%, 100% { transform: translateX(520%); opacity: 0; }
+}
 .hero-panel::before {
   content: "";
   position: absolute;
   inset: 0;
   background: ${colors.glow !== "none" ? colors.glow : `linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent)`};
   pointer-events: none;
+}
+.hero-bento {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+}
+.hero-bento .bento-hero-cell {
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  min-height: 140px;
+  display: grid;
+  align-content: end;
+  gap: var(--space-2);
+}
+.hero-bento .bento-hero-cell.span-4 { grid-column: span 4; min-height: 200px; }
+.hero-bento .bento-hero-cell.span-2 { grid-column: span 2; }
+.hero-bento .bento-hero-cell h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+}
+.hero-bento .bento-hero-cell p { font-size: 14px; color: var(--muted); line-height: 1.55; }
+@media (max-width: 720px) {
+  .hero-bento { grid-template-columns: 1fr; }
+  .hero-bento .bento-hero-cell.span-4,
+  .hero-bento .bento-hero-cell.span-2 { grid-column: span 1; }
+}
+.hero-editorial {
+  text-align: left;
+  max-width: 780px;
+  margin-inline: auto;
+}
+.hero-editorial h1 {
+  margin-inline: 0;
+  max-width: none;
+  font-size: clamp(44px, 8vw, 84px);
+  line-height: 1.02;
+}
+.hero-editorial .lede {
+  margin-inline: 0;
+  max-width: 58ch;
+  font-size: clamp(18px, 2.2vw, 22px);
+  line-height: 1.7;
+}
+.hero-editorial .hero-ctas { justify-content: flex-start; }
+.hero-minimal {
+  padding: clamp(120px, 18vw, 200px) 0 clamp(80px, 12vw, 140px);
+}
+.hero-minimal h1 {
+  font-size: clamp(48px, 9vw, 96px);
+  letter-spacing: -0.04em;
+  max-width: 14ch;
+}
+.hero-minimal .lede {
+  font-size: clamp(16px, 2vw, 18px);
+  max-width: 42ch;
+  color: var(--ink-secondary);
+}
+.hero-minimal .hero-ctas { margin-top: var(--space-8); }
+.features-icon-rows {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 720px;
+  margin-inline: auto;
+}
+.feature-icon-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: var(--space-4);
+  align-items: start;
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.feature-icon-row .icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.feature-icon-row h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.feature-icon-row p { color: var(--muted); font-size: 15px; line-height: 1.6; }
+.prose-block {
+  max-width: 68ch;
+  margin-inline: auto;
+  font-size: 18px;
+  line-height: 1.8;
+  color: var(--ink-secondary);
+}
+.prose-block p + p { margin-top: var(--space-5); }
+.prose-block h3 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: var(--space-4);
 }
 .hero-panel .mock-ui {
   position: relative;
@@ -347,22 +477,28 @@ ${names.map((name) => `        <div class="integration-tile reveal">${esc(name)}
   </section>`;
 }
 
+function heroAnim(flags, index) {
+  if (!flags.showHeroFadeUp) return "";
+  return ` fade-up fade-up-${index}`;
+}
+
 export function renderHeroSplit(content, profile, renderHeadline, options = {}) {
   const { revealClass = "reveal", flags = {} } = options;
   const primaryCta = content.hero?.ctas?.[0] ?? { label: "Get started", href: "#" };
   const secondaryCta = content.hero?.ctas?.[1] ?? null;
+  const spotlight = flags.showSpotlight ? " spotlight-target" : "";
   return `  <section class="hero">
     <div class="container hero-split">
       <div>
-        ${flags.showEyebrow && content.hero?.eyebrow ? `<div class="eyebrow ${revealClass}">${esc(content.hero.eyebrow)}</div>` : ""}
-        <h1 class="${revealClass}">${renderHeadline(content.hero?.headline || content.brand || "Welcome")}</h1>
-        ${content.hero?.subhead ? `<p class="lede ${revealClass}">${esc(content.hero.subhead)}</p>` : ""}
-        <div class="hero-ctas ${revealClass}">
+        ${flags.showEyebrow && content.hero?.eyebrow ? `<div class="eyebrow ${revealClass}${heroAnim(flags, 1)}">${esc(content.hero.eyebrow)}</div>` : ""}
+        <h1 class="${revealClass}${heroAnim(flags, 2)}">${renderHeadline(content.hero?.headline || content.brand || "Welcome")}</h1>
+        ${content.hero?.subhead ? `<p class="lede ${revealClass}${heroAnim(flags, 3)}">${esc(content.hero.subhead)}</p>` : ""}
+        <div class="hero-ctas ${revealClass}${heroAnim(flags, 4)}">
           <a class="btn btn-primary btn-lg" href="${escAttr(primaryCta.href)}">${esc(primaryCta.label)}</a>
           ${secondaryCta ? `<a class="btn btn-ghost btn-lg" href="${escAttr(secondaryCta.href)}">${esc(secondaryCta.label)}</a>` : ""}
         </div>
       </div>
-      <div class="hero-panel ${revealClass}" aria-hidden="true">
+      <div class="hero-panel${spotlight} ${revealClass}${heroAnim(flags, 5)}" aria-hidden="true">
         <div class="mock-ui">
           <div class="mock-bar w80"></div>
           <div class="mock-bar w60"></div>
@@ -375,19 +511,132 @@ export function renderHeroSplit(content, profile, renderHeadline, options = {}) 
   </section>`;
 }
 
+export function renderHeroBento(content, profile, renderHeadline, options = {}) {
+  const { revealClass = "reveal", flags = {} } = options;
+  const primaryCta = content.hero?.ctas?.[0] ?? { label: "Get started", href: "#" };
+  const secondaryCta = content.hero?.ctas?.[1] ?? null;
+  const features = (content.features ?? []).slice(0, 3);
+  const cells = features.length >= 2
+    ? features.map((feature, index) => {
+      const span = index === 0 ? "span-4" : "span-2";
+      return `        <article class="bento-hero-cell ${span} ${revealClass}${heroAnim(flags, 4 + index)}">
+          <h3>${esc(feature.title)}</h3>
+          <p>${esc(feature.body)}</p>
+        </article>`;
+    }).join("\n")
+    : `        <article class="bento-hero-cell span-4 ${revealClass}${heroAnim(flags, 4)}">
+          <h3>${esc(content.brand || "Product")}</h3>
+          <p>${esc(content.hero?.subhead || "Built for teams who care about craft.")}</p>
+        </article>
+        <article class="bento-hero-cell span-2 ${revealClass}${heroAnim(flags, 5)}">
+          <h3>Fast</h3>
+          <p>Ship in minutes, not weeks.</p>
+        </article>`;
+
+  return `  <section class="hero">
+    <div class="container">
+      ${flags.showEyebrow && content.hero?.eyebrow ? `<div class="eyebrow ${revealClass}${heroAnim(flags, 1)}">${esc(content.hero.eyebrow)}</div>` : ""}
+      <h1 class="${revealClass}${heroAnim(flags, 2)}">${renderHeadline(content.hero?.headline || content.brand || "Welcome")}</h1>
+      ${content.hero?.subhead ? `<p class="lede ${revealClass}${heroAnim(flags, 3)}">${esc(content.hero.subhead)}</p>` : ""}
+      <div class="hero-ctas ${revealClass}${heroAnim(flags, 4)}">
+        <a class="btn btn-primary btn-lg" href="${escAttr(primaryCta.href)}">${esc(primaryCta.label)}</a>
+        ${secondaryCta ? `<a class="btn btn-ghost btn-lg" href="${escAttr(secondaryCta.href)}">${esc(secondaryCta.label)}</a>` : ""}
+      </div>
+      <div class="hero-bento">
+${cells}
+      </div>
+    </div>
+  </section>`;
+}
+
+export function renderHeroEditorial(content, profile, renderHeadline, options = {}) {
+  const { revealClass = "reveal", flags = {} } = options;
+  const primaryCta = content.hero?.ctas?.[0] ?? { label: "Read more", href: "#" };
+  const secondaryCta = content.hero?.ctas?.[1] ?? null;
+  return `  <section class="hero">
+    <div class="container hero-editorial">
+      ${flags.showEyebrow && content.hero?.eyebrow ? `<div class="eyebrow ${revealClass}${heroAnim(flags, 1)}">${esc(content.hero.eyebrow)}</div>` : ""}
+      <h1 class="${revealClass}${heroAnim(flags, 2)}">${renderHeadline(content.hero?.headline || content.brand || "Welcome")}</h1>
+      ${content.hero?.subhead ? `<p class="lede ${revealClass}${heroAnim(flags, 3)}">${esc(content.hero.subhead)}</p>` : ""}
+      <div class="hero-ctas ${revealClass}${heroAnim(flags, 4)}">
+        <a class="btn btn-primary btn-lg" href="${escAttr(primaryCta.href)}">${esc(primaryCta.label)}</a>
+        ${secondaryCta ? `<a class="btn btn-ghost btn-lg" href="${escAttr(secondaryCta.href)}">${esc(secondaryCta.label)}</a>` : ""}
+      </div>
+    </div>
+  </section>`;
+}
+
+export function renderHeroMinimal(content, profile, renderHeadline, options = {}) {
+  const { revealClass = "reveal", flags = {} } = options;
+  const primaryCta = content.hero?.ctas?.[0] ?? { label: "Get started", href: "#" };
+  return `  <section class="hero hero-minimal">
+    <div class="container">
+      <h1 class="${revealClass}${heroAnim(flags, 1)}">${renderHeadline(content.hero?.headline || content.brand || "Welcome")}</h1>
+      ${content.hero?.subhead ? `<p class="lede ${revealClass}${heroAnim(flags, 2)}">${esc(content.hero.subhead)}</p>` : ""}
+      <div class="hero-ctas ${revealClass}${heroAnim(flags, 3)}">
+        <a class="btn btn-primary btn-lg" href="${escAttr(primaryCta.href)}">${esc(primaryCta.label)}</a>
+      </div>
+    </div>
+  </section>`;
+}
+
+export function renderProseSection(content, options = {}) {
+  const { revealClass = "reveal" } = options;
+  const section = (content.sections ?? [])[0];
+  const heading = section?.heading || `About ${content.brand || "us"}`;
+  const body = section?.body
+    || content.hero?.subhead
+    || content.description
+    || "We build tools that respect your time, your taste, and your team.";
+  const paragraphs = String(body).split(/\n{2,}/).filter(Boolean);
+  return `  <section class="section alt" id="story">
+    <div class="container">
+      <div class="prose-block ${revealClass}">
+        <h3>${esc(heading)}</h3>
+${paragraphs.map((paragraph) => `        <p>${esc(paragraph.trim())}</p>`).join("\n")}
+      </div>
+    </div>
+  </section>`;
+}
+
+export function renderIconRowFeatures(content, options = {}) {
+  const { revealClass = "reveal", showSectionKickers = false } = options;
+  const brand = content.brand || "Product";
+  const features = (content.features ?? []).slice(0, 6);
+  if (!features.length) return "";
+  return `  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head centered ${revealClass}">
+        ${showSectionKickers ? `<div class="kicker">Capabilities</div>\n        ` : ""}<h2>${esc(content.featuresHeading || `What ${brand} delivers`)}</h2>
+      </div>
+      <div class="features-icon-rows">
+${features.map((feature, index) => `        <article class="feature-icon-row ${revealClass}">
+          <div class="icon" aria-hidden="true">${String(index + 1).padStart(2, "0")}</div>
+          <div>
+            <h3>${esc(feature.title)}</h3>
+            <p>${esc(feature.body)}</p>
+          </div>
+        </article>`).join("\n")}
+      </div>
+    </div>
+  </section>`;
+}
+
 export const COMPONENT_RENDERERS = {
   "social-logo-cloud": renderLogoCloud,
   "pricing-three-tier": renderPricingSection,
   "pricing-two-column": renderPricingSection,
   "content-faq-accordion": renderFaqSection,
   "features-bento-grid": renderBentoFeatures,
+  "features-icon-rows": renderIconRowFeatures,
+  "content-prose-section": renderProseSection,
   "social-trust-badges": renderTrustBadges,
   "features-integration-grid": renderIntegrationGrid
 };
 
 export function renderCatalogSections(content, profile, patterns, helpers = {}) {
   const sections = [];
-  const order = helpers.sectionOrder ?? ["logos", "pricing", "faq", "trust", "integrations", "bento"];
+  const order = helpers.sectionOrder ?? ["logos", "pricing", "faq", "trust", "integrations", "bento", "prose"];
   const patternIds = new Set((patterns ?? []).map((pattern) => pattern.id));
   const sectionOptions = {
     showSectionKickers: helpers.renderFlags?.showSectionKickers ?? false
@@ -400,7 +649,8 @@ export function renderCatalogSections(content, profile, patterns, helpers = {}) 
     faq: () => patternIds.has("content-faq-accordion") ? renderFaqSection(content, sectionOptions) : "",
     trust: () => patternIds.has("social-trust-badges") ? renderTrustBadges() : "",
     integrations: () => patternIds.has("features-integration-grid") ? renderIntegrationGrid(content, sectionOptions) : "",
-    bento: () => patternIds.has("features-bento-grid") ? renderBentoFeatures(content, sectionOptions) : ""
+    bento: () => patternIds.has("features-bento-grid") ? renderBentoFeatures(content, sectionOptions) : "",
+    prose: () => patternIds.has("content-prose-section") ? renderProseSection(content, sectionOptions) : ""
   };
 
   for (const key of order) {

@@ -14,6 +14,7 @@ import {
   analyzeUiReference,
   generateUiReference
 } from "./ai-vision.js";
+import { resolveNavVariant } from "./design-db/site-chrome.js";
 import {
   databaseSummary,
   extractVisualPreferences,
@@ -120,7 +121,8 @@ export async function transformSite(inputDir, outputDir, options = {}) {
   const outputHtml = renderPage(content, plan.profile.profile, renderOptions);
   const outputCss = renderStylesheet(plan.profile.profile, {
     taste: plan.taste,
-    renderFlags: plan.renderFlags
+    renderFlags: plan.renderFlags,
+    navVariant: resolveNavVariant(plan.patterns)
   });
   const after = assessFullUiQuality(outputHtml, outputCss, { perspective: "output" });
 
