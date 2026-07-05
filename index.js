@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import morphConfig from "./morph.config.json" with { type: "json" };
@@ -20,6 +21,10 @@ async function getHandler() {
     handlerPromise = (async () => {
       ensureAppUrl();
       const config = parseConfig(morphConfig, configPath);
+      // Vercel's /var/task is read-only; redirect all writes to /tmp
+      if (process.env.VERCEL) {
+        config.morphDir = path.join(os.tmpdir(), ".morph");
+      }
       return createMorphHandler(config, {
         host: "0.0.0.0",
         port: 443,
