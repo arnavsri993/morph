@@ -53,6 +53,60 @@ export function assessCaptureQuality(html) {
   return { ok: true };
 }
 
+function visibleTextLength(html) {
+  return String(html ?? "")
+    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim()
+    .length;
+}
+
+function metaDescription(html) {
+  const source = String(html ?? "");
+  return source.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)?.[1]?.trim()
+    || source.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i)?.[1]?.trim()
+    || "";
+}
+
+// Stricter than assessCaptureQuality — rejects pages morph can't meaningfully scan.
+export function assessScanReadiness(html) {
+  const captureQuality = assessCaptureQuality(html);
+  if (!captureQuality.ok) return captureQuality;
+
+  const source = String(html ?? "");
+  const textLength = visibleTextLength(source);
+  const description = metaDescription(source);
+  const headingCount = (source.match(/<h[1-6]\b/gi) ?? []).length;
+  const paragraphCount = (source.match(/<p\b/gi) ?? []).length;
+
+  if (textLength < 120 && !description) {
+    return {
+      ok: false,
+      reason: "We couldn't read enough content from this site. It may require login, block automated access, or load entirely in JavaScript. Try a GitHub repo instead."
+    };
+  }
+
+  if (headingCount === 0 && paragraphCount === 0 && textLength < 400 && !description) {
+    return {
+      ok: false,
+      reason: "This page has no readable text for morph to scan. Try a GitHub repo or a different URL."
+    };
+  }
+
+  if (source.length > 50_000 && textLength < 250 && headingCount <= 1) {
+    return {
+      ok: false,
+      reason: "This site didn't render readable content for us. It's likely JavaScript-only and blocked our scanner. Try a GitHub repo instead."
+    };
+  }
+
+  return { ok: true };
+}
+
 async function createBrowserContext(chromium) {
   const browser = await chromium.launch({
     headless: true,
@@ -89,6 +143,12 @@ async function captureWithPlaywright(parsed, options = {}) {
     if (!quality.ok) {
       const error = new Error(quality.reason);
       error.code = "bot_wall";
+      throw error;
+    }
+    const scanReady = assessScanReadiness(html);
+    if (!scanReady.ok) {
+      const error = new Error(scanReady.reason);
+      error.code = "site_unreadable";
       throw error;
     }
     const css = await page.evaluate(async () => {
@@ -139,6 +199,10 @@ async function collectLocalCss(html, baseFile) {
 async function fetchFilePage(parsed, outputDir) {
   const entrySource = fileURLToPath(parsed.href);
   const html = await readFile(entrySource, "utf8");
+  const scanReady = assessScanReadiness(html);
+  if (!scanReady.ok) {
+    throw new Error(scanReady.reason);
+  }
   const css = await collectLocalCss(html, entrySource);
   const enriched = injectCapturedCss(html, css);
   await mkdir(outputDir, { recursive: true });
@@ -203,6 +267,10 @@ async function captureWithFetch(parsed, options = {}) {
     if (!quality.ok) {
       throw new Error(quality.reason);
     }
+    const scanReady = assessScanReadiness(html);
+    if (!scanReady.ok) {
+      throw new Error(scanReady.reason);
+    }
     return { title, html, css, screenshotBase64: null };
   } finally {
     clearTimeout(timeout);
@@ -262,7 +330,17 @@ export async function fetchPageForTransform(url, outputDir) {
   }
 
   if (parsed.protocol === "file:") {
-    return fetchFilePage(parsed, outputDir);
+    try {
+      return await fetchFilePage(parsed, outputDir);
+    } catch (error) {
+      return {
+        url: parsed.href,
+        capturedAt: new Date().toISOString(),
+        method: "file",
+        status: "capture_failed",
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
   }
 
   try {

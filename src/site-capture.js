@@ -115,10 +115,13 @@ export function mergeCapturedIntoContent(content, capture) {
 
     if (block.heading) {
       if (sectionHeadings.has(titleKey)) continue;
+      const body = block.body || "";
+      const items = block.items ?? [];
+      if (!body.trim() && !items.length) continue;
       sections.push({
         heading: block.heading,
-        body: block.body || "",
-        items: block.items ?? []
+        body,
+        items
       });
       sectionHeadings.add(titleKey);
     }
@@ -314,7 +317,12 @@ function collectPreservedBlocks(capture, content, heroKeys) {
   const used = new Set([
     ...heroKeys,
     ...(content.features ?? []).map((feature) => normalizeKey(feature.title)),
-    ...(content.sections ?? []).map((section) => normalizeKey(section.heading))
+    ...(content.features ?? []).map((feature) => normalizeKey(feature.body)).filter(Boolean),
+    ...(content.sections ?? []).map((section) => normalizeKey(section.heading)),
+    ...(content.sections ?? []).flatMap((section) => [
+      normalizeKey(section.body),
+      ...(section.items ?? []).map((item) => normalizeKey(item))
+    ]).filter(Boolean)
   ]);
 
   const preserved = [];

@@ -300,15 +300,15 @@ export function componentStyles(profile) {
   color: var(--ink-secondary);
 }
 .hero-minimal .hero-ctas { margin-top: var(--space-8); }
-.features-icon-rows {
+.features-detail-rows {
   display: grid;
   gap: var(--space-4);
   max-width: 720px;
   margin-inline: auto;
 }
-.feature-icon-row {
+.feature-detail-row {
   display: grid;
-  grid-template-columns: 48px 1fr;
+  grid-template-columns: var(--space-7) 1fr;
   gap: var(--space-4);
   align-items: start;
   padding: var(--space-5);
@@ -316,25 +316,25 @@ export function componentStyles(profile) {
   border: 1px solid var(--border);
   background: var(--surface);
 }
-.feature-icon-row .icon {
-  width: 48px;
-  height: 48px;
+.feature-detail-row .feature-index {
+  width: var(--space-7);
+  height: var(--space-7);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--primary) 14%, transparent);
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 700;
   color: var(--primary);
 }
-.feature-icon-row h3 {
+.feature-detail-row h3 {
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--text-lg);
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-2);
 }
-.feature-icon-row p { color: var(--muted); font-size: 15px; line-height: 1.6; }
+.feature-detail-row p { color: var(--muted); font-size: var(--text-md); line-height: 1.6; }
 .prose-block {
   max-width: 68ch;
   margin-inline: auto;
@@ -375,7 +375,8 @@ export function componentStyles(profile) {
 const INTEGRATION_NAMES = ["GitHub", "Slack", "Stripe", "Notion", "Figma", "Linear", "Vercel", "AWS"];
 
 export function renderLogoCloud(content) {
-  const brands = deriveLogoNames(content);
+  if (!Array.isArray(content.logoPartners) || content.logoPartners.length < 3) return "";
+  const brands = content.logoPartners.slice(0, 8);
   return `  <section class="logo-cloud" aria-label="Trusted by">
     <div class="container">
       <p class="label reveal">Trusted by teams at</p>
@@ -389,11 +390,8 @@ ${brands.map((name) => `        <span class="logo-chip">${esc(name)}</span>`).jo
 export function renderPricingSection(content, profile, options = {}) {
   const brand = content.brand || "Product";
   const showKickers = options.showSectionKickers ?? false;
-  const tiers = [
-    { name: "Starter", price: "Free", period: "", features: ["Core features", "Community support", "1 workspace"] },
-    { name: "Pro", price: "$19", period: "/mo", features: ["Everything in Starter", "Advanced analytics", "Priority support", "Unlimited projects"], featured: true },
-    { name: "Enterprise", price: "Custom", period: "", features: ["SSO & SAML", "Dedicated support", "Custom SLA", "Audit logs"] }
-  ];
+  const tiers = derivePricingTiers(content);
+  if (!tiers?.length) return "";
   return `  <section class="section alt" id="pricing">
     <div class="container">
       <div class="section-head centered reveal">
@@ -416,6 +414,7 @@ ${tier.features.map((feature) => `            <li>${esc(feature)}</li>`).join("\
 export function renderFaqSection(content, options = {}) {
   const showKickers = options.showSectionKickers ?? false;
   const faqs = deriveFaqs(content);
+  if (faqs.length < 2) return "";
   return `  <section class="section" id="faq">
     <div class="container">
       <div class="section-head centered reveal">
@@ -433,7 +432,9 @@ ${faqs.map((faq) => `        <details class="faq-item reveal">
 
 export function renderBentoFeatures(content, options = {}) {
   const showKickers = options.showSectionKickers ?? false;
-  const features = (content.features ?? []).slice(0, 5);
+  const features = (content.features ?? [])
+    .filter((feature) => !/sign up|get started|learn more/i.test(feature.title))
+    .slice(0, 4);
   if (features.length < 2) return "";
   const spans = ["span-4", "span-2", "span-2", "span-3", "span-3"];
   return `  <section class="section alt" id="bento">
@@ -451,8 +452,9 @@ ${features.map((feature, index) => `        <article class="bento-cell ${spans[i
   </section>`;
 }
 
-export function renderTrustBadges() {
-  const badges = ["SOC 2 Type II", "GDPR Ready", "99.9% Uptime", "Enterprise SSO"];
+export function renderTrustBadges(content) {
+  const badges = content.trustBadges ?? [];
+  if (badges.length < 2) return "";
   return `  <section class="section alt" aria-label="Trust and compliance">
     <div class="container">
       <div class="trust-row reveal">
@@ -463,15 +465,16 @@ ${badges.map((badge) => `        <span class="trust-badge">${esc(badge)}</span>`
 }
 
 export function renderIntegrationGrid(content, options = {}) {
+  const names = (content.integrations ?? []).filter(Boolean);
+  if (names.length < 4) return "";
   const showKickers = options.showSectionKickers ?? false;
-  const names = INTEGRATION_NAMES.slice(0, 8);
   return `  <section class="section" id="integrations">
     <div class="container">
       <div class="section-head centered reveal">
         ${showKickers ? `<div class="kicker">Integrations</div>\n        ` : ""}<h2>Works with your stack</h2>
       </div>
       <div class="integration-grid">
-${names.map((name) => `        <div class="integration-tile reveal">${esc(name)}</div>`).join("\n")}
+${names.slice(0, 8).map((name) => `        <div class="integration-tile reveal">${esc(name)}</div>`).join("\n")}
       </div>
     </div>
   </section>`;
@@ -542,7 +545,7 @@ export function renderHeroBento(content, profile, renderHeadline, options = {}) 
         <a class="btn btn-primary btn-lg" href="${escAttr(primaryCta.href)}">${esc(primaryCta.label)}</a>
         ${secondaryCta ? `<a class="btn btn-ghost btn-lg" href="${escAttr(secondaryCta.href)}">${esc(secondaryCta.label)}</a>` : ""}
       </div>
-      <div class="hero-bento">
+      <div class="hero-bento" id="features">
 ${cells}
       </div>
     </div>
@@ -582,13 +585,13 @@ export function renderHeroMinimal(content, profile, renderHeadline, options = {}
 
 export function renderProseSection(content, options = {}) {
   const { revealClass = "reveal" } = options;
-  const section = (content.sections ?? [])[0];
-  const heading = section?.heading || `About ${content.brand || "us"}`;
-  const body = section?.body
-    || content.hero?.subhead
-    || content.description
-    || "We build tools that respect your time, your taste, and your team.";
-  const paragraphs = String(body).split(/\n{2,}/).filter(Boolean);
+  const section = (content.sections ?? []).find((entry) =>
+    entry.body?.trim()
+    && !/^(features|pricing)$/i.test(entry.heading ?? "")
+  );
+  if (!section?.body?.trim()) return "";
+  const heading = section.heading || `About ${content.brand || "us"}`;
+  const paragraphs = String(section.body).split(/\n{2,}/).filter(Boolean);
   return `  <section class="section alt" id="story">
     <div class="container">
       <div class="prose-block ${revealClass}">
@@ -609,9 +612,9 @@ export function renderIconRowFeatures(content, options = {}) {
       <div class="section-head centered ${revealClass}">
         ${showSectionKickers ? `<div class="kicker">Capabilities</div>\n        ` : ""}<h2>${esc(content.featuresHeading || `What ${brand} delivers`)}</h2>
       </div>
-      <div class="features-icon-rows">
-${features.map((feature, index) => `        <article class="feature-icon-row ${revealClass}">
-          <div class="icon" aria-hidden="true">${String(index + 1).padStart(2, "0")}</div>
+      <div class="features-detail-rows">
+${features.map((feature, index) => `        <article class="feature-detail-row ${revealClass}">
+          <div class="feature-index" aria-hidden="true">${String(index + 1).padStart(2, "0")}</div>
           <div>
             <h3>${esc(feature.title)}</h3>
             <p>${esc(feature.body)}</p>
@@ -647,9 +650,12 @@ export function renderCatalogSections(content, profile, patterns, helpers = {}) 
     pricing: () => (patternIds.has("pricing-three-tier") || patternIds.has("pricing-two-column"))
       ? renderPricingSection(content, profile, sectionOptions) : "",
     faq: () => patternIds.has("content-faq-accordion") ? renderFaqSection(content, sectionOptions) : "",
-    trust: () => patternIds.has("social-trust-badges") ? renderTrustBadges() : "",
+    trust: () => patternIds.has("social-trust-badges") ? renderTrustBadges(content) : "",
     integrations: () => patternIds.has("features-integration-grid") ? renderIntegrationGrid(content, sectionOptions) : "",
-    bento: () => patternIds.has("features-bento-grid") ? renderBentoFeatures(content, sectionOptions) : "",
+    bento: () => (patternIds.has("features-bento-grid")
+      && !patternIds.has("features-card-grid")
+      && !patternIds.has("features-icon-rows"))
+      ? renderBentoFeatures(content, sectionOptions) : "",
     prose: () => patternIds.has("content-prose-section") ? renderProseSection(content, sectionOptions) : ""
   };
 
@@ -660,27 +666,42 @@ export function renderCatalogSections(content, profile, patterns, helpers = {}) 
   return sections;
 }
 
-function deriveLogoNames(content) {
-  if (Array.isArray(content.logoPartners) && content.logoPartners.length >= 3) {
-    return content.logoPartners.slice(0, 8);
+function derivePricingTiers(content) {
+  if (Array.isArray(content.pricingTiers) && content.pricingTiers.length >= 2) {
+    return content.pricingTiers;
   }
-  const fromFeatures = (content.features ?? []).slice(0, 4).map((feature) => feature.title.split(/\s+/)[0]);
-  const defaults = ["Acme", "Globex", "Initech", "Umbrella", "Stark"];
-  const names = [...new Set(fromFeatures.filter((name) => name.length <= 12))];
-  return (names.length >= 3 ? names : defaults).slice(0, 5);
+  const pricingSection = (content.sections ?? []).find((section) => /pricing/i.test(section.heading ?? ""));
+  if (!pricingSection?.items?.length) return null;
+  return pricingSection.items.map((item) => {
+    const dash = String(item).match(/^(.+?)\s*[-–—]\s*(.+)$/);
+    if (!dash) return { name: String(item).slice(0, 24), price: String(item), period: "", features: [String(item)] };
+    const name = dash[1].trim();
+    const rest = dash[2].trim();
+    if (/contact/i.test(rest)) {
+      return { name, price: "Contact us", period: "", features: ["Volume pricing", "Dedicated support", "Custom contracts"] };
+    }
+    const money = rest.match(/\$[\d]+(?:\.\d+)?(?:\s+per\s+[\w\s]+)?/i)?.[0]?.trim();
+    if (/free/i.test(name) || (/up to/i.test(rest) && !money)) {
+      return { name, price: "Free", period: "", features: [rest] };
+    }
+    const period = money
+      ? rest.replace(money, "").trim().replace(/^per\s+/i, "/").replace(/\s+/g, "")
+      : "";
+    return {
+      name,
+      price: money || name,
+      period,
+      features: [rest],
+      featured: /pro/i.test(name)
+    };
+  });
 }
 
 function deriveFaqs(content) {
-  const fromFeatures = (content.features ?? []).slice(0, 3).map((feature) => ({
+  return (content.features ?? []).slice(0, 4).map((feature) => ({
     q: `How does ${feature.title} work?`,
-    a: feature.body || `${feature.title} is included in every plan and works out of the box.`
-  }));
-  if (fromFeatures.length >= 2) return fromFeatures;
-  return [
-    { q: "How do I get started?", a: "Sign up for free, connect your workspace, and invite your team in under five minutes." },
-    { q: "Can I change plans later?", a: "Yes — upgrade or downgrade anytime. Changes take effect on your next billing cycle." },
-    { q: "Is there an enterprise plan?", a: "Contact sales for SSO, custom SLAs, dedicated support, and volume pricing." }
-  ];
+    a: feature.body || `${feature.title} is included in every plan.`
+  })).filter((faq) => faq.a.length > 12);
 }
 
 function esc(value) {

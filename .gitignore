@@ -3,6 +3,9 @@
 .morph/runs/
 .morph/latest-report.json
 .morph/transform-checkout/
+.morph/batch-test/runs/
+.morph/batch-test/results/
+.morph/batch-test/last-run.log
 morph-output/
 node_modules/
 .env

@@ -13,8 +13,8 @@ import {
 } from "../src/core.js";
 import { serveMorph } from "../src/server.js";
 import { landingHtml } from "../src/landing.js";
-import { extractContent, transformSite } from "../src/transform.js";
-import { assessCaptureQuality } from "../src/preview.js";
+import { extractContent, findEntryHtml, transformSite } from "../src/transform.js";
+import { assessCaptureQuality, assessScanReadiness, fetchPageForTransform } from "../src/preview.js";
 import { enrichContent, researchSite } from "../src/site-research.js";
 import { captureSiteSnapshot, mergeCapturedIntoContent } from "../src/site-capture.js";
 import { assessUiQuality, databaseSummary, selectProfile, selectArchetype, catalogSummary, matchReferenceSites, buildRetrievalPlan, sourceIndexSummary, extractVisualPreferences, planTransform, alignProfileToPreferences } from "../src/design-db/index.js";
@@ -620,6 +620,29 @@ test("studio review scores url site without mutating source fixture", async () =
   }
 });
 
+test("findEntryHtml prefers the shallowest index.html after a url capture", async () => {
+  const checkout = await mkdtemp(path.join(os.tmpdir(), "morph-entry-"));
+  try {
+    await mkdir(path.join(checkout, "examples", "nested"), { recursive: true });
+    await writeFile(
+      path.join(checkout, "examples", "nested", "index.html"),
+      "<html><head><title>Nested clone page</title></head><body><h1>Nested</h1></body></html>"
+    );
+
+    const nestedBefore = await findEntryHtml(checkout);
+    assert.equal(nestedBefore, path.join(checkout, "examples", "nested", "index.html"));
+
+    await fetchPageForTransform("https://example.com", checkout);
+    const entry = await findEntryHtml(checkout);
+    const html = await readFile(entry, "utf8");
+    assert.equal(entry, path.join(checkout, "index.html"));
+    assert.match(html, /Example Domain/);
+  } finally {
+    const { rm } = await import("node:fs/promises");
+    await rm(checkout, { recursive: true, force: true });
+  }
+});
+
 test("design intelligence database exposes profiles and heuristics", () => {
   const summary = databaseSummary();
   assert.equal(summary.profiles >= 16, true);
@@ -979,6 +1002,50 @@ test("assessCaptureQuality rejects bot-check pages", () => {
   const result = assessCaptureQuality(botWall);
   assert.equal(result.ok, false);
   assert.match(result.reason, /bot-check/i);
+});
+
+test("assessScanReadiness rejects empty javascript shells", () => {
+  const shell = `<!doctype html><html><head><title>App</title></head><body><div id="root"></div><script src="/bundle.js"></script></body></html>`;
+  const result = assessScanReadiness(shell);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /empty|readable/i);
+});
+
+test("studio review refuses unreadable websites instead of fabricating scores", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-shell-"));
+  const siteDir = path.join(tempRoot, "shell");
+  await mkdir(siteDir, { recursive: true });
+  await writeFile(
+    path.join(siteDir, "index.html"),
+    `<!doctype html><html><head><title>App</title></head><body><div id="root"></div><script src="/bundle.js"></script></body></html>`
+  );
+  const previewUrl = `file://${path.join(siteDir, "index.html")}`;
+
+  const configPath = path.join(tempRoot, "morph.config.json");
+  await writeFile(configPath, `${JSON.stringify({
+    projectName: "Acme Studio Shell",
+    projectRoot: "fixtures/acme-saas",
+    morphDir: ".morph",
+    tokenFiles: ["design-system/tokens.css"],
+    scan: ["src/**/*.tsx"]
+  }, null, 2)}\n`);
+
+  const config = await loadConfig(configPath, tempRoot);
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
+
+  try {
+    const response = await fetch(`${url}/api/studio/review`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ source: "url", previewUrl })
+    });
+    assert.equal(response.status, 422);
+    const payload = await response.json();
+    assert.equal(payload.error, "site_unreadable");
+    assert.match(payload.message, /empty|readable/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 test("extractContent ignores accessibility boilerplate and uses title taglines", () => {

@@ -290,8 +290,13 @@ export async function findEntryHtml(rootDir) {
   if (!existsSync(rootDir)) return null;
   const htmlFiles = await walkForHtml(rootDir);
   if (!htmlFiles.length) return null;
-  const index = htmlFiles.find((file) => path.basename(file).toLowerCase() === "index.html");
-  if (index) return index;
+  const indexFiles = htmlFiles.filter((file) => path.basename(file).toLowerCase() === "index.html");
+  if (indexFiles.length) {
+    indexFiles.sort((left, right) =>
+      left.split(path.sep).length - right.split(path.sep).length || left.localeCompare(right)
+    );
+    return indexFiles[0];
+  }
   htmlFiles.sort((left, right) => left.split(path.sep).length - right.split(path.sep).length || left.localeCompare(right));
   return htmlFiles[0];
 }
@@ -551,6 +556,7 @@ export function extractContent(rawHtml) {
   const ctas = deriveCtas(html, anchors);
 
   const { features, sections } = deriveFeatureSections(headings, paragraphs, listItems, heroHeading);
+  const pricingTiers = derivePricingTiers(sections) ?? extractPricingTiersFromHtml(html);
   const stats = deriveStats(listItems, headings);
 
   const footerText = textOf(html.match(/<footer[^>]*>([\s\S]*?)<\/footer>/i)?.[1] ?? "")
@@ -573,6 +579,7 @@ export function extractContent(rawHtml) {
     )?.text ?? null,
     features,
     sections,
+    pricingTiers,
     stats,
     testimonial: blockquote ? parseTestimonial(blockquote) : null,
     cta: {
@@ -682,6 +689,74 @@ function deriveCtas(html, anchors) {
   }
   if (!ctas.length) ctas.push({ label: "Get started", href: "#get-started" });
   return ctas;
+}
+
+function extractPricingTiersFromHtml(html) {
+  const cards = [...String(html).matchAll(/<(?:div|article)[^>]*class=["'][^"']*pricing-card[^"']*["'][^>]*>([\s\S]*?)<\/(?:div|article)>/gi)];
+  if (cards.length < 2) return null;
+
+  return cards.map((match) => {
+    const inner = match[1];
+    const name = textOf(inner.match(/<strong[^>]*>([\s\S]*?)<\/strong>/i)?.[1] ?? "");
+    const detail = textOf(inner.match(/<span[^>]*>([\s\S]*?)<\/span>/i)?.[1] ?? "");
+    if (!name) return null;
+    if (/contact/i.test(detail)) {
+      return { name, price: "Contact us", period: "", features: [detail] };
+    }
+    const money = detail.match(/\$[\d]+(?:\.\d+)?(?:\s+per\s+[\w\s]+)?/i)?.[0]?.trim();
+    if (/free/i.test(name) || (/up to/i.test(detail) && !money)) {
+      return { name, price: "Free", period: "", features: [detail] };
+    }
+    const period = money
+      ? detail.replace(money, "").trim().replace(/^per\s+/i, "/").replace(/\s+/g, "")
+      : "";
+    return {
+      name,
+      price: money || name,
+      period,
+      features: [detail],
+      featured: /pro/i.test(name)
+    };
+  }).filter(Boolean);
+}
+
+function derivePricingTiers(sections) {
+  const pricingSection = (sections ?? []).find((section) => /pricing/i.test(section.heading ?? ""));
+  if (!pricingSection?.items?.length) return null;
+
+  return pricingSection.items.map((item) => {
+    const dash = String(item).match(/^(.+?)\s*[-–—]\s*(.+)$/);
+    if (!dash) {
+      return { name: String(item).slice(0, 24), price: String(item), period: "", features: [String(item)] };
+    }
+
+    const name = dash[1].trim();
+    const rest = dash[2].trim();
+    if (/contact/i.test(rest)) {
+      return {
+        name,
+        price: "Contact us",
+        period: "",
+        features: ["Volume pricing", "Dedicated support", "Custom contracts"]
+      };
+    }
+
+    const money = rest.match(/\$[\d]+(?:\.\d+)?(?:\s+per\s+[\w\s]+)?/i)?.[0]?.trim();
+    if (/free/i.test(name) || (/up to/i.test(rest) && !money)) {
+      return { name, price: "Free", period: "", features: [rest] };
+    }
+
+    const period = money
+      ? rest.replace(money, "").trim().replace(/^per\s+/i, "/").replace(/\s+/g, "")
+      : "";
+    return {
+      name,
+      price: money || name,
+      period,
+      features: [rest],
+      featured: /pro/i.test(name)
+    };
+  });
 }
 
 function deriveFeatureSections(headings, paragraphs, listItems, heroHeading) {

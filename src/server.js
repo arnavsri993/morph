@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
-import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,8 +37,8 @@ import {
   shellStyles
 } from "./chrome.js";
 import { landingHtml } from "./landing.js";
-import { fetchPageForTransform } from "./preview.js";
-import { transformSite } from "./transform.js";
+import { fetchPageForTransform, assessScanReadiness } from "./preview.js";
+import { transformSite, findEntryHtml } from "./transform.js";
 import { cloneRepo } from "./github.js";
 import { listSponsorIntegrations } from "./ai-providers.js";
 import { aiVisionStatus } from "./ai-vision.js";
@@ -465,10 +466,14 @@ async function runTransformReview(config, {
   referenceImage,
   generateReference
 }) {
-  const studioRoot = path.join(os.tmpdir(), ".studio-run");
+  const studioRoot = path.join(os.tmpdir(), ".studio-run", runId);
   const checkoutRoot = path.join(studioRoot, "checkout");
   const transformedRoot = path.join(studioRoot, "transformed");
-  await mkdir(studioRoot, { recursive: true });
+  if (existsSync(studioRoot)) {
+    await rm(studioRoot, { recursive: true, force: true });
+  }
+  await mkdir(checkoutRoot, { recursive: true });
+  await mkdir(transformedRoot, { recursive: true });
 
   let preview = null;
   if (source === "github") {
@@ -480,9 +485,11 @@ async function runTransformReview(config, {
   } else {
     preview = await fetchPageForTransform(previewUrl, checkoutRoot);
     if (preview.status !== "captured") {
-      throw new HttpError(422, "url_fetch_failed", preview.error || "Could not fetch the preview URL.");
+      throw new HttpError(422, "site_unreadable", preview.error || "Could not read this website. No review was run.");
     }
   }
+
+  await assertCheckoutIsScannable(checkoutRoot);
 
   let transform;
   try {
@@ -565,6 +572,18 @@ async function runTransformReview(config, {
     passed: before.verdict === "pass",
     ciSummary: `Current UI ${before.score}/100${before.verdict === "pass" ? " passes" : " fails"} the gate. After redesign: ${after.score}/100. ${transform.summary}`
   };
+}
+
+async function assertCheckoutIsScannable(checkoutRoot) {
+  const entry = await findEntryHtml(checkoutRoot);
+  if (!entry) {
+    throw new HttpError(422, "site_unreadable", "No HTML page was found to scan.");
+  }
+  const html = await readFile(entry, "utf8");
+  const scanReady = assessScanReadiness(html);
+  if (!scanReady.ok) {
+    throw new HttpError(422, "site_unreadable", scanReady.reason);
+  }
 }
 
 function heuristicsAsReport(assessment, file, config, options = {}) {
@@ -1757,6 +1776,9 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     }
     .welcome h3 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
     .welcome p { max-width: 440px; margin: 0 auto 24px; font-size: 15px; line-height: 1.7; }
+    .welcome.review-failure .welcome-icon { color: var(--bad); background: rgba(248, 113, 113, 0.08); }
+    .welcome.review-failure h3 { color: var(--ink); }
+    .welcome.review-failure .review-summary { display: block; margin-top: 8px; color: var(--muted); font-size: 13px; }
 
     /* ── Studio review receipt ─────────────────────────────────────── */
     .review-hero {
@@ -2179,6 +2201,10 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       const previewUrl = previewUrlInput?.value.trim() || "";
       const githubRepo = githubRepoInput?.value.trim() || "";
 
+      if (looksLikeHttpUrl(previewUrl)) {
+        return { source: "url", previewUrl, instructions };
+      }
+
       if (activeSource === "github") {
         if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo) or switch to Preview URL.");
         if (looksLikeHttpUrl(githubRepo) && !isGithubRepoInput(githubRepo)) {
@@ -2340,7 +2366,12 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         html += '<div class="detail-body"><pre class="research-brief">' + esc(p.transform.siteResearch.summary) + '</pre></div></details>';
       }
       if (p.previewUrl) {
-        html += '<div class="review-meta"><strong>Preview URL:</strong> ' + esc(p.previewUrl) + '</div>';
+        html += '<div class="review-meta"><strong>Scanned URL:</strong> ' + esc(p.previewUrl) + '</div>';
+      }
+      if (p.preview?.title) {
+        html += '<div class="review-meta"><strong>Captured page:</strong> ' + esc(p.preview.title)
+          + (p.preview.method ? ' <span class="preview">via ' + esc(p.preview.method) + '</span>' : '')
+          + '</div>';
       }
       if (p.targetFile) {
         html += '<div class="review-meta"><strong>File:</strong> ' + esc(p.targetFile) + '</div>';
@@ -2533,12 +2564,35 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     function showWelcome() {
       lastPayload = null;
       stopNarration();
+      pipeline.hidden = true;
       output.style.display = "none";
       outputReadable.style.display = "";
       outputReadable.innerHTML = '<div class="welcome">'
         + '<div class="welcome-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>'
         + '<h3>Ready to review</h3>'
         + '<p>Click <strong>Try demo site</strong> for a one-click walkthrough, or connect a GitHub repo / preview URL and hit <strong>Run full review</strong>.</p>'
+        + '</div>';
+      updateNarrateButton();
+    }
+
+    function showFailure(message) {
+      lastPayload = null;
+      stopNarration();
+      pipeline.hidden = true;
+      score.textContent = "–";
+      score.className = "stat-value";
+      possibleScore.textContent = "–";
+      possibleScore.className = "stat-value";
+      gate.textContent = "–";
+      gate.className = "stat-value";
+      fixes.textContent = "–";
+      output.style.display = "none";
+      outputReadable.style.display = "";
+      outputReadable.innerHTML = '<div class="welcome review-failure">'
+        + '<div class="welcome-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg></div>'
+        + '<h3>Could not scan this site</h3>'
+        + '<p>' + esc(String(message || "This website could not be read.")) + '</p>'
+        + '<span class="review-summary">No scores were generated. Try a different URL or paste a GitHub repo instead.</span>'
         + '</div>';
       updateNarrateButton();
     }
@@ -2701,7 +2755,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         renderPayload(payload);
         await refreshRuns();
       } catch (error) {
-        showRaw(error.stack || error.message);
+        showFailure(error.message || "Request failed");
       } finally {
         trigger.disabled = false;
       }
