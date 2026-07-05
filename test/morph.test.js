@@ -275,7 +275,8 @@ test("landing page is served at / and the studio dashboard at /studio", async ()
     const studio = await studioResponse.text();
     assert.equal(studio.includes("Run full review"), true);
     assert.equal(studio.includes("Review history"), true);
-    assert.equal(studio.includes("Connect GitHub"), true);
+    assert.equal(studio.includes("Enable GitHub sign-in"), true);
+    assert.equal(studio.includes("Save credentials"), true);
     assert.equal(studio.includes("Agent instructions"), true);
     assert.equal(studio.includes("Preview URL"), true);
     assert.equal(studio.includes("Paste UI code"), true);
@@ -319,6 +320,56 @@ test("landing page stays public in oauth mode while studio requires sign-in", as
     assert.equal(login.includes("Log in"), true);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("github credentials save at runtime and enable the studio connect flow", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-github-auth-"));
+  const fixtureRoot = path.join(tempRoot, "acme-saas");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
+
+  const configPath = path.join(tempRoot, "morph.config.json");
+  await writeFile(configPath, `${JSON.stringify({
+    projectName: "Acme GitHub",
+    projectRoot: "acme-saas",
+    morphDir: ".morph",
+    tokenFiles: ["design-system/tokens.css"],
+    scan: ["src/**/*.tsx"]
+  }, null, 2)}\n`);
+
+  const savedEnv = {
+    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET
+  };
+  delete process.env.GITHUB_CLIENT_ID;
+  delete process.env.GITHUB_CLIENT_SECRET;
+
+  const config = await loadConfig(configPath, tempRoot);
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
+
+  try {
+    const before = await fetchJson(`${url}/api/health`);
+    assert.equal(before.github.configured, false);
+
+    const saveResponse = await fetch(`${url}/api/auth/github`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ clientId: "Iv1.test-client-id", clientSecret: "ghsec-test-secret" })
+    });
+    assert.equal(saveResponse.status, 200);
+    const saved = await saveResponse.json();
+    assert.equal(saved.github.configured, true);
+    assert.equal(saved.providers.github, true);
+
+    const studio = await (await fetch(`${url}/studio`)).text();
+    assert.equal(studio.includes("Save credentials"), false);
+    assert.equal(studio.includes('href="/auth/github?returnTo='), true);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
 });
 

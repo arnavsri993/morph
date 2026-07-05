@@ -113,7 +113,7 @@ export async function serveMorph(config, options = {}) {
       }
 
       if (request.method === "GET" && (url.pathname === "/studio" || url.pathname === "/studio/")) {
-        return sendHtml(response, await dashboardHtml(config, session));
+        return sendHtml(response, await dashboardHtml(config, session, runtimeAuth, auth.getAppUrl(request, host, port)));
       }
 
       if (request.method === "GET" && url.pathname === "/api/health") {
@@ -278,6 +278,7 @@ export async function serveMorph(config, options = {}) {
           source: body.source,
           previewUrl: body.previewUrl,
           githubRepo: body.githubRepo,
+          githubToken: session?.githubToken ?? null,
           instructions: body.instructions,
           sourceCode: body.sourceCode,
           targetFile: body.targetFile,
@@ -357,8 +358,13 @@ export async function serveMorph(config, options = {}) {
       return sendJson(response, 404, { error: "not_found" });
     } catch (error) {
       if (error instanceof AuthError && url && !url.pathname.startsWith("/api/")) {
-        const returnTo = encodeURIComponent(sanitizeReturnTo(url.searchParams.get("returnTo")));
-        return redirect(response, `/login?error=${encodeURIComponent(error.message)}&returnTo=${returnTo}`);
+        const returnTo = sanitizeReturnTo(url.searchParams.get("returnTo"));
+        if (returnTo.startsWith("/studio")) {
+          const separator = returnTo.includes("?") ? "&" : "?";
+          return redirect(response, `${returnTo}${separator}error=${encodeURIComponent(error.message)}`);
+        }
+        const encodedReturnTo = encodeURIComponent(returnTo);
+        return redirect(response, `/login?error=${encodeURIComponent(error.message)}&returnTo=${encodedReturnTo}`);
       }
       return sendJson(response, error.statusCode ?? 500, {
         error: error.code ?? "server_error",
@@ -396,6 +402,7 @@ async function runStudioReview(config, options = {}) {
         source: resolved.source,
         githubRepo: resolved.githubRepo,
         previewUrl: resolved.previewUrl,
+        githubToken: options.githubToken ?? null,
         instructions,
         referenceImage: options.referenceImage,
         generateReference: options.generateReference
@@ -500,6 +507,7 @@ async function runTransformReview(config, {
   source,
   githubRepo = null,
   previewUrl = null,
+  githubToken = null,
   instructions,
   referenceImage,
   generateReference
@@ -512,7 +520,7 @@ async function runTransformReview(config, {
   let preview = null;
   if (source === "github") {
     try {
-      await cloneRepo(githubRepo, checkoutRoot);
+      await cloneRepo(githubRepo, checkoutRoot, { token: githubToken || undefined });
     } catch (error) {
       throw new HttpError(422, "github_clone_failed", `Could not clone ${githubRepo}: ${error.message}`);
     }
@@ -828,11 +836,59 @@ function publicConfig(config, runtimeAuth, billing) {
 }
 
 
-async function dashboardHtml(config, session) {
+function renderGithubConnectBlock({ githubConnected, githubLabel, githubConfigured, appUrl }) {
+  if (githubConnected) {
+    return `<div class="github-connect">
+              <div>
+                <strong id="githubStatusLabel">GitHub connected</strong>
+                <span id="githubStatusText">Signed in as ${githubLabel}. Private repos can be cloned for review.</span>
+              </div>
+              <span class="auth-status ready">Connected</span>
+            </div>`;
+  }
+
+  if (!githubConfigured) {
+    return `<div class="github-connect">
+              <div>
+                <strong>Enable GitHub sign-in</strong>
+                <span>Save OAuth credentials below, then connect your GitHub account for private repos.</span>
+              </div>
+            </div>
+            <form class="auth-form" id="githubOAuthForm">
+              <label for="githubClientId">GitHub OAuth Client ID
+                <input id="githubClientId" name="clientId" type="text" required autocomplete="off" placeholder="Iv1.…">
+              </label>
+              <label for="githubClientSecret">GitHub OAuth Client Secret
+                <input id="githubClientSecret" name="clientSecret" type="password" required autocomplete="off" placeholder="••••••••">
+              </label>
+              <button type="submit" class="btn btn-ghost">Save credentials</button>
+              <p class="auth-status pending" id="githubOAuthStatus" hidden></p>
+            </form>
+            <p class="github-setup-note">Create an OAuth App at <a href="https://github.com/settings/developers" target="_blank" rel="noreferrer">github.com/settings/developers</a> with callback <code>${appUrl}/auth/github/callback</code>. Public repos work without sign-in.</p>`;
+  }
+
+  return `<div class="github-connect">
+            <div>
+              <strong id="githubStatusLabel">Connect GitHub</strong>
+              <span id="githubStatusText">Sign in for private repos. Public repos clone without sign-in.</span>
+            </div>
+            <a class="btn btn-ghost" href="/auth/github?returnTo=${encodeURIComponent("/studio?source=github")}">Connect GitHub</a>
+          </div>`;
+}
+
+async function dashboardHtml(config, session, runtimeAuth, appUrl) {
   const workspaceName = escapeHtml(config.workspace?.name ?? "Local Workspace");
   const projectName = escapeHtml(config.projectName ?? "Project");
   const githubConnected = session?.provider === "github";
   const githubLabel = githubConnected ? escapeHtml(session.name || session.email || "GitHub account") : "";
+  const githubConfigured = isGithubConfigured(runtimeAuth);
+  const safeAppUrl = escapeHtml(appUrl);
+  const githubConnectBlock = renderGithubConnectBlock({
+    githubConnected,
+    githubLabel,
+    githubConfigured,
+    appUrl: safeAppUrl
+  });
   let demoDriftSource = "";
   const demoCandidates = [
     path.join(config.configDir, "fixtures/acme-saas/src/routes/settings/billing.tsx"),
@@ -863,26 +919,43 @@ async function dashboardHtml(config, session) {
   <style>
     :root {
       color-scheme: dark;
-      --bg: #09090b;
-      --surface: rgba(24, 24, 27, 0.55);
-      --surface-solid: #18181b;
-      --ink: #fafafa;
+      --bg: #060608;
+      --bg-subtle: #0c0c0f;
+      --surface: rgba(22, 22, 26, 0.72);
+      --surface-solid: #16161a;
+      --surface-elevated: #1e1e24;
+      --ink: #f4f4f5;
       --muted: #a1a1aa;
       --faint: #71717a;
-      --line: rgba(255, 255, 255, 0.08);
-      --line-strong: rgba(255, 255, 255, 0.14);
+      --line: rgba(255, 255, 255, 0.07);
+      --line-strong: rgba(255, 255, 255, 0.13);
       --brand-a: #818cf8;
       --brand-b: #a78bfa;
       --cyan: #22d3ee;
       --ok: #4ade80;
+      --ok-dim: rgba(74, 222, 128, 0.12);
       --bad: #f87171;
+      --bad-dim: rgba(248, 113, 113, 0.12);
       --warn: #fbbf24;
+      --warn-dim: rgba(251, 191, 36, 0.12);
+      --drift-visual: #f472b6;
+      --drift-visual-dim: rgba(244, 114, 182, 0.14);
+      --drift-component: #818cf8;
+      --drift-component-dim: rgba(129, 140, 248, 0.14);
+      --drift-interaction: #22d3ee;
+      --drift-interaction-dim: rgba(34, 211, 238, 0.14);
+      --drift-responsive: #c084fc;
+      --drift-responsive-dim: rgba(192, 132, 252, 0.14);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.04);
+      --shadow-md: 0 8px 32px -8px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      --shadow-lg: 0 24px 64px -16px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
       --font: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      --radius: 20px;
-      --radius-sm: 12px;
-      --page-pad: clamp(24px, 5vw, 64px);
-      --section-gap: 56px;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+      --page-pad: clamp(20px, 3.5vw, 64px);
+      --section-gap: clamp(48px, 5vw, 72px);
     }
     * { box-sizing: border-box; }
     body {
@@ -890,12 +963,29 @@ async function dashboardHtml(config, session) {
       background: var(--bg);
       color: var(--ink);
       font-family: var(--font);
-      font-size: 16px;
-      line-height: 1.7;
+      font-size: 15px;
+      line-height: 1.65;
       -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
     }
-    ::selection { background: rgba(129, 140, 248, 0.35); }
-    :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 8px; }
+    ::selection { background: rgba(129, 140, 248, 0.38); color: #fff; }
+    :focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; border-radius: var(--radius-xs); }
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 12px;
+      z-index: 100;
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-elevated);
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      box-shadow: var(--shadow-md);
+    }
+    .skip-link:focus { left: 12px; }
     a { color: inherit; }
     code { font-family: var(--mono); font-size: 0.86em; color: var(--cyan); }
 
@@ -933,12 +1023,13 @@ async function dashboardHtml(config, session) {
       align-items: center;
       justify-content: space-between;
       gap: 24px;
-      min-height: 72px;
+      min-height: 64px;
       padding: 0 var(--page-pad);
       border-bottom: 1px solid var(--line);
-      background: rgba(9, 9, 11, 0.72);
-      -webkit-backdrop-filter: blur(20px) saturate(1.4);
-      backdrop-filter: blur(20px) saturate(1.4);
+      background: rgba(6, 6, 8, 0.82);
+      -webkit-backdrop-filter: blur(24px) saturate(1.5);
+      backdrop-filter: blur(24px) saturate(1.5);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
     }
     .nav-left { display: flex; align-items: center; gap: 32px; min-width: 0; }
     .brand {
@@ -974,7 +1065,12 @@ async function dashboardHtml(config, session) {
       transition: color 0.2s ease, background 0.2s ease;
     }
     .nav-link:hover { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
-    .nav-link.active { color: var(--ink); background: rgba(255, 255, 255, 0.08); }
+    .nav-link:focus-visible { outline-offset: -2px; }
+    .nav-link.active {
+      color: var(--ink);
+      background: rgba(129, 140, 248, 0.12);
+      box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.22);
+    }
     .nav-right { display: flex; align-items: center; gap: 16px; flex: none; }
     .project-pill {
       display: none;
@@ -1029,17 +1125,17 @@ async function dashboardHtml(config, session) {
     }
     .top-link:hover { color: var(--ink); }
 
-    .page { padding: 48px var(--page-pad) 96px; }
+    .page { padding: clamp(40px, 5vw, 56px) var(--page-pad) clamp(80px, 8vw, 112px); }
     .content {
       display: grid;
       gap: var(--section-gap);
       width: 100%;
-      max-width: 920px;
+      max-width: min(1160px, 100%);
       margin: 0 auto;
     }
 
     /* ── Page head ─────────────────────────────────────────────────── */
-    .page-head { display: grid; gap: 28px; }
+    .page-head { display: grid; gap: 36px; }
     .eyebrow {
       display: inline-flex;
       align-items: center;
@@ -1072,7 +1168,7 @@ async function dashboardHtml(config, session) {
       background-clip: text;
       color: transparent;
     }
-    .lede { margin: 0; color: var(--muted); font-size: 17px; line-height: 1.75; max-width: 56ch; }
+    .lede { margin: 0; color: var(--muted); font-size: 17px; line-height: 1.8; max-width: 62ch; }
     .lede code { font-size: 0.9em; }
     h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
     h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
@@ -1118,13 +1214,16 @@ async function dashboardHtml(config, session) {
       mask-composite: exclude;
       pointer-events: none;
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 56px -8px rgba(129, 140, 248, 0.85); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 32px -4px rgba(129, 140, 248, 0.75), 0 0 0 1px rgba(129, 140, 248, 0.3); }
+    .btn-primary:focus-visible { outline-color: var(--brand-a); }
     .btn-ghost {
       color: var(--ink);
       background: rgba(255, 255, 255, 0.04);
       border-color: var(--line-strong);
     }
-    .btn-ghost:hover { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.07); }
+    .btn-ghost:hover { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.08); transform: translateY(-1px); }
+    .btn-ghost:focus-visible { outline-color: var(--brand-a); }
+    .btn-ghost:active, .btn-primary:active { transform: translateY(0); }
     .btn[disabled] { opacity: 0.5; cursor: wait; transform: none !important; }
 
     /* ── Spotlight cards ───────────────────────────────────────────── */
@@ -1134,9 +1233,12 @@ async function dashboardHtml(config, session) {
       border-radius: var(--radius);
       border: 1px solid var(--line);
       background: var(--surface);
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
     }
+    .spotlight:hover { border-color: var(--line-strong); box-shadow: var(--shadow-md); }
     .spotlight::before {
       content: "";
       position: absolute;
@@ -1156,8 +1258,9 @@ async function dashboardHtml(config, session) {
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--surface);
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-sm);
     }
     .panel-pad { padding: 32px; }
     .panel-head {
@@ -1165,24 +1268,27 @@ async function dashboardHtml(config, session) {
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 20px 28px;
+      padding: 18px 24px;
       border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.015);
     }
-    .panel-head .hint { font-size: 13px; color: var(--faint); }
+    .panel-head h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+    .panel-head .hint { font-size: 12px; color: var(--faint); font-family: var(--mono); }
 
-    .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+    .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
     .stat {
       position: relative;
       overflow: hidden;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--surface);
-      padding: 28px 32px;
+      padding: 24px 28px;
       display: grid;
-      gap: 8px;
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
-      transition: border-color 0.25s ease, transform 0.25s ease;
+      gap: 6px;
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
     }
     .stat::before {
       content: "";
@@ -1193,29 +1299,31 @@ async function dashboardHtml(config, session) {
       transition: opacity 0.45s ease;
       pointer-events: none;
     }
-    .stat:hover { border-color: rgba(255, 255, 255, 0.14); transform: translateY(-2px); }
+    .stat:hover { border-color: rgba(255, 255, 255, 0.14); transform: translateY(-2px); box-shadow: var(--shadow-md); }
     .stat:hover::before { opacity: 1; }
-    .stat-label { font-size: 13px; font-weight: 500; color: var(--faint); }
+    .stat-label { font-size: 12px; font-weight: 500; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; }
     .stat-value {
-      font-size: 40px;
+      font-size: clamp(32px, 4vw, 40px);
       font-weight: 600;
       letter-spacing: -0.03em;
       line-height: 1.1;
       font-variant-numeric: tabular-nums;
     }
-    .stat-value.ok { color: var(--ok); }
-    .stat-value.bad { color: var(--bad); }
-    .stat-sub { font-size: 13px; color: var(--faint); font-family: var(--mono); }
+    .stat-value.ok { color: var(--ok); text-shadow: 0 0 24px rgba(74, 222, 128, 0.25); }
+    .stat-value.bad { color: var(--bad); text-shadow: 0 0 24px rgba(248, 113, 113, 0.2); }
+    .stat-value.warn { color: var(--warn); text-shadow: 0 0 24px rgba(251, 191, 36, 0.2); }
+    .stat-sub { font-size: 12px; color: var(--faint); font-family: var(--mono); letter-spacing: -0.01em; }
 
     .pipeline {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 16px 24px;
-      padding: 20px 28px;
-      border: 1px solid rgba(129, 140, 248, 0.2);
+      gap: 14px 20px;
+      padding: 18px 24px;
+      border: 1px solid rgba(129, 140, 248, 0.22);
       border-radius: var(--radius);
-      background: linear-gradient(90deg, rgba(129, 140, 248, 0.06), rgba(167, 139, 250, 0.03));
+      background: linear-gradient(90deg, rgba(129, 140, 248, 0.07), rgba(167, 139, 250, 0.04));
+      box-shadow: var(--shadow-sm);
     }
     .pipeline[hidden] { display: none; }
     .pipe-stage { display: flex; align-items: baseline; gap: 10px; }
@@ -1228,14 +1336,26 @@ async function dashboardHtml(config, session) {
     .pipe-summary { margin-left: auto; font-size: 14px; color: var(--muted); }
 
     .workgrid { display: grid; gap: 28px; }
-    .history-list { max-height: 420px; overflow: auto; padding: 12px; }
+    @media (min-width: 980px) {
+      .workgrid { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); align-items: start; }
+    }
+    .history-list {
+      max-height: 440px;
+      overflow: auto;
+      padding: 8px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+    }
+    .history-list::-webkit-scrollbar { width: 6px; }
+    .history-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 999px; }
+    .history-list::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
     .run {
       display: grid;
       grid-template-columns: 40px minmax(0, 1fr) auto;
-      gap: 6px 16px;
+      gap: 4px 14px;
       align-items: center;
       width: 100%;
-      padding: 16px 18px;
+      padding: 14px 16px;
       border: 1px solid transparent;
       border-radius: var(--radius-sm);
       background: transparent;
@@ -1243,35 +1363,47 @@ async function dashboardHtml(config, session) {
       font: inherit;
       text-align: left;
       cursor: pointer;
-      transition: background 0.2s ease, border-color 0.2s ease;
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
     }
+    .run + .run { margin-top: 2px; }
     .run:hover { background: rgba(255, 255, 255, 0.04); border-color: var(--line); }
-    .run.selected { background: rgba(129, 140, 248, 0.08); border-color: rgba(129, 140, 248, 0.25); }
+    .run:focus-visible { outline: 2px solid var(--brand-a); outline-offset: -2px; }
+    .run.selected {
+      background: rgba(129, 140, 248, 0.1);
+      border-color: rgba(129, 140, 248, 0.28);
+      box-shadow: inset 3px 0 0 var(--brand-a);
+    }
     .run-icon {
       grid-row: span 2;
       width: 40px; height: 40px;
-      border-radius: 12px;
+      border-radius: var(--radius-sm);
       display: grid;
       place-items: center;
       color: var(--brand-a);
       background: rgba(129, 140, 248, 0.1);
-      border: 1px solid rgba(129, 140, 248, 0.18);
+      border: 1px solid rgba(129, 140, 248, 0.2);
+      transition: background 0.18s ease, border-color 0.18s ease;
     }
-    .run-kind { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .run-meta { grid-column: 2 / 4; font-family: var(--mono); font-size: 12px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .run:hover .run-icon, .run.selected .run-icon {
+      background: rgba(129, 140, 248, 0.16);
+      border-color: rgba(129, 140, 248, 0.32);
+    }
+    .run-kind { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+    .run-meta { grid-column: 2 / 4; font-family: var(--mono); font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .verdict {
       justify-self: end;
       font-family: var(--mono);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
       border-radius: 999px;
-      padding: 4px 12px;
+      padding: 4px 10px;
+      border: 1px solid transparent;
     }
-    .verdict.pass { color: var(--ok); background: rgba(74, 222, 128, 0.1); }
-    .verdict.fail { color: var(--bad); background: rgba(248, 113, 113, 0.1); }
-    .verdict.stored { color: var(--muted); background: rgba(255, 255, 255, 0.06); }
+    .verdict.pass { color: var(--ok); background: var(--ok-dim); border-color: rgba(74, 222, 128, 0.22); }
+    .verdict.fail { color: var(--bad); background: var(--bad-dim); border-color: rgba(248, 113, 113, 0.22); }
+    .verdict.stored { color: var(--muted); background: rgba(255, 255, 255, 0.05); border-color: var(--line); }
     .empty {
       display: grid;
       justify-items: center;
@@ -1298,29 +1430,34 @@ async function dashboardHtml(config, session) {
       background: transparent;
       color: var(--muted);
       font: inherit;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
-      padding: 6px 16px;
+      padding: 6px 14px;
       cursor: pointer;
-      transition: background 0.2s ease, color 0.2s ease;
+      transition: background 0.18s ease, color 0.18s ease;
     }
-    .seg button.active { background: rgba(255, 255, 255, 0.1); color: var(--ink); }
-    .seg button:hover:not(.active) { color: var(--ink); }
+    .seg button.active { background: rgba(255, 255, 255, 0.1); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+    .seg button:hover:not(.active) { color: var(--ink); background: rgba(255, 255, 255, 0.04); }
+    .seg button:focus-visible { outline-offset: -2px; }
 
     pre#output {
       overflow: auto;
       margin: 0;
       min-height: 360px;
-      max-height: 520px;
-      padding: 24px 28px;
-      background: transparent;
+      max-height: 560px;
+      padding: 20px 24px;
+      background: rgba(6, 6, 8, 0.5);
       color: #e4e4e7;
       font-family: var(--mono);
-      font-size: 13px;
-      line-height: 1.75;
+      font-size: 12.5px;
+      line-height: 1.7;
       white-space: pre-wrap;
       word-break: break-word;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
     }
+    pre#output::-webkit-scrollbar { width: 6px; height: 6px; }
+    pre#output::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 999px; }
     .j-key { color: #8ab4ff; }
     .j-str { color: #7ee0c2; }
     .j-num { color: #fbbf24; }
@@ -1330,25 +1467,31 @@ async function dashboardHtml(config, session) {
     .readable {
       overflow: auto;
       min-height: 360px;
-      max-height: 520px;
-      font-size: 14px;
-      line-height: 1.65;
+      max-height: 560px;
+      font-size: 13.5px;
+      line-height: 1.6;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
     }
+    .readable::-webkit-scrollbar { width: 6px; }
+    .readable::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 999px; }
     .readable details { border-bottom: 1px solid var(--line); }
     .readable details:last-child { border-bottom: none; }
     .readable summary {
-      padding: 16px 28px;
+      padding: 14px 24px;
       cursor: pointer;
       font-weight: 500;
-      font-size: 14px;
+      font-size: 13.5px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       user-select: none;
       list-style: none;
-      transition: background 0.2s ease;
+      transition: background 0.18s ease, color 0.18s ease;
     }
-    .readable summary:hover { background: rgba(255, 255, 255, 0.03); }
+    .readable summary:hover { background: rgba(255, 255, 255, 0.03); color: var(--ink); }
+    .readable summary:focus-visible { outline-offset: -2px; background: rgba(255, 255, 255, 0.04); }
+    .readable details[open] > summary { background: rgba(255, 255, 255, 0.025); border-bottom: 1px solid var(--line); }
     .readable summary::-webkit-details-marker { display: none; }
     .readable summary::before {
       content: "";
@@ -1361,21 +1504,42 @@ async function dashboardHtml(config, session) {
     }
     .readable details[open] > summary::before { transform: rotate(45deg); }
     .readable summary .preview { color: var(--faint); font-weight: 450; font-size: 12px; }
-    .readable .detail-body { padding: 4px 28px 20px 40px; }
+    .readable .detail-body { padding: 16px 24px 20px 32px; }
     .r-badge {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
       border-radius: 999px;
-      padding: 1px 9px;
+      padding: 2px 9px;
       font-family: var(--mono);
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
+      border: 1px solid transparent;
+      line-height: 1.4;
     }
-    .r-badge.pass { background: rgba(52, 211, 153, 0.13); color: var(--ok); }
-    .r-badge.fail, .r-badge.high { background: rgba(251, 113, 133, 0.13); color: var(--bad); }
-    .r-badge.medium { background: rgba(251, 191, 36, 0.13); color: var(--warn); }
-    .r-badge.low { background: rgba(148, 163, 199, 0.13); color: var(--muted); }
+    .r-badge.pass { background: var(--ok-dim); color: var(--ok); border-color: rgba(74, 222, 128, 0.25); }
+    .r-badge.fail, .r-badge.high { background: var(--bad-dim); color: var(--bad); border-color: rgba(248, 113, 113, 0.25); }
+    .r-badge.medium { background: var(--warn-dim); color: var(--warn); border-color: rgba(251, 191, 36, 0.25); }
+    .r-badge.low { background: rgba(148, 163, 184, 0.12); color: #94a3b8; border-color: rgba(148, 163, 184, 0.22); }
+    .drift-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: var(--radius-xs);
+      padding: 2px 8px;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+      line-height: 1.4;
+    }
+    .drift-badge.drift-visual { color: var(--drift-visual); background: var(--drift-visual-dim); border-color: rgba(244, 114, 182, 0.28); }
+    .drift-badge.drift-component { color: var(--drift-component); background: var(--drift-component-dim); border-color: rgba(129, 140, 248, 0.28); }
+    .drift-badge.drift-interaction { color: var(--drift-interaction); background: var(--drift-interaction-dim); border-color: rgba(34, 211, 238, 0.28); }
+    .drift-badge.drift-responsive { color: var(--drift-responsive); background: var(--drift-responsive-dim); border-color: rgba(192, 132, 252, 0.28); }
+    .drift-badge.drift-other { color: var(--muted); background: rgba(255, 255, 255, 0.05); border-color: var(--line); }
     .score-bar-wrap { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
     .score-bar-wrap strong { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
     .score-bar { height: 6px; border-radius: 999px; background: rgba(148, 163, 199, 0.14); flex: 1; overflow: hidden; }
@@ -1383,24 +1547,53 @@ async function dashboardHtml(config, session) {
     .score-bar-fill.good { background: linear-gradient(90deg, #10b981, var(--ok)); }
     .score-bar-fill.warn { background: linear-gradient(90deg, #d97706, var(--warn)); }
     .score-bar-fill.bad { background: linear-gradient(90deg, #e11d48, var(--bad)); }
-    .r-chips { display: flex; gap: 7px; flex-wrap: wrap; }
-    .r-chip { border: 1px solid var(--line); border-radius: 7px; padding: 3px 10px; font-size: 12px; color: var(--muted); }
-    .r-kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 14px; }
-    .r-kv dt { color: var(--faint); font-size: 12px; }
-    .r-kv dd { margin: 0; font-size: 12px; color: var(--muted); word-break: break-word; }
+    .r-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .r-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xs);
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.02);
+      transition: border-color 0.18s ease, background 0.18s ease;
+    }
+    .r-chip:hover { border-color: var(--line-strong); background: rgba(255, 255, 255, 0.04); }
+    .r-kv { display: grid; grid-template-columns: minmax(88px, 120px) 1fr; gap: 6px 14px; }
+    .r-kv dt { color: var(--faint); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+    .r-kv dd { margin: 0; font-size: 12.5px; color: var(--muted); word-break: break-word; line-height: 1.55; }
     .r-issue {
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 11px 13px;
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
       margin-bottom: 8px;
-      background: rgba(5, 6, 11, 0.4);
+      background: rgba(6, 6, 8, 0.45);
+      border-left-width: 3px;
+      transition: border-color 0.18s ease, background 0.18s ease;
     }
+    .r-issue:hover { background: rgba(255, 255, 255, 0.025); border-color: var(--line-strong); }
+    .r-issue.r-sev-high { border-left-color: var(--bad); }
+    .r-issue.r-sev-medium { border-left-color: var(--warn); }
+    .r-issue.r-sev-low { border-left-color: #94a3b8; }
     .r-issue:last-child { margin-bottom: 0; }
-    .r-issue-head { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; font-weight: 600; font-size: 12.5px; font-family: var(--mono); }
+    .r-issue-head {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 12px;
+      font-family: var(--mono);
+    }
+    .r-issue-id { color: var(--ink); font-weight: 500; letter-spacing: -0.01em; }
     .r-issue dl { margin: 0; }
     .r-list { padding-left: 18px; margin: 0; color: var(--muted); }
-    .r-list li { margin-bottom: 4px; font-size: 12px; }
-    .r-text { font-size: 12px; color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+    .r-list li { margin-bottom: 6px; font-size: 12.5px; line-height: 1.55; }
+    .r-list li::marker { color: var(--faint); }
+    .r-text { font-size: 12.5px; color: var(--muted); white-space: pre-wrap; word-break: break-word; line-height: 1.6; }
 
     /* ── Setup section ─────────────────────────────────────────────── */
     .section-title { margin: 0; }
@@ -1427,7 +1620,8 @@ async function dashboardHtml(config, session) {
       transition: background 0.2s ease, color 0.2s ease;
     }
     .panel-tabs button.active { background: rgba(255, 255, 255, 0.1); color: var(--ink); }
-    .panel-tabs button:hover:not(.active) { color: var(--ink); }
+    .panel-tabs button:hover:not(.active) { color: var(--ink); background: rgba(255, 255, 255, 0.04); }
+    .panel-tabs button:focus-visible { outline-offset: -2px; }
     .tab-pane[hidden] { display: none; }
     .setup-panel {
       position: relative;
@@ -1435,7 +1629,7 @@ async function dashboardHtml(config, session) {
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--surface);
-      padding: 36px 40px 40px;
+      padding: 44px 48px 48px;
       -webkit-backdrop-filter: blur(16px);
       backdrop-filter: blur(16px);
     }
@@ -1449,12 +1643,12 @@ async function dashboardHtml(config, session) {
       pointer-events: none;
     }
     .setup-panel:hover::before { opacity: 1; }
-    .setup-head { margin-bottom: 28px; position: relative; display: grid; gap: 10px; }
+    .setup-head { margin-bottom: 32px; position: relative; display: grid; gap: 12px; }
     .setup-head .source-badge { justify-self: start; margin-top: 4px; }
     .project-pill .sep { opacity: 0.35; }
     .setup-head h2 { margin: 0 0 10px; font-size: 22px; letter-spacing: -0.02em; }
     .setup-head p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
-    .setup-stack { display: grid; gap: 32px; position: relative; }
+    .setup-stack { display: grid; gap: 40px; position: relative; }
     .source-pane { display: grid; gap: 20px; }
     .source-pane[hidden] { display: none; }
     .source-note { margin: 0; color: var(--faint); font-size: 14px; line-height: 1.7; }
@@ -1470,7 +1664,16 @@ async function dashboardHtml(config, session) {
       padding: 20px 24px;
     }
     .github-connect strong { display: block; font-size: 15px; margin-bottom: 4px; font-weight: 500; }
-    .github-connect span { color: var(--muted); font-size: 14px; }
+    .github-connect span { color: var(--muted); font-size: 14px; line-height: 1.65; }
+    .github-setup-note {
+      margin: 0;
+      color: var(--faint);
+      font-size: 14px;
+      line-height: 1.75;
+    }
+    .github-setup-note a { color: var(--cyan); text-decoration: none; }
+    .github-setup-note a:hover { text-decoration: underline; }
+    .github-setup-note code { font-size: 12px; word-break: break-all; }
     .auth-form { display: grid; gap: 10px; }
     .auth-form label { display: grid; gap: 10px; font-size: 14px; font-weight: 500; color: var(--muted); }
     .auth-form input {
@@ -1533,19 +1736,20 @@ async function dashboardHtml(config, session) {
       min-height: 280px;
       resize: vertical;
       border: 1px solid var(--line-strong);
-      border-radius: 12px;
-      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      padding: 16px 18px;
       font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.55;
+      font-size: 12.5px;
+      line-height: 1.6;
       color: var(--ink);
-      background: rgba(5, 6, 11, 0.55);
+      background: rgba(6, 6, 8, 0.65);
       width: 100%;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
     .code-editor textarea:focus {
       outline: none;
       border-color: var(--brand-a);
-      box-shadow: 0 0 0 3px rgba(109, 141, 255, 0.18);
+      box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
     }
     .code-toolbar {
       display: flex;
@@ -1563,30 +1767,34 @@ async function dashboardHtml(config, session) {
     }
     .code-pane {
       border: 1px solid var(--line);
-      border-radius: 10px;
+      border-radius: var(--radius-sm);
       overflow: hidden;
-      background: rgba(5, 6, 11, 0.45);
+      background: rgba(6, 6, 8, 0.55);
+      box-shadow: var(--shadow-sm);
     }
     .code-pane-head {
-      padding: 8px 12px;
+      padding: 10px 14px;
       border-bottom: 1px solid var(--line);
-      font-size: 11px;
-      font-weight: 650;
-      letter-spacing: 0.06em;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--faint);
+      background: rgba(255, 255, 255, 0.02);
     }
     .code-pane pre {
       margin: 0;
-      padding: 12px;
+      padding: 14px 16px;
       overflow: auto;
       max-height: 320px;
       font-family: var(--mono);
-      font-size: 11px;
-      line-height: 1.55;
-      color: #dbe4f8;
+      font-size: 11.5px;
+      line-height: 1.6;
+      color: #e4e4e7;
       white-space: pre-wrap;
       word-break: break-word;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
     }
     @media (max-width: 900px) {
       .code-diff { grid-template-columns: 1fr; }
@@ -1649,8 +1857,71 @@ async function dashboardHtml(config, session) {
     .welcome h3 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
     .welcome p { max-width: 440px; margin: 0 auto 24px; font-size: 15px; line-height: 1.7; }
 
+    /* ── Studio review receipt ─────────────────────────────────────── */
+    .review-hero {
+      padding: 18px 24px 16px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(129, 140, 248, 0.04) 0%, transparent 100%);
+    }
+    .review-verdict-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .review-summary { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+    .review-meta { margin-bottom: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+    .review-meta strong { color: var(--ink); font-weight: 500; }
+    .review-action { margin: 12px 0 4px; }
+    .review-action .btn { min-height: 40px; padding: 0 18px; font-size: 13px; }
+    .review-pipeline {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 12px;
+      padding-top: 4px;
+    }
+    .review-pipeline-arrow { color: var(--faint); font-size: 14px; }
+    .review-pipeline-step { display: inline-flex; align-items: center; gap: 6px; }
+    .review-pipeline-note { color: var(--ok); font-size: 11px; margin-left: 2px; }
+    .health-card {
+      margin-bottom: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      font-size: 12.5px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .health-card strong { color: var(--ink); font-weight: 600; }
+    .gate-row { margin-bottom: 12px; font-size: 12.5px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .patch-title { font-size: 12px; font-weight: 600; display: block; margin-bottom: 6px; color: var(--ink); }
+
     @media (min-width: 900px) {
       .project-pill { display: inline-flex; }
+    }
+    @media (min-width: 1280px) {
+      .content { max-width: 1280px; }
+      .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+      .workgrid { gap: 24px; }
+    }
+    @media (min-width: 1920px) {
+      .content { max-width: 1400px; }
+      .page { padding-top: 56px; }
+      .stat-value { font-size: 44px; }
+    }
+    @media (max-width: 768px) {
+      .nav { min-height: 56px; gap: 12px; }
+      .nav-left { gap: 16px; }
+      .state-chip { display: none; }
+      .page-head { gap: 24px; }
+      h1 { font-size: clamp(28px, 8vw, 36px); }
+      .lede { font-size: 15px; }
+      .setup-panel { padding: 24px 20px; }
+      .panel-head { flex-wrap: wrap; gap: 12px; }
+      .workgrid { gap: 20px; }
+      .history-list, pre#output, .readable { max-height: 360px; min-height: 280px; }
     }
     @media (max-width: 720px) {
       .stats { grid-template-columns: 1fr; }
@@ -1668,6 +1939,7 @@ async function dashboardHtml(config, session) {
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#overview">Skip to content</a>
   <div class="backdrop" aria-hidden="true">
     <div class="aurora"></div>
     <div class="grid-bg"></div>
@@ -1678,8 +1950,8 @@ async function dashboardHtml(config, session) {
       <a class="brand" href="/" title="Back to morph">
         <span class="mark">m</span><span>morph</span>
       </a>
-      <nav class="nav-links" aria-label="Studio">
-        <a class="nav-link active" href="#overview">Overview</a>
+      <nav class="nav-links" aria-label="Studio sections">
+        <a class="nav-link active" href="#overview" aria-current="page">Overview</a>
         <a class="nav-link" href="#history">History</a>
       </nav>
     </div>
@@ -1721,20 +1993,12 @@ async function dashboardHtml(config, session) {
             </div>
           </div>
           <div class="source-pane" data-source-pane="github" hidden>
-            <div class="github-connect">
-              <div>
-                <strong id="githubStatusLabel">${githubConnected ? "GitHub connected" : "Connect GitHub"}</strong>
-                <span id="githubStatusText">${githubConnected ? githubLabel : "Sign in to review agent branches from your repos."}</span>
-              </div>
-              ${githubConnected
-                ? `<span class="auth-status ready">Connected</span>`
-                : `<a class="btn btn-ghost" href="/auth/github?returnTo=%2Fstudio">Connect GitHub</a>`}
-            </div>
+            ${githubConnectBlock}
             <label class="auth-form" for="githubRepo">
               <span>Repository</span>
               <input id="githubRepo" name="githubRepo" type="text" required autocomplete="off" placeholder="owner/repo">
             </label>
-            <p class="source-note">morph clones the repo, scores the current UI, and shows the possible score after a full redesign at <code>/transformed</code>.</p>
+            <p class="source-note">morph clones the repo, scores the current UI, and shows the possible score after a full redesign at <code>/transformed</code>. Public repos work without sign-in; connect GitHub for private repos.</p>
           </div>
           <div class="source-pane" data-source-pane="url" hidden>
             <form class="auth-form" id="previewForm" onsubmit="return false">
@@ -1845,19 +2109,54 @@ async function dashboardHtml(config, session) {
     sourceCodeInput?.addEventListener("input", updateSourceBadge);
     if (sourceCodeInput && DEMO_DRIFT) sourceCodeInput.value = DEMO_DRIFT;
 
+    function activateSourceTab(sourceName) {
+      activeSource = sourceName;
+      document.querySelectorAll("[data-source-tab]").forEach((candidate) => {
+        const active = candidate.dataset.sourceTab === sourceName;
+        candidate.classList.toggle("active", active);
+        candidate.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      document.querySelectorAll("[data-source-pane]").forEach((pane) => {
+        pane.hidden = pane.dataset.sourcePane !== sourceName;
+      });
+      updateSourceBadge();
+    }
+
     document.querySelectorAll("[data-source-tab]").forEach((tabButton) => {
       tabButton.addEventListener("click", () => {
-        activeSource = tabButton.dataset.sourceTab || "github";
-        document.querySelectorAll("[data-source-tab]").forEach((candidate) => {
-          const active = candidate === tabButton;
-          candidate.classList.toggle("active", active);
-          candidate.setAttribute("aria-selected", active ? "true" : "false");
-        });
-        document.querySelectorAll("[data-source-pane]").forEach((pane) => {
-          pane.hidden = pane.dataset.sourcePane !== activeSource;
-        });
-        updateSourceBadge();
+        activateSourceTab(tabButton.dataset.sourceTab || "paste");
       });
+    });
+
+    const initialSource = new URLSearchParams(window.location.search).get("source");
+    if (initialSource === "github" || initialSource === "url" || initialSource === "paste") {
+      activateSourceTab(initialSource);
+    }
+
+    const githubOAuthForm = document.querySelector("#githubOAuthForm");
+    const githubOAuthStatus = document.querySelector("#githubOAuthStatus");
+    githubOAuthForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const clientId = document.querySelector("#githubClientId")?.value.trim() || "";
+      const clientSecret = document.querySelector("#githubClientSecret")?.value.trim() || "";
+      if (!clientId || !clientSecret) return;
+      if (githubOAuthStatus) {
+        githubOAuthStatus.hidden = false;
+        githubOAuthStatus.textContent = "Saving credentials…";
+        githubOAuthStatus.className = "auth-status pending";
+      }
+      try {
+        await api("/api/auth/github", {
+          method: "POST",
+          body: JSON.stringify({ clientId, clientSecret })
+        });
+        window.location.href = "/studio?source=github";
+      } catch (error) {
+        if (githubOAuthStatus) {
+          githubOAuthStatus.textContent = error.message || "Could not save GitHub credentials.";
+          githubOAuthStatus.className = "auth-status pending";
+        }
+      }
     });
 
     function updateSourceBadge() {
@@ -1958,6 +2257,19 @@ async function dashboardHtml(config, session) {
       return '<span class="r-badge ' + cls + '">' + esc(String(text)) + '</span>';
     }
 
+    function driftBadge(type) {
+      const t = String(type || "").toLowerCase();
+      const map = {
+        design_drift: { cls: "drift-visual", label: "visual" },
+        visual_drift: { cls: "drift-visual", label: "visual" },
+        component_drift: { cls: "drift-component", label: "component" },
+        interaction_drift: { cls: "drift-interaction", label: "interaction" },
+        responsive_drift: { cls: "drift-responsive", label: "responsive" }
+      };
+      const m = map[t] || { cls: "drift-other", label: t.replace(/_drift$/, "").replace(/_/g, " ") || "drift" };
+      return '<span class="drift-badge ' + m.cls + '">' + esc(m.label) + '</span>';
+    }
+
     function esc(s) {
       return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
     }
@@ -1984,42 +2296,40 @@ async function dashboardHtml(config, session) {
       const repair = p.repair;
       const vCls   = p.finalVerdict === "pass" ? "pass" : "fail";
 
-      let html = '<div style="padding:14px 14px 10px;border-bottom:1px solid var(--line)">';
-      // Overall verdict + summary line
-      html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+      let html = '<div class="review-hero">';
+      html += '<div class="review-verdict-row">';
       html += badge(p.finalVerdict || "unknown", vCls);
-      html += '<span style="color:var(--muted);font-size:12px">' + esc(p.ciSummary || "") + '</span>';
+      html += '<span class="review-summary">' + esc(p.ciSummary || "") + '</span>';
       html += '</div>';
       if (p.instructions) {
-        html += '<div style="margin-bottom:8px;font-size:12px;color:var(--muted)"><strong style="color:var(--ink)">Instructions:</strong> ' + esc(p.instructions) + '</div>';
+        html += '<div class="review-meta"><strong>Instructions:</strong> ' + esc(p.instructions) + '</div>';
       }
       if (p.githubRepo) {
-        html += '<div style="margin-bottom:8px;font-size:12px;color:var(--muted)"><strong style="color:var(--ink)">GitHub:</strong> ' + esc(p.githubRepo) + '</div>';
+        html += '<div class="review-meta"><strong>GitHub:</strong> ' + esc(p.githubRepo) + '</div>';
       }
       if (p.transform?.profile) {
-        html += '<div style="margin-bottom:8px;font-size:12px;color:var(--muted)"><strong style="color:var(--ink)">Design profile:</strong> '
+        html += '<div class="review-meta"><strong>Design profile:</strong> '
           + esc(p.transform.profile.name) + ' — ' + esc(p.transform.profile.inspiration || "") + '</div>';
       }
       if (p.transformedPreviewPath) {
-        html += '<div style="margin:10px 0"><a class="btn btn-primary" href="' + esc(p.transformedPreviewPath) + '" target="_blank" rel="noreferrer">Open transformed site ↗</a></div>';
+        html += '<div class="review-action"><a class="btn btn-primary" href="' + esc(p.transformedPreviewPath) + '" target="_blank" rel="noreferrer">Open transformed site ↗</a></div>';
       }
       if (p.previewUrl) {
-        html += '<div style="margin-bottom:8px;font-size:12px;color:var(--muted)"><strong style="color:var(--ink)">Preview URL:</strong> ' + esc(p.previewUrl) + '</div>';
+        html += '<div class="review-meta"><strong>Preview URL:</strong> ' + esc(p.previewUrl) + '</div>';
       }
       if (p.targetFile) {
-        html += '<div style="margin-bottom:8px;font-size:12px;color:var(--muted)"><strong style="color:var(--ink)">File:</strong> ' + esc(p.targetFile) + '</div>';
+        html += '<div class="review-meta"><strong>File:</strong> ' + esc(p.targetFile) + '</div>';
       }
-      // Pipeline strip: Current → Redesign → Possible
-      html += '<div style="display:flex;gap:8px;align-items:center;font-size:12px;flex-wrap:wrap">';
+      html += '<div class="review-pipeline">';
       html += pipelineStep("Current", before?.score);
-      html += '<span style="color:var(--muted)">→</span>';
-      html += '<span style="color:var(--muted)">' + esc(p.engine === "design_db_transform"
+      html += '<span class="review-pipeline-arrow" aria-hidden="true">→</span>';
+      html += '<span class="review-summary">' + esc(p.engine === "design_db_transform"
         ? (p.transform?.profile?.name || "Redesign")
         : String(repair?.replacements ?? 0) + " fixes") + '</span>';
-      html += '<span style="color:var(--muted)">→</span>';
+      html += '<span class="review-pipeline-arrow" aria-hidden="true">→</span>';
       html += pipelineStep("Possible", after?.score);
       if (p.redesignPasses && p.finalVerdict !== "pass") {
-        html += '<span style="color:var(--ok);font-size:11px;margin-left:4px">would pass after redesign</span>';
+        html += '<span class="review-pipeline-note">would pass after redesign</span>';
       }
       html += '</div>';
       html += '</div>';
@@ -2069,7 +2379,7 @@ async function dashboardHtml(config, session) {
     function pipelineStep(label, score) {
       const n = Number(score);
       const cls = n >= 95 ? "pass" : "fail";
-      return '<span>' + esc(label) + ': ' + badge(n >= 95 ? "pass" : "fail", cls) + ' <strong>' + esc(String(score ?? "?")) + '</strong>/100</span>';
+      return '<span class="review-pipeline-step">' + esc(label) + ': ' + badge(n >= 95 ? "pass" : "fail", cls) + ' <strong>' + esc(String(score ?? "?")) + '</strong>/100</span>';
     }
 
     // ── Report body (shared by before/after and plain verify runs) ────────────
@@ -2100,18 +2410,18 @@ async function dashboardHtml(config, session) {
       // Gate
       if (report.gate) {
         const g = report.gate;
-        html += '<div style="margin-bottom:10px;font-size:12px">';
+        html += '<div class="gate-row">';
         html += 'Merge gate: ' + badge(g.passed ? "passed" : "blocked", g.passed ? "pass" : "fail");
-        html += ' &nbsp;threshold ' + esc(String(g.threshold)) + '/100';
+        html += '<span class="review-summary">threshold ' + esc(String(g.threshold)) + '/100</span>';
         html += '</div>';
       }
 
       if (report.health?.score != null) {
-        html += '<div style="margin-bottom:10px;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:12px">';
+        html += '<div class="health-card">';
         html += '<strong>Buoy health</strong> · ' + esc(String(report.health.score)) + '/100';
         if (report.health.tier) html += ' · ' + esc(report.health.tier);
         if (Array.isArray(report.health.suggestions) && report.health.suggestions.length) {
-          html += '<ul class="r-list" style="margin-top:6px">' + report.health.suggestions.slice(0, 3).map((item) => '<li>' + esc(item) + '</li>').join("") + '</ul>';
+          html += '<ul class="r-list" style="margin-top:8px">' + report.health.suggestions.slice(0, 3).map((item) => '<li>' + esc(item) + '</li>').join("") + '</ul>';
         }
         html += '</div>';
       }
@@ -2129,8 +2439,9 @@ async function dashboardHtml(config, session) {
       if (Array.isArray(report.issues) && report.issues.length > 0) {
         html += report.issues.map(issue => {
           const sev = String(issue.severity || "low").toLowerCase();
-          return '<div class="r-issue">' +
-            '<div class="r-issue-head">' + badge(issue.severity, sev) + ' <span>' + esc(issue.id || "") + '</span></div>' +
+          const drift = issue.type ? driftBadge(issue.type) : "";
+          return '<div class="r-issue r-sev-' + sev + '">' +
+            '<div class="r-issue-head">' + badge(issue.severity, sev) + drift + '<span class="r-issue-id">' + esc(issue.id || "") + '</span></div>' +
             '<dl class="r-kv">' +
             (issue.file ? '<dt>File</dt><dd>' + esc(issue.file) + (issue.line ? ':' + issue.line : '') + '</dd>' : '') +
             (issue.reason ? '<dt>Reason</dt><dd>' + esc(issue.reason) + '</dd>' : '') +
@@ -2160,7 +2471,7 @@ async function dashboardHtml(config, session) {
       html += '<dt>Risk</dt><dd>' + esc(repair.risk || "unknown") + '</dd>';
       html += '</dl>';
       if (Array.isArray(repair.patches) && repair.patches.length) {
-        html += '<strong style="font-size:12px;display:block;margin-bottom:4px">Patched files</strong>';
+        html += '<strong class="patch-title">Patched files</strong>';
         html += '<ul class="r-list">' + repair.patches.map(p => '<li>' + esc(p.file) + ' (' + (p.replacements?.length || 0) + ' replacements)</li>').join("") + '</ul>';
       }
       return html;

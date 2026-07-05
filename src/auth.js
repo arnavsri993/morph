@@ -166,6 +166,9 @@ export function createAuthManager(config, runtimeAuth) {
       iat: now,
       exp: now + SESSION_TTL_MS
     };
+    if (user.provider === "github" && user.accessToken) {
+      payload.githubToken = user.accessToken;
+    }
     const token = signSession(payload);
     response.setHeader("set-cookie", buildSessionCookie(token));
     return payload;
@@ -208,7 +211,7 @@ export function createAuthManager(config, runtimeAuth) {
       const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: redirectUri,
-        scope: "read:user user:email",
+        scope: "read:user user:email repo",
         state
       });
       return `https://github.com/login/oauth/authorize?${params}`;
@@ -331,7 +334,8 @@ export function createAuthManager(config, runtimeAuth) {
       email: email || `${profile.login}@users.noreply.github.com`,
       name: profile.name || profile.login,
       picture: profile.avatar_url ?? null,
-      provider: "github"
+      provider: "github",
+      accessToken: tokenPayload.access_token
     };
   }
 

@@ -4,18 +4,21 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 
-export function githubCloneUrl(repo) {
+export function githubCloneUrl(repo, { token = null } = {}) {
   const raw = String(repo ?? "").trim();
   if (!raw) throw new Error("A GitHub repository is required.");
   if (/^https?:\/\//i.test(raw) || /^git@/i.test(raw) || /^file:\/\//i.test(raw)) return raw;
   if (!/^[\w.-]+\/[\w.-]+$/.test(raw)) {
     throw new Error(`"${raw}" is not a valid GitHub repository. Use owner/repo or a full URL.`);
   }
+  if (token) {
+    return `https://x-access-token:${encodeURIComponent(token)}@github.com/${raw}.git`;
+  }
   return `https://github.com/${raw}.git`;
 }
 
-export async function cloneRepo(repo, destination, { branch = null, timeoutMs = 60_000 } = {}) {
-  const url = githubCloneUrl(repo);
+export async function cloneRepo(repo, destination, { branch = null, timeoutMs = 60_000, token = null } = {}) {
+  const url = githubCloneUrl(repo, { token });
   if (existsSync(destination)) {
     await rm(destination, { recursive: true, force: true });
   }
