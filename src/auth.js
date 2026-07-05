@@ -58,10 +58,7 @@ export function createAuthManager(config, runtimeAuth) {
   }
 
   function getAuthMode() {
-    const explicit = config.auth?.mode ?? process.env.MORPH_AUTH_MODE ?? "dev";
-    if (explicit === "oauth") return "oauth";
-    if (explicit === "dev" && (isGoogleConfigured() || isGithubConfigured())) return "oauth";
-    return explicit;
+    return config.auth?.mode ?? process.env.MORPH_AUTH_MODE ?? "dev";
   }
 
   function isAuthRequired() {
@@ -411,23 +408,27 @@ MORPH_AUTH_MODE=oauth</pre>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Log in · Morph</title>
-  <meta name="theme-color" content="#04060c">
+  <title>Log in · morph</title>
+  <meta name="theme-color" content="#05060b">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
-      --bg: #04060c;
-      --ink: #e9effd;
-      --muted: #97a3c0;
-      --faint: #67738f;
-      --line: rgba(151, 163, 192, 0.16);
-      --line-strong: rgba(151, 163, 192, 0.3);
-      --surface: rgba(13, 19, 34, 0.72);
-      --accent: #5b8cff;
+      --bg: #05060b;
+      --ink: #eef2fc;
+      --muted: #98a3c1;
+      --faint: #67718e;
+      --line: rgba(148, 163, 199, 0.16);
+      --line-strong: rgba(148, 163, 199, 0.3);
+      --surface: rgba(14, 18, 30, 0.72);
+      --accent: #6d8dff;
       --accent-2: #22d3ee;
       --ok: #34d399;
       --bad: #fb7185;
-      --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+      --display: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     }
     * { box-sizing: border-box; }
     body {
@@ -469,6 +470,7 @@ MORPH_AUTH_MODE=oauth</pre>
       display: flex;
       align-items: center;
       gap: 10px;
+      font-family: var(--display);
       font-weight: 700;
       margin-bottom: 22px;
       color: inherit;
@@ -483,18 +485,10 @@ MORPH_AUTH_MODE=oauth</pre>
       font-size: 15px;
       font-weight: 800;
       color: #fff;
-      background: linear-gradient(135deg, #5b8cff 0%, #7c5cff 55%, #22d3ee 130%);
+      background: linear-gradient(135deg, #6d8dff 0%, #8b5cf6 55%, #22d3ee 130%);
       box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.4), 0 6px 20px -6px rgba(91, 140, 255, 0.7);
     }
-    .brand-tag {
-      color: var(--faint);
-      font-weight: 500;
-      font-size: 13px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 2px 9px;
-    }
-    h1 { margin: 0 0 8px; font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; }
+    h1 { margin: 0 0 8px; font-family: var(--display); font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 700; }
     .sub { margin: 0 0 22px; color: var(--muted); line-height: 1.55; font-size: 14.5px; }
     .providers { display: grid; gap: 10px; }
     .provider {
@@ -519,7 +513,7 @@ MORPH_AUTH_MODE=oauth</pre>
     .provider.google:hover { background: #fff; }
     .provider.continue {
       color: #fff;
-      background: linear-gradient(135deg, #5b8cff, #7c5cff);
+      background: linear-gradient(135deg, #6d8dff, #8b5cf6);
       border: 0;
       box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.45) inset, 0 14px 34px -12px rgba(91, 140, 255, 0.65);
       margin-top: 16px;
@@ -593,9 +587,9 @@ MORPH_AUTH_MODE=oauth</pre>
     <div class="orb orb-b"></div>
   </div>
   <main class="card">
-    <a class="brand" href="/"><span class="mark">M</span><span>Morph</span><span class="brand-tag">Studio</span></a>
+    <a class="brand" href="/"><span class="mark">m</span><span>morph</span></a>
     <h1>Log in</h1>
-    <p class="sub">Access the Morph review control plane — before/after reviews, repair loops, and stored receipts.</p>
+    <p class="sub">Access the morph review control plane — before/after reviews, repair loops, and stored receipts.</p>
     ${errorBlock}
     ${providerSection}
     <a class="back" href="/">← Back to morph landing page</a>

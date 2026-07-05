@@ -16,26 +16,30 @@ export function landingHtml(config, session) {
   <meta property="og:title" content="Morph — CI for agent-written frontend">
   <meta property="og:description" content="AI writes the UI. Morph makes it belong. Verify, repair, and gate agent-generated frontend with deterministic patches and JSON receipts.">
   <meta property="og:type" content="website">
-  <meta name="theme-color" content="#04060c">
+  <meta name="theme-color" content="#05060b">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
-      --bg: #04060c;
+      --bg: #05060b;
       --bg-soft: #070b15;
-      --raised: rgba(13, 19, 34, 0.62);
-      --ink: #e9effd;
-      --muted: #97a3c0;
-      --faint: #67738f;
-      --line: rgba(151, 163, 192, 0.14);
-      --line-strong: rgba(151, 163, 192, 0.28);
-      --accent: #5b8cff;
+      --raised: rgba(14, 18, 30, 0.62);
+      --ink: #eef2fc;
+      --muted: #98a3c1;
+      --faint: #67718e;
+      --line: rgba(148, 163, 199, 0.13);
+      --line-strong: rgba(148, 163, 199, 0.26);
+      --accent: #6d8dff;
       --accent-2: #22d3ee;
       --violet: #8b5cf6;
       --ok: #34d399;
       --bad: #fb7185;
       --warn: #fbbf24;
       --font: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+      --display: "Space Grotesk", var(--font);
+      --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
@@ -159,6 +163,7 @@ export function landingHtml(config, session) {
       align-items: center;
       gap: 10px;
       text-decoration: none;
+      font-family: var(--display);
       font-weight: 700;
       font-size: 17px;
       letter-spacing: -0.01em;
@@ -171,17 +176,8 @@ export function landingHtml(config, session) {
       font-size: 15px;
       font-weight: 800;
       color: #fff;
-      background: linear-gradient(135deg, #5b8cff 0%, #7c5cff 55%, #22d3ee 130%);
+      background: linear-gradient(135deg, #6d8dff 0%, #8b5cf6 55%, #22d3ee 130%);
       box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.4), 0 6px 20px -6px rgba(91, 140, 255, 0.7);
-    }
-    .brand-tag {
-      color: var(--faint);
-      font-weight: 500;
-      font-size: 13px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 2px 9px;
-      margin-left: 2px;
     }
     .nav-links {
       display: flex;
@@ -235,7 +231,7 @@ export function landingHtml(config, session) {
     .btn svg { flex: none; }
     .btn-primary {
       color: #fff;
-      background: linear-gradient(135deg, #5b8cff, #7c5cff);
+      background: linear-gradient(135deg, #6d8dff, #8b5cf6);
       box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.45) inset, 0 14px 34px -12px rgba(91, 140, 255, 0.65);
     }
     .btn-primary:hover {
@@ -308,18 +304,19 @@ export function landingHtml(config, session) {
       font-size: 11px;
       font-weight: 800;
       color: #fff;
-      background: linear-gradient(135deg, #5b8cff, #7c5cff);
+      background: linear-gradient(135deg, #6d8dff, #8b5cf6);
     }
     .eyebrow strong { color: var(--ink); font-weight: 650; }
     h1 {
       margin: 0 0 22px;
-      font-size: clamp(38px, 5.4vw, 62px);
-      line-height: 1.04;
-      letter-spacing: -0.03em;
-      font-weight: 750;
+      font-family: var(--display);
+      font-size: clamp(38px, 5.4vw, 60px);
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+      font-weight: 700;
     }
     .grad {
-      background: linear-gradient(92deg, #5b8cff 0%, #22d3ee 55%, #8b5cf6 110%);
+      background: linear-gradient(92deg, #6d8dff 0%, #22d3ee 55%, #8b5cf6 110%);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -480,10 +477,11 @@ export function landingHtml(config, session) {
     }
     h2 {
       margin: 0 0 16px;
-      font-size: clamp(28px, 3.4vw, 40px);
+      font-family: var(--display);
+      font-size: clamp(28px, 3.4vw, 38px);
       line-height: 1.12;
       letter-spacing: -0.02em;
-      font-weight: 720;
+      font-weight: 700;
     }
     .section-head p { margin: 0; color: var(--muted); font-size: 16.5px; }
 
@@ -1021,10 +1019,9 @@ export function landingHtml(config, session) {
 
   <header class="site-header" id="siteHeader">
     <div class="shell nav-bar">
-      <a class="brand" href="#top" aria-label="Morph home">
-        <span class="mark">M</span>
-        <span>Morph</span>
-        <span class="brand-tag">Studio</span>
+      <a class="brand" href="#top" aria-label="morph home">
+        <span class="mark">m</span>
+        <span>morph</span>
       </a>
       <nav class="nav-links" aria-label="Primary">
         <a href="#product">Product</a>
@@ -1061,9 +1058,9 @@ export function landingHtml(config, session) {
     <!-- ── Hero ─────────────────────────────────────────────────────── -->
     <section class="shell hero">
       <div>
-        <div class="eyebrow reveal"><span class="dot">M</span> <span><strong>Morph</strong> — CI for agent-written frontend</span></div>
-        <h1 class="reveal" style="transition-delay:.06s">AI writes the UI.<br><span class="grad">Morph makes it belong.</span></h1>
-        <p class="lede reveal" style="transition-delay:.12s">Morph catches <strong>design-system drift</strong> in agent-generated frontend, explains every finding in plain language, and emits <strong>deterministic repair patches</strong> your agent can apply — before the PR ever reaches a human.</p>
+        <div class="eyebrow reveal"><span class="dot">m</span> <span><strong>morph</strong> — CI for agent-written frontend</span></div>
+        <h1 class="reveal" style="transition-delay:.06s">AI writes the UI.<br><span class="grad">morph makes it belong.</span></h1>
+        <p class="lede reveal" style="transition-delay:.12s">morph catches <strong>design-system drift</strong> in agent-generated frontend, explains every finding in plain language, and emits <strong>deterministic repair patches</strong> your agent can apply — before the PR ever reaches a human.</p>
         <div class="cta-row reveal" style="transition-delay:.18s">
           <a class="btn btn-primary btn-lg" href="/studio">
             Launch Studio
@@ -1223,13 +1220,14 @@ npm run serve">Copy</button>
       <div class="shell studio-wrap">
         <div>
           <div class="section-head reveal" style="margin-bottom:0">
-            <div class="kicker">Morph Studio</div>
-            <h2>An interactive review journey, not another dashboard</h2>
-            <p>Studio turns the stressful "is this AI code safe to merge?" moment into a guided before/after review with narration, receipts, and a one-click repair loop.</p>
+            <div class="kicker">morph Studio</div>
+            <h2>Connect GitHub or preview a live URL</h2>
+            <p>Studio is where you point morph at agent output: connect a repo, paste a URL for Playwright capture, add instructions, and run the full before/after repair loop with JSON receipts.</p>
           </div>
           <ul class="journey-list reveal" style="transition-delay:.08s">
-            <li><span class="jn">2</span><span><b>Inspect agent UI</b> — token-level findings with severity</span></li>
-            <li><span class="jn">3</span><span><b>Generate fix plan</b> — deterministic patches, previewed</span></li>
+            <li><span class="jn">1</span><span><b>Connect GitHub</b> — sign in and point morph at the agent branch</span></li>
+            <li><span class="jn">2</span><span><b>Or paste a preview URL</b> — morph captures the page with Playwright</span></li>
+            <li><span class="jn">3</span><span><b>Add agent instructions</b> — tell morph what to focus on</span></li>
             <li><span class="jn">4</span><span><b>Run full review</b> — repair an isolated copy, re-verify</span></li>
             <li><span class="jn">5</span><span><b>Ship with receipts</b> — stored runs in JSON or readable mode</span></li>
           </ul>
@@ -1428,7 +1426,7 @@ npm run serve">Copy</button>
     <div class="shell">
       <div class="foot-grid">
         <div class="foot-brand">
-          <a class="brand" href="#top"><span class="mark">M</span><span>Morph</span><span class="brand-tag">Studio</span></a>
+          <a class="brand" href="#top"><span class="mark">m</span><span>morph</span></a>
           <p>The consistency layer between coding agents and production frontend. Verify, repair, and gate agent-written UI with receipts.</p>
         </div>
         <div class="foot-col">

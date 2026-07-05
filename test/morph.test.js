@@ -189,6 +189,13 @@ test("landing page is served at / and the studio dashboard at /studio", async ()
     const studio = await studioResponse.text();
     assert.equal(studio.includes("Run full review"), true);
     assert.equal(studio.includes("Review history"), true);
+    assert.equal(studio.includes("Connect GitHub"), true);
+    assert.equal(studio.includes("Agent instructions"), true);
+    assert.equal(studio.includes("Preview URL"), true);
+    assert.equal(studio.includes("morph"), true);
+    assert.equal(studio.includes("Narrate review"), false);
+    assert.equal(studio.includes("Load broken demo"), false);
+    assert.equal(studio.includes("Paste UI code"), false);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -364,6 +371,83 @@ test("stripe checkout stays stubbed until configured and webhooks verify signatu
   }
 });
 
+test("studio review accepts preview url and agent instructions", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-inputs-"));
+  const fixtureRoot = path.join(tempRoot, "acme-saas");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
+
+  const configPath = path.join(tempRoot, "morph.config.json");
+  await writeFile(configPath, `${JSON.stringify({
+    projectName: "Acme Studio Inputs",
+    projectId: "acme-studio-inputs",
+    projectRoot: "acme-saas",
+    morphDir: ".morph",
+    tokenFiles: ["design-system/tokens.css"],
+    scan: ["src/**/*.tsx"],
+    componentImports: {
+      Button: "src/components/Button.tsx"
+    },
+    gate: {
+      minScore: 95
+    }
+  }, null, 2)}\n`);
+
+  const config = await loadConfig(configPath, tempRoot);
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
+
+  try {
+    const response = await fetch(`${url}/api/studio/review`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        source: "url",
+        previewUrl: "https://example.com/billing",
+        instructions: "Review the agent billing screen for token drift."
+      })
+    });
+    assert.equal(response.status, 201);
+    const payload = await response.json();
+    assert.equal(payload.run.payload.source, "url");
+    assert.equal(payload.run.payload.previewUrl, "https://example.com/billing");
+    assert.equal(payload.run.payload.instructions, "Review the agent billing screen for token drift.");
+    assert.equal(payload.run.payload.preview?.url, "https://example.com/billing");
+    assert.equal(payload.run.payload.finalVerdict, "pass");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("studio review rejects requests without github repo or preview url", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-missing-"));
+  const fixtureRoot = path.join(tempRoot, "acme-saas");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
+
+  const configPath = path.join(tempRoot, "morph.config.json");
+  await writeFile(configPath, `${JSON.stringify({
+    projectName: "Acme Studio Missing",
+    projectRoot: "acme-saas",
+    morphDir: ".morph",
+    tokenFiles: ["design-system/tokens.css"],
+    scan: ["src/**/*.tsx"]
+  }, null, 2)}\n`);
+
+  const config = await loadConfig(configPath, tempRoot);
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
+
+  try {
+    const response = await fetch(`${url}/api/studio/review`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    });
+    assert.equal(response.status, 400);
+    const payload = await response.json();
+    assert.equal(payload.error, "missing_project_source");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test("studio review repairs an isolated copy without mutating source fixture", async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-"));
   const fixtureRoot = path.join(tempRoot, "acme-saas");
@@ -391,7 +475,14 @@ test("studio review repairs an isolated copy without mutating source fixture", a
   const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
 
   try {
-    const response = await fetch(`${url}/api/studio/review`, { method: "POST" });
+    const response = await fetch(`${url}/api/studio/review`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        source: "url",
+        previewUrl: "https://example.com/billing"
+      })
+    });
     assert.equal(response.status, 201);
     const payload = await response.json();
 
