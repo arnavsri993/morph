@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import {
   createReport,
   formatHumanReport,
@@ -171,7 +171,9 @@ async function main() {
     const report = await createReport(config);
     const output = args.output ?? config.report?.defaultOutput ?? null;
     if (output) {
-      await writeFile(config.resolveFromConfig(output), `${JSON.stringify(report, null, 2)}\n`);
+      const destination = config.resolveFromConfig(output);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await writeFile(destination, `${JSON.stringify(report, null, 2)}\n`);
     }
     if (args.store) {
       const stored = await storeRun(config, "verify", report);
