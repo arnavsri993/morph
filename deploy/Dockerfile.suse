@@ -1,0 +1,23 @@
+# morph Studio on openSUSE — SUSE bonus track deployment target.
+# Build: docker build -f deploy/Dockerfile.suse -t morph-studio:suse .
+# Run:   docker run --rm -p 4177:4177 --env-file .env morph-studio:suse
+
+FROM registry.opensuse.org/opensuse/tumbleweed:latest
+
+RUN zypper -n refresh \
+  && zypper -n install nodejs20 npm git \
+  && zypper clean -a
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY . .
+
+ENV NODE_ENV=production
+ENV MORPH_SUSE_RUNTIME=1
+ENV MORPH_CONTAINER_BASE=opensuse
+ENV MORPH_AUTH_MODE=dev
+ENV MORPH_APP_URL=http://127.0.0.1:4177
+
+EXPOSE 4177
+CMD ["node", "./bin/morph.js", "serve", "--config", "morph.config.json", "--host", "0.0.0.0", "--port", "4177"]

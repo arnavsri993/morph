@@ -1,0 +1,47 @@
+# Microsoft for Startups — deploy morph Studio to Azure Container Apps.
+# Requires: az containerapp up (or apply via Azure Portal) and Founders Hub credits.
+#
+#   az containerapp up \
+#     --name morph-studio \
+#     --resource-group morph-rg \
+#     --location eastus \
+#     --environment morph-env \
+#     --source . \
+#     --ingress external \
+#     --target-port 4177
+
+properties:
+  configuration:
+    ingress:
+      external: true
+      targetPort: 4177
+      transport: auto
+    secrets:
+      - name: auth-secret
+        value: replace-me
+      - name: openrouter-api-key
+        value: replace-me
+  template:
+    containers:
+      - name: morph-studio
+        image: morph-studio:suse
+        env:
+          - name: MORPH_AUTH_MODE
+            value: oauth
+          - name: MORPH_APP_URL
+            value: https://morph-studio.azurecontainerapps.io
+          - name: WEBSITE_SITE_NAME
+            value: morph-studio
+          - name: AUTH_SECRET
+            secretRef: auth-secret
+          - name: OPENROUTER_API_KEY
+            secretRef: openrouter-api-key
+          - name: AZURE_OPENAI_ENDPOINT
+            value: https://YOUR_RESOURCE.openai.azure.com
+          - name: AZURE_OPENAI_API_KEY
+            secretRef: azure-openai-key
+          - name: AZURE_OPENAI_DEPLOYMENT
+            value: gpt-4o-mini
+        resources:
+          cpu: 1.0
+          memory: 2Gi

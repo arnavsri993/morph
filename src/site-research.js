@@ -311,6 +311,10 @@ function buildEnrichmentSkipTitles(content) {
     const normalized = normalizeEnrichmentText(value);
     if (normalized) skip.add(normalized);
   }
+  for (const section of content.sections ?? []) {
+    const normalized = normalizeEnrichmentText(section.heading);
+    if (normalized) skip.add(normalized);
+  }
   return skip;
 }
 

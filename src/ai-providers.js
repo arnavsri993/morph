@@ -446,10 +446,13 @@ function isNvidiaViaOpenRouter() {
 }
 
 function detectAzureHosting() {
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim() ?? "";
+  const endpointLooksReal = endpoint.length > 0
+    && !/YOUR_RESOURCE|example\.com|replace-me/i.test(endpoint);
   return Boolean(
     process.env.WEBSITE_SITE_NAME
     || process.env.CONTAINER_APP_NAME
-    || process.env.AZURE_OPENAI_ENDPOINT?.trim()
+    || (endpointLooksReal && isProviderConfigured("microsoft"))
   );
 }
 

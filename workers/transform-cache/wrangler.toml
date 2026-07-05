@@ -1,0 +1,16 @@
+# Cloudflare Workers — cache transformed morph sites at the edge.
+# Deploy: npx wrangler deploy --config workers/transform-cache/wrangler.toml
+
+name = "morph-transform-cache"
+main = "index.js"
+compatibility_date = "2026-03-01"
+
+[vars]
+MORPH_ORIGIN = "https://your-morph-studio.example.com"
+
+[[kv_namespaces]]
+binding = "TRANSFORM_CACHE"
+id = "replace-with-kv-namespace-id"
+
+[ai]
+binding = "AI"

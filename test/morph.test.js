@@ -289,7 +289,8 @@ test("landing page is served at / and the studio dashboard at /studio", async ()
     assert.equal(studio.includes("Paste UI code"), false);
     assert.equal(studio.includes("Load broken demo"), false);
     assert.equal(studio.includes("morph"), true);
-    assert.equal(studio.includes("Narrate review"), false);
+    assert.equal(studio.includes("Narrate review"), true);
+    assert.equal(studio.includes("Dictate"), true);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -799,8 +800,10 @@ test("site research maps audience, structure, and enriches content before transf
   assert.equal(research.cards.length >= 2, true);
 
   const content = enrichContent(extractContent(html), research);
-  assert.equal(content.features.length >= 2, true);
+  assert.equal(content.features.length >= 1, true);
+  assert.equal(content.features.some((feature) => feature.title === "Community programs"), true);
   assert.equal(content.sections.length >= 1, true);
+  assert.equal(content.sections.some((section) => section.heading === "Upcoming events"), true);
   assert.equal(content.logoPartners?.length >= 3, true);
   assert.equal(content.research?.summary?.includes("Cerebral Valley"), true);
 });

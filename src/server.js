@@ -1472,7 +1472,50 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     .auth-status.pending { color: var(--warn); }
     .auth-status.pending::before { background: var(--warn); box-shadow: 0 0 12px rgba(251, 191, 36, 0.5); }
     .instructions-field { display: grid; gap: 12px; }
-    .instructions-field label { font-size: 14px; font-weight: 500; color: var(--muted); }
+    .instructions-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .instructions-field label { font-size: 14px; font-weight: 500; color: var(--muted); margin: 0; }
+    .receipt-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .voice-btn {
+      min-height: 36px;
+      padding: 0 14px;
+      font-size: 13px;
+    }
+    .voice-btn[disabled] {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .voice-btn.listening {
+      color: #fecaca;
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.35);
+      box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.15);
+    }
+    .voice-btn.speaking {
+      color: #bbf7d0;
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(34, 197, 94, 0.35);
+      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.15);
+    }
+    .voice-hint {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .voice-hint[data-tone="error"] { color: var(--bad); }
+    .voice-hint[data-tone="active"] { color: var(--brand-b); }
     .instructions-field textarea {
       min-height: 160px;
       resize: vertical;
@@ -1780,7 +1823,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
           <div class="source-pane" data-source-pane="url" hidden>
             <form class="auth-form" id="previewForm">
               <label for="previewUrl">Web URL</label>
-              <input id="previewUrl" name="previewUrl" type="url" inputmode="url" autocomplete="url" required placeholder="https://cerebralvalley.ai">
+              <input id="previewUrl" name="previewUrl" type="url" inputmode="url" autocomplete="url" required placeholder="https://cursor.com">
             </form>
             <p class="source-note">morph fetches your live site, scores the current UI, and shows the possible score after a full redesign at <code>/transformed</code>.</p>
             <div class="preview-frame" id="previewFrame" hidden>
@@ -1790,8 +1833,15 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
             <div class="preview-empty" id="previewPlaceholder">Run a review to see the capture here.</div>
           </div>
           <div class="instructions-field">
-            <label for="agentInstructions">Agent instructions</label>
-            <textarea id="agentInstructions" name="instructions" placeholder="What did the agent build? What should morph focus on — token drift, components, focus states, layout?"></textarea>
+            <div class="instructions-toolbar">
+              <label for="agentInstructions">Agent instructions</label>
+              <button type="button" class="btn btn-ghost voice-btn" id="voiceInputBtn" aria-label="Dictate instructions" aria-pressed="false">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                Dictate
+              </button>
+            </div>
+            <textarea id="agentInstructions" name="instructions" placeholder="What did the agent build? What should morph focus on — token drift, components, focus states, layout? Or tap Dictate and say it aloud."></textarea>
+            <p class="voice-hint" id="voiceInputStatus" hidden aria-live="polite"></p>
           </div>
           <div class="actions">
             <button type="button" class="btn btn-primary" data-action="studio-review" id="runReviewBtn">
@@ -1829,9 +1879,15 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         <div class="panel spotlight" aria-live="polite">
           <div class="panel-head">
             <h2>Receipt</h2>
-            <div class="seg" role="tablist" aria-label="Receipt format">
-              <button id="toggleReadable" class="active" data-mode="readable" role="tab" aria-selected="true">Readable</button>
-              <button id="toggleJson" data-mode="json" role="tab">JSON</button>
+            <div class="receipt-tools">
+              <button type="button" class="btn btn-ghost voice-btn" id="narrateReviewBtn" aria-label="Narrate review" disabled>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+                Narrate review
+              </button>
+              <div class="seg" role="tablist" aria-label="Receipt format">
+                <button id="toggleReadable" class="active" data-mode="readable" role="tab" aria-selected="true">Readable</button>
+                <button id="toggleJson" data-mode="json" role="tab">JSON</button>
+              </div>
             </div>
           </div>
           <pre id="output" style="display:none">Loading…</pre>
@@ -2303,13 +2359,15 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
 
     function showWelcome() {
       lastPayload = null;
+      stopNarration();
       output.style.display = "none";
       outputReadable.style.display = "";
       outputReadable.innerHTML = '<div class="welcome">'
         + '<div class="welcome-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>'
         + '<h3>Ready to review</h3>'
-        + '<p>Connect a GitHub repo or enter a preview URL, then click <strong>Run full review</strong> to score your site, see the redesign delta, and get the merge gate.</p>'
+        + '<p>Connect a GitHub repo or enter a preview URL, then click <strong>Run full review</strong> to score your site, see the redesign delta, and get the merge gate. Use <strong>Dictate</strong> for voice instructions or <strong>Narrate review</strong> to hear findings aloud.</p>'
         + '</div>';
+      updateNarrateButton();
     }
 
     async function api(path, options) {
@@ -2360,6 +2418,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     function renderPayload(payload) {
       lastPayload = payload;
       applyOutputMode(payload);
+      updateNarrateButton();
       const runPayload = payload.run?.payload;
       const before = runPayload?.before;
       const after = runPayload?.after;
@@ -2436,9 +2495,11 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
 
     function showRaw(text) {
       lastPayload = null;
+      stopNarration();
       output.style.display = "";
       outputReadable.style.display = "none";
       output.textContent = text;
+      updateNarrateButton();
     }
 
     document.addEventListener("click", async (event) => {
@@ -2480,6 +2541,239 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         el.style.setProperty("--spot-y", ((e.clientY - rect.top) / rect.height * 100) + "%");
       });
     });
+
+    const voiceInputBtn = document.querySelector("#voiceInputBtn");
+    const voiceInputStatus = document.querySelector("#voiceInputStatus");
+    const narrateReviewBtn = document.querySelector("#narrateReviewBtn");
+    const speechSupported = typeof window.speechSynthesis !== "undefined";
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognitionSupported = Boolean(SpeechRecognitionCtor);
+    let voiceRecognition = null;
+    let voiceListening = false;
+    let voiceNarrating = false;
+
+    function setVoiceHint(el, text, tone) {
+      if (!el) return;
+      if (!text) {
+        el.hidden = true;
+        el.textContent = "";
+        el.removeAttribute("data-tone");
+        return;
+      }
+      el.hidden = false;
+      el.textContent = text;
+      if (tone) el.dataset.tone = tone;
+      else el.removeAttribute("data-tone");
+    }
+
+    function pickSpeechVoice() {
+      if (!speechSupported) return null;
+      const voices = window.speechSynthesis.getVoices();
+      return voices.find((voice) => /en(-|_)(US|GB)/i.test(voice.lang) && /samantha|google|natural|premium/i.test(voice.name))
+        || voices.find((voice) => /en(-|_)(US|GB)/i.test(voice.lang))
+        || voices[0]
+        || null;
+    }
+
+    function buildReportNarration(report, prefix) {
+      if (!report) return [];
+      const lines = [];
+      const label = prefix || "Review";
+      if (report.score != null) {
+        lines.push(label + " scored " + report.score + " out of 100.");
+      }
+      const issues = Array.isArray(report.issues) ? report.issues : [];
+      if (!issues.length) {
+        lines.push(label + " has no issues.");
+        return lines;
+      }
+      lines.push(label + " found " + issues.length + " issue" + (issues.length === 1 ? "" : "s") + ".");
+      const limit = Math.min(issues.length, 6);
+      for (let index = 0; index < limit; index += 1) {
+        const issue = issues[index];
+        const severity = issue.severity || "medium";
+        const reason = issue.reason || issue.id || "design drift";
+        const fix = issue.suggestedFix ? " Suggested fix: " + issue.suggestedFix + "." : "";
+        lines.push("Issue " + (index + 1) + ", " + severity + " severity: " + reason + "." + fix);
+      }
+      if (issues.length > limit) {
+        lines.push("Plus " + (issues.length - limit) + " more issues. Open the receipt for the full list.");
+      }
+      return lines;
+    }
+
+    function buildStudioNarration(payload) {
+      const lines = [];
+      const verdict = payload.finalVerdict === "pass" ? "passed" : "did not pass";
+      lines.push("morph studio review " + verdict + ".");
+      if (payload.ciSummary) lines.push(payload.ciSummary);
+      if (payload.currentScore != null && payload.possibleScore != null) {
+        lines.push("Current score " + payload.currentScore + " out of 100. Possible score after redesign " + payload.possibleScore + " out of 100.");
+      }
+      if (payload.transform?.profile) {
+        lines.push("Selected design profile " + payload.transform.profile.name + ", inspired by " + (payload.transform.profile.inspiration || "frontier product design") + ".");
+      }
+      lines.push(...buildReportNarration(payload.before, "Current UI"));
+      if (payload.passed) {
+        lines.push("The merge gate is open. This branch is safe to review.");
+      } else {
+        lines.push("The merge gate is blocked. Review the remaining issues before merging.");
+      }
+      if (Array.isArray(payload.userJourney) && payload.userJourney.length) {
+        lines.push("Review journey: " + payload.userJourney.slice(0, 4).join(". ") + ".");
+      }
+      return lines.filter(Boolean).join(" ");
+    }
+
+    function buildNarrationScript(payload) {
+      const reviewPayload = payload?.run?.payload ?? payload;
+      if (!reviewPayload || typeof reviewPayload !== "object") return "";
+      if (reviewPayload.schemaVersion === "morph.studio-review.v1") {
+        return buildStudioNarration(reviewPayload);
+      }
+      if (reviewPayload.score != null || Array.isArray(reviewPayload.issues)) {
+        return buildReportNarration(reviewPayload, "Review").join(" ");
+      }
+      return "";
+    }
+
+    function updateNarrateButton() {
+      if (!narrateReviewBtn) return;
+      if (!speechSupported) {
+        narrateReviewBtn.hidden = true;
+        return;
+      }
+      narrateReviewBtn.hidden = false;
+      const script = buildNarrationScript(lastPayload);
+      narrateReviewBtn.disabled = !script;
+      narrateReviewBtn.classList.toggle("speaking", voiceNarrating);
+      narrateReviewBtn.innerHTML = voiceNarrating
+        ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg> Stop narration'
+        : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg> Narrate review';
+    }
+
+    function stopNarration() {
+      if (!speechSupported) return;
+      window.speechSynthesis.cancel();
+      voiceNarrating = false;
+      updateNarrateButton();
+    }
+
+    function startNarration() {
+      if (!speechSupported) return;
+      const script = buildNarrationScript(lastPayload);
+      if (!script) return;
+      stopNarration();
+      const utterance = new SpeechSynthesisUtterance(script);
+      const voice = pickSpeechVoice();
+      if (voice) utterance.voice = voice;
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.onstart = () => {
+        voiceNarrating = true;
+        updateNarrateButton();
+      };
+      utterance.onend = () => {
+        voiceNarrating = false;
+        updateNarrateButton();
+      };
+      utterance.onerror = () => {
+        voiceNarrating = false;
+        updateNarrateButton();
+      };
+      voiceNarrating = true;
+      updateNarrateButton();
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function appendDictation(text) {
+      const next = String(text ?? "").trim();
+      if (!next || !agentInstructionsInput) return;
+      const current = agentInstructionsInput.value.trim();
+      agentInstructionsInput.value = current ? current + " " + next : next;
+      agentInstructionsInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    function setupVoiceInput() {
+      if (!voiceInputBtn) return;
+      if (!recognitionSupported) {
+        voiceInputBtn.hidden = true;
+        return;
+      }
+      voiceRecognition = new SpeechRecognitionCtor();
+      voiceRecognition.continuous = false;
+      voiceRecognition.interimResults = true;
+      voiceRecognition.lang = "en-US";
+
+      voiceRecognition.addEventListener("start", () => {
+        voiceListening = true;
+        voiceInputBtn.classList.add("listening");
+        voiceInputBtn.setAttribute("aria-pressed", "true");
+        setVoiceHint(voiceInputStatus, "Listening… describe what the agent built or what morph should focus on.", "active");
+      });
+
+      voiceRecognition.addEventListener("end", () => {
+        voiceListening = false;
+        voiceInputBtn.classList.remove("listening");
+        voiceInputBtn.setAttribute("aria-pressed", "false");
+        if (!voiceInputStatus?.dataset.tone || voiceInputStatus.dataset.tone === "active") {
+          setVoiceHint(voiceInputStatus, "");
+        }
+      });
+
+      voiceRecognition.addEventListener("error", (event) => {
+        const blocked = event.error === "not-allowed" || event.error === "service-not-allowed";
+        setVoiceHint(
+          voiceInputStatus,
+          blocked
+            ? "Microphone access was blocked. Allow mic permissions to dictate instructions."
+            : "Could not capture speech. Try again or type your instructions.",
+          "error"
+        );
+      });
+
+      voiceRecognition.addEventListener("result", (event) => {
+        let interim = "";
+        let finalText = "";
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          const transcript = result[0]?.transcript ?? "";
+          if (result.isFinal) finalText += transcript;
+          else interim += transcript;
+        }
+        if (interim) {
+          setVoiceHint(voiceInputStatus, "Heard: " + interim.trim(), "active");
+        }
+        if (finalText.trim()) {
+          appendDictation(finalText);
+          setVoiceHint(voiceInputStatus, "Added dictated instructions.", "active");
+        }
+      });
+
+      voiceInputBtn.addEventListener("click", () => {
+        if (voiceListening) {
+          voiceRecognition.stop();
+          return;
+        }
+        stopNarration();
+        try {
+          voiceRecognition.start();
+        } catch {
+          setVoiceHint(voiceInputStatus, "Could not start dictation. Try again.", "error");
+        }
+      });
+    }
+
+    narrateReviewBtn?.addEventListener("click", () => {
+      if (voiceNarrating) stopNarration();
+      else startNarration();
+    });
+
+    if (speechSupported) {
+      window.speechSynthesis.addEventListener("voiceschanged", updateNarrateButton);
+    }
+    setupVoiceInput();
+    updateNarrateButton();
 
     async function boot() {
       try {
