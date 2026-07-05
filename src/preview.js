@@ -94,6 +94,52 @@ async function fetchFilePage(parsed, outputDir) {
   };
 }
 
+async function collectRemoteCss(html, baseUrl) {
+  const chunks = [];
+  for (const match of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
+    if (match[1]?.trim()) chunks.push(match[1]);
+  }
+  for (const match of html.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/gi)) {
+    const href = match[0].match(/href=["']([^"']+)["']/i)?.[1];
+    if (!href) continue;
+    let resolved;
+    try {
+      resolved = new URL(href, baseUrl).href;
+    } catch {
+      continue;
+    }
+    if (!/^https?:/i.test(resolved)) continue;
+    try {
+      const response = await fetch(resolved);
+      if (response.ok) chunks.push(await response.text());
+    } catch {
+      // unreadable remote stylesheet
+    }
+  }
+  return chunks.join("\n");
+}
+
+async function captureWithFetch(parsed, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeout ?? 20_000);
+  try {
+    const response = await fetch(parsed.href, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: { "user-agent": "morph-review/0.1 (+https://morph.dev)" }
+    });
+    if (!response.ok) {
+      throw new Error(`Preview URL returned HTTP ${response.status}.`);
+    }
+    const html = await response.text();
+    const css = await collectRemoteCss(html, parsed.href);
+    const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? parsed.hostname;
+    return { title, html, css, screenshotBase64: null };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function injectCapturedCss(html, css) {
   if (!css.trim()) return html;
   const styleBlock = `<style data-morph-captured="true">\n${css}\n</style>`;
@@ -101,17 +147,6 @@ function injectCapturedCss(html, css) {
     return html.replace(/<\/head>/i, `${styleBlock}\n</head>`);
   }
   return `${styleBlock}\n${html}`;
-}
-
-function playwrightFailure(error) {
-  const message = error instanceof Error ? error.message : String(error);
-  const missingPlaywright = /Cannot find module 'playwright'|playwright/i.test(message);
-  return {
-    status: missingPlaywright ? "playwright_not_installed" : "capture_failed",
-    error: missingPlaywright
-      ? "Playwright is not installed. Run npm install playwright && npx playwright install chromium."
-      : message
-  };
 }
 
 export async function capturePreviewUrl(url) {
@@ -129,13 +164,25 @@ export async function capturePreviewUrl(url) {
       status: "captured"
     };
   } catch (error) {
-    const failure = playwrightFailure(error);
-    return {
-      url: parsed.href,
-      capturedAt: new Date().toISOString(),
-      method: "playwright",
-      ...failure
-    };
+    try {
+      const fallback = await captureWithFetch(parsed);
+      return {
+        url: parsed.href,
+        title: fallback.title,
+        screenshotBase64: null,
+        capturedAt: new Date().toISOString(),
+        method: "fetch",
+        status: "captured"
+      };
+    } catch (fetchError) {
+      return {
+        url: parsed.href,
+        capturedAt: new Date().toISOString(),
+        method: "fetch",
+        status: "capture_failed",
+        error: fetchError instanceof Error ? fetchError.message : String(fetchError)
+      };
+    }
   }
 }
 
@@ -166,12 +213,29 @@ export async function fetchPageForTransform(url, outputDir) {
       entry: entryPath
     };
   } catch (error) {
-    const failure = playwrightFailure(error);
-    return {
-      url: parsed.href,
-      capturedAt: new Date().toISOString(),
-      method: "playwright",
-      ...failure
-    };
+    try {
+      const fallback = await captureWithFetch(parsed);
+      const html = injectCapturedCss(fallback.html, fallback.css);
+      await mkdir(outputDir, { recursive: true });
+      const entryPath = path.join(outputDir, "index.html");
+      await writeFile(entryPath, html);
+      return {
+        url: parsed.href,
+        title: fallback.title,
+        screenshotBase64: null,
+        capturedAt: new Date().toISOString(),
+        method: "fetch",
+        status: "captured",
+        entry: entryPath
+      };
+    } catch (fetchError) {
+      return {
+        url: parsed.href,
+        capturedAt: new Date().toISOString(),
+        method: "fetch",
+        status: "capture_failed",
+        error: fetchError instanceof Error ? fetchError.message : String(fetchError)
+      };
+    }
   }
 }
