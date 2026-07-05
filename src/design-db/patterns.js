@@ -163,13 +163,24 @@ a { color: inherit; text-decoration: none; }
   background: var(--primary);
   flex: none;
 }
+.site-nav nav {
+  margin-left: auto;
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
 .nav-links {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-left: auto;
   list-style: none;
   padding: 0;
+}
+.site-nav .brand,
+.nav-cta,
+.nav-toggle {
+  flex-shrink: 0;
 }
 .nav-links a {
   padding: 8px 14px;
@@ -645,6 +656,18 @@ const FONT_TOKEN_MAP = [
 ];
 
 function tokenizeGeneratedCss(css) {
+  const source = String(css);
+  const rootMatch = source.match(/:root\s*\{[\s\S]*?\}/);
+  if (!rootMatch) return applyCssTokenReplacements(source);
+
+  const rootBlock = rootMatch[0];
+  const rootStart = source.indexOf(rootBlock);
+  const before = source.slice(0, rootStart);
+  const after = source.slice(rootStart + rootBlock.length);
+  return before + rootBlock + applyCssTokenReplacements(after);
+}
+
+function applyCssTokenReplacements(css) {
   let out = String(css);
   for (const [literal, token] of SPACING_TOKEN_MAP) {
     out = out.replaceAll(` ${literal};`, ` ${token};`);

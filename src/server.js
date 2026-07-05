@@ -1107,7 +1107,10 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
     p { margin: 0; color: var(--muted); }
 
-    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .run-status { flex: 1 1 100%; margin: 0; font-size: 13px; color: var(--muted); }
+    .run-status[data-tone="pending"] { color: var(--ink); }
+    .run-status[data-tone="error"] { color: var(--bad); }
     .btn[disabled] { opacity: 0.5; cursor: wait; transform: none !important; }
 
     /* ── Spotlight cards ───────────────────────────────────────────── */
@@ -2022,6 +2025,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
             <button type="button" class="btn btn-ghost" id="runDemoBtn">
               Try demo site
             </button>
+            <p class="run-status" id="runStatus" hidden aria-live="polite"></p>
           </div>
         </div>
       </section>
@@ -2100,6 +2104,9 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     const previewMeta = document.querySelector("#previewMeta");
     const previewPlaceholder = document.querySelector("#previewPlaceholder");
     const sourceBadge = document.querySelector("#sourceBadge");
+    const runStatus = document.querySelector("#runStatus");
+    const runReviewBtn = document.querySelector("#runReviewBtn");
+    const runReviewBtnDefaultHtml = runReviewBtn?.innerHTML ?? "";
 
     let activeSource = "github";
 
@@ -2632,9 +2639,36 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       return '<details><summary>' + esc(key) + ' ' + preview + '</summary><div class="detail-body">' + body + '</div></details>';
     }
 
+    function setRunStatus(text, tone) {
+      if (!runStatus) return;
+      if (!text) {
+        runStatus.hidden = true;
+        runStatus.textContent = "";
+        runStatus.removeAttribute("data-tone");
+        return;
+      }
+      runStatus.hidden = false;
+      runStatus.textContent = text;
+      if (tone) runStatus.dataset.tone = tone;
+      else runStatus.removeAttribute("data-tone");
+    }
+
+    function setRunBusy(busy) {
+      if (!runReviewBtn) return;
+      runReviewBtn.disabled = busy;
+      runReviewBtn.innerHTML = busy
+        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Running…'
+        : runReviewBtnDefaultHtml;
+    }
+
+    function scrollReceiptIntoView() {
+      outputReadable?.closest(".panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
     function showWelcome() {
       lastPayload = null;
       stopNarration();
+      setRunStatus("");
       pipeline.hidden = true;
       output.style.display = "none";
       outputReadable.style.display = "";
@@ -2672,10 +2706,15 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     }
 
     async function api(path, options) {
-      const response = await fetch(path, {
-        headers: { "content-type": "application/json" },
-        ...options
-      });
+      let response;
+      try {
+        response = await fetch(path, {
+          headers: { "content-type": "application/json" },
+          ...options
+        });
+      } catch {
+        throw new Error("Could not reach morph. Start the server with npm run serve, then try again.");
+      }
       const raw = await response.text();
       let payload = null;
       try {
@@ -2836,13 +2875,16 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       const action = trigger.dataset.action;
       if (!action) return;
       if (action === "studio-review") {
+        setRunStatus("Running full review… This usually takes 30–90 seconds.", "pending");
+        scrollReceiptIntoView();
         outputReadable.innerHTML = '<div class="welcome"><p>Running full review…</p></div>';
         output.style.display = "none";
         outputReadable.style.display = "";
       } else {
         showRaw("Running " + action + "…");
       }
-      trigger.disabled = true;
+      if (action === "studio-review") setRunBusy(true);
+      else trigger.disabled = true;
       try {
         const route = action === "studio-review"
           ? "/api/studio/review"
@@ -2854,15 +2896,24 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         selectedRunId = payload.run?.id ?? null;
         renderPayload(payload);
         await refreshRuns();
+        if (action === "studio-review") setRunStatus("");
       } catch (error) {
+        const message = userFacingErrorMessage(error);
+        if (action === "studio-review") {
+          setRunStatus(message, "error");
+          scrollReceiptIntoView();
+        }
         showFailure(error, {
           title: action === "studio-review" ? "Review failed" : "Request failed",
           hint: action === "studio-review"
-            ? "No scores were generated. Try cursor.com or https://yoursite.com, or paste a GitHub repo (owner/repo)."
+            ? message.includes("npm run serve")
+              ? "In this repo: npm run serve — then open http://127.0.0.1:4177/studio"
+              : "No scores were generated. Try cursor.com or https://yoursite.com, or paste a GitHub repo (owner/repo)."
             : ""
         });
       } finally {
-        trigger.disabled = false;
+        if (action === "studio-review") setRunBusy(false);
+        else trigger.disabled = false;
       }
     });
 

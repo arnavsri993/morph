@@ -353,19 +353,32 @@ export function componentStyles(profile) {
 .hero-panel .mock-ui {
   position: relative;
   width: 100%;
-  max-width: 360px;
+  max-width: 380px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-alt);
   padding: var(--space-4);
   display: grid;
   gap: var(--space-3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.hero-panel .mock-ui::before {
+  content: "";
+  display: block;
+  width: 44px;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  margin-bottom: var(--space-1);
 }
 .mock-bar {
-  height: var(--space-2);
-  border-radius: var(--space-1);
-  background: color-mix(in srgb, var(--primary) 25%, transparent);
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
+.mock-bar.w80 { background: color-mix(in srgb, var(--primary) 30%, transparent); }
+.mock-bar.w60 { background: color-mix(in srgb, var(--primary) 18%, transparent); }
+.mock-bar.w40 { background: color-mix(in srgb, var(--muted) 24%, transparent); width: 40%; }
 .mock-bar.w60 { width: 60%; }
 .mock-bar.w80 { width: 80%; }
 .mock-bar.w40 { width: 40%; }
