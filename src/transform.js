@@ -286,31 +286,112 @@ function buildSummary(plan, before, after, aiHints) {
   return `morph re-rendered the site with ${plan.profile.profile.name} (${plan.archetype.archetype.name} layout, ${plan.patterns.length} UI patterns): UI quality ${before.score}/100 → ${after.score}/100.${refNote}${appliedNote}${aiNote}`;
 }
 
+const SKIP_HTML_DIRS = new Set([
+  "node_modules", ".git", ".morph", ".next", ".nuxt", ".svelte-kit",
+  "_includes", "_layouts", "partials", "templates", "fragments", "snippets",
+  "cypress", "__tests__", "fixtures"
+]);
+
+const BUILD_HTML_DIRS = new Set(["dist", "build", "out"]);
+
 export async function findEntryHtml(rootDir) {
   if (!existsSync(rootDir)) return null;
-  const htmlFiles = await walkForHtml(rootDir);
-  if (!htmlFiles.length) return null;
-  const indexFiles = htmlFiles.filter((file) => path.basename(file).toLowerCase() === "index.html");
-  if (indexFiles.length) {
-    indexFiles.sort((left, right) =>
-      left.split(path.sep).length - right.split(path.sep).length || left.localeCompare(right)
-    );
-    return indexFiles[0];
+  const sourceFiles = await walkForHtml(rootDir, { includeBuild: false });
+  let entry = await pickBestHtmlEntry(rootDir, sourceFiles);
+  if (!entry) {
+    const buildFiles = await walkForHtml(rootDir, { includeBuild: true, onlyBuild: true });
+    entry = await pickBestHtmlEntry(rootDir, buildFiles);
   }
-  htmlFiles.sort((left, right) => left.split(path.sep).length - right.split(path.sep).length || left.localeCompare(right));
-  return htmlFiles[0];
+  return entry;
 }
 
-async function walkForHtml(directory) {
+async function pickBestHtmlEntry(rootDir, htmlFiles) {
+  if (!htmlFiles.length) return null;
+
+  const ranked = htmlFiles
+    .map((file) => ({ file, pathScore: scoreHtmlPath(file, rootDir) }))
+    .filter((candidate) => candidate.pathScore > -500)
+    .sort((left, right) => right.pathScore - left.pathScore || left.file.localeCompare(right.file));
+
+  let best = null;
+  let bestScore = -Infinity;
+  for (const candidate of ranked.slice(0, 24)) {
+    let html;
+    try {
+      html = await readFile(candidate.file, "utf8");
+    } catch {
+      continue;
+    }
+    const contentScore = scoreHtmlContent(html, candidate.pathScore);
+    if (contentScore > bestScore) {
+      best = candidate.file;
+      bestScore = contentScore;
+    }
+  }
+  return best;
+}
+
+function scoreHtmlPath(file, rootDir) {
+  const relative = path.relative(rootDir, file).split(path.sep);
+  const lower = relative.map((part) => part.toLowerCase());
+  if (lower.some((part) => SKIP_HTML_DIRS.has(part))) return -1000;
+  let score = 0;
+  score -= relative.length * 8;
+  if (path.basename(file).toLowerCase() === "index.html") score += 80;
+  if (lower[0] === "public") score += 60;
+  if (lower[0] === "docs") score += 40;
+  if (relative.length === 1) score += 50;
+  if (lower.includes("template") && relative.length > 2) score -= 30;
+  if (/\/(support|component)\//i.test(file)) score -= 40;
+  return score;
+}
+
+function scoreHtmlContent(html, pathScore) {
+  if (!looksLikeHtmlPage(html)) return -Infinity;
+  const textLength = visibleTextFromHtml(html);
+  const headingCount = (String(html).match(/<h[1-6]\b/gi) ?? []).length;
+  const paragraphCount = (String(html).match(/<p\b/gi) ?? []).length;
+  let score = pathScore;
+  score += Math.min(textLength / 12, 80);
+  score += headingCount * 6;
+  score += paragraphCount * 4;
+  if (/<!doctype/i.test(html)) score += 10;
+  if (/\{\%|\{\{/.test(html) && textLength < 500) score -= 40;
+  return score;
+}
+
+function looksLikeHtmlPage(html) {
+  const source = String(html ?? "");
+  return /<!doctype/i.test(source) || /<html\b/i.test(source) || /<body\b/i.test(source);
+}
+
+function visibleTextFromHtml(html) {
+  return String(html ?? "")
+    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .length;
+}
+
+async function walkForHtml(directory, options = {}) {
   const rootStat = await stat(directory);
   if (!rootStat.isDirectory()) return [];
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
-    if (["node_modules", ".git", ".morph", "dist", "build", ".next"].includes(entry.name)) continue;
-    const absolute = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await walkForHtml(absolute));
-    else if (entry.name.toLowerCase().endsWith(".html")) files.push(absolute);
+    if (entry.isDirectory()) {
+      if (SKIP_HTML_DIRS.has(entry.name)) continue;
+      if (!options.includeBuild && BUILD_HTML_DIRS.has(entry.name)) continue;
+      if (options.onlyBuild && !BUILD_HTML_DIRS.has(entry.name)) continue;
+      files.push(...await walkForHtml(path.join(directory, entry.name), options));
+      continue;
+    }
+    if (entry.name.toLowerCase().endsWith(".html")) {
+      files.push(path.join(directory, entry.name));
+    }
   }
   return files;
 }
@@ -788,6 +869,7 @@ function deriveFeatureSections(headings, paragraphs, listItems, heroHeading) {
   const features = [];
   const sections = [];
   for (const entry of entries) {
+    if (CTA_PATTERN.test(entry.heading)) continue;
     if (entry.heading.length <= 42 && entry.body && entry.body.length <= 200 && entry.items.length <= 1) {
       features.push({ title: entry.heading, body: entry.body });
     } else {

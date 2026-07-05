@@ -668,7 +668,11 @@ export function renderCatalogSections(content, profile, patterns, helpers = {}) 
 
 function derivePricingTiers(content) {
   if (Array.isArray(content.pricingTiers) && content.pricingTiers.length >= 2) {
-    return content.pricingTiers;
+    return content.pricingTiers.map((tier) => ({
+      ...tier,
+      price: String(tier.price ?? "").match(/^\$[\d.]+/)?.[0] ?? tier.price,
+      period: tier.period || (/per\s+user/i.test(String(tier.price ?? "")) ? "/user/mo" : tier.period ?? "")
+    }));
   }
   const pricingSection = (content.sections ?? []).find((section) => /pricing/i.test(section.heading ?? ""));
   if (!pricingSection?.items?.length) return null;

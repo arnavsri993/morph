@@ -37,7 +37,7 @@ import {
   shellStyles
 } from "./chrome.js";
 import { landingHtml } from "./landing.js";
-import { fetchPageForTransform, assessScanReadiness } from "./preview.js";
+import { fetchPageForTransform, assessScanReadiness, normalizePreviewUrlInput } from "./preview.js";
 import { transformSite, findEntryHtml } from "./transform.js";
 import { cloneRepo } from "./github.js";
 import { listSponsorIntegrations } from "./ai-providers.js";
@@ -319,14 +319,14 @@ export async function createMorphHandler(config, options = {}) {
         const returnTo = sanitizeReturnTo(url.searchParams.get("returnTo"));
         if (returnTo.startsWith("/studio")) {
           const separator = returnTo.includes("?") ? "&" : "?";
-          return redirect(response, `${returnTo}${separator}error=${encodeURIComponent(error.message)}`);
+          return redirect(response, `${returnTo}${separator}error=${encodeURIComponent(userFacingErrorMessage(error))}`);
         }
         const encodedReturnTo = encodeURIComponent(returnTo);
-        return redirect(response, `/login?error=${encodeURIComponent(error.message)}&returnTo=${encodedReturnTo}`);
+        return redirect(response, `/login?error=${encodeURIComponent(userFacingErrorMessage(error))}&returnTo=${encodedReturnTo}`);
       }
       return sendJson(response, error.statusCode ?? 500, {
         error: error.code ?? "server_error",
-        message: error.message
+        message: userFacingErrorMessage(error)
       });
     }
   };
@@ -480,7 +480,14 @@ async function runTransformReview(config, {
     try {
       await cloneRepo(githubRepo, checkoutRoot, { token: githubToken || undefined });
     } catch (error) {
-      throw new HttpError(422, "github_clone_failed", `Could not clone ${githubRepo}: ${error.message}`);
+      throw new HttpError(422, "github_clone_failed", userFacingErrorMessage(`Could not clone ${githubRepo}: ${error.message}`));
+    }
+    const homepage = await readPackageHomepage(checkoutRoot);
+    if (homepage && !(await findEntryHtml(checkoutRoot))) {
+      preview = await fetchPageForTransform(homepage, checkoutRoot);
+      if (preview.status !== "captured") {
+        throw new HttpError(422, "site_unreadable", preview.error || unreadableRepoMessage());
+      }
     }
   } else {
     preview = await fetchPageForTransform(previewUrl, checkoutRoot);
@@ -501,7 +508,7 @@ async function runTransformReview(config, {
       forceRerender: true
     });
   } catch (error) {
-    throw new HttpError(422, "transform_failed", error.message);
+    throw new HttpError(422, "transform_failed", userFacingErrorMessage(error));
   }
 
   const transformedPreviewPath = `/api/runs/${runId}/transformed/index.html`;
@@ -577,12 +584,28 @@ async function runTransformReview(config, {
 async function assertCheckoutIsScannable(checkoutRoot) {
   const entry = await findEntryHtml(checkoutRoot);
   if (!entry) {
-    throw new HttpError(422, "site_unreadable", "No HTML page was found to scan.");
+    throw new HttpError(422, "site_unreadable", unreadableRepoMessage());
   }
   const html = await readFile(entry, "utf8");
   const scanReady = assessScanReadiness(html);
   if (!scanReady.ok) {
-    throw new HttpError(422, "site_unreadable", scanReady.reason);
+    throw new HttpError(422, "site_unreadable", scanReady.reason || unreadableRepoMessage());
+  }
+}
+
+function unreadableRepoMessage() {
+  return "This repo has no scannable HTML page. Framework repos (Next.js, React, Vite) usually need a deployed preview — switch to Preview URL and paste your live site.";
+}
+
+async function readPackageHomepage(checkoutRoot) {
+  const packagePath = path.join(checkoutRoot, "package.json");
+  if (!existsSync(packagePath)) return null;
+  try {
+    const pkg = JSON.parse(await readFile(packagePath, "utf8"));
+    const homepage = String(pkg.homepage ?? "").trim();
+    return looksLikePreviewUrl(homepage) ? homepage : null;
+  } catch {
+    return null;
   }
 }
 
@@ -756,13 +779,17 @@ function resolveStudioSource(options) {
   }
 
   if (source === "url") {
-    if (!previewUrl) {
+    const normalizedPreviewUrl = normalizePreviewUrlInput(previewUrl);
+    if (!normalizedPreviewUrl) {
       throw new HttpError(400, "missing_preview_url", "A preview URL is required.");
+    }
+    if (!/^https?:\/\//i.test(normalizedPreviewUrl) && !/^file:\/\//i.test(normalizedPreviewUrl)) {
+      throw new HttpError(400, "invalid_preview_url", "Enter a valid website address (for example https://cursor.com).");
     }
     if (githubRepo) {
       throw new HttpError(400, "ambiguous_source", "Provide either a GitHub repo or a preview URL, not both.");
     }
-    return { source: "url", previewUrl, githubRepo: null };
+    return { source: "url", previewUrl: normalizedPreviewUrl, githubRepo: null };
   }
 
   if (source === "github") {
@@ -2086,6 +2113,9 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       document.querySelectorAll("[data-source-pane]").forEach((pane) => {
         pane.hidden = pane.dataset.sourcePane !== sourceName;
       });
+      if (sourceName === "github" && previewUrlInput?.value.trim()) {
+        previewUrlInput.value = "";
+      }
       updateSourceBadge();
     }
 
@@ -2142,7 +2172,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         window.location.href = "/studio?source=github";
       } catch (error) {
         if (githubOAuthStatus) {
-          githubOAuthStatus.textContent = error.message || "Could not save GitHub credentials.";
+          githubOAuthStatus.textContent = userFacingErrorMessage(error) || "Could not save GitHub credentials.";
           githubOAuthStatus.className = "auth-status pending";
         }
       }
@@ -2163,6 +2193,21 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       return /^https?:\\/\\//i.test(String(value ?? "").trim());
     }
 
+    function normalizeWebUrl(value) {
+      const raw = String(value ?? "").trim();
+      if (!raw) return "";
+      if (/^https?:\\/\\//i.test(raw) || /^file:\\/\\//i.test(raw)) return raw;
+      if (/^[\\w.-]+\\/[\\w.-]+(\\/.*)?$/.test(raw) && !/\\.[a-z]{2,}/i.test(raw.split("/")[0])) return raw;
+      if (/\\.[a-z]{2,}(\\/|$|:|\\?|#)/i.test(raw) || /^localhost\\b/i.test(raw)) {
+        return "https://" + raw.replace(/^\\/+/, "");
+      }
+      return raw;
+    }
+
+    function looksLikeWebAddress(value) {
+      return looksLikeHttpUrl(normalizeWebUrl(value));
+    }
+
     function isGithubRepoInput(value) {
       const raw = String(value ?? "").trim();
       if (!raw) return false;
@@ -2171,12 +2216,25 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     }
 
     previewUrlInput?.addEventListener("input", () => {
-      if (looksLikeHttpUrl(previewUrlInput?.value)) {
+      const normalized = normalizeWebUrl(previewUrlInput?.value);
+      if (normalized && normalized !== previewUrlInput?.value && looksLikeHttpUrl(normalized)) {
+        previewUrlInput.value = normalized;
+      }
+      if (looksLikeWebAddress(previewUrlInput?.value)) {
         activateSourceTab("url");
       }
       updateSourceBadge();
     });
     githubRepoInput?.addEventListener("input", () => {
+      const raw = githubRepoInput?.value.trim() || "";
+      if (looksLikeWebAddress(raw) && !isGithubRepoInput(raw)) {
+        const normalized = normalizeWebUrl(raw);
+        if (previewUrlInput) previewUrlInput.value = normalized;
+        githubRepoInput.value = "";
+        activateSourceTab("url");
+        updateSourceBadge();
+        return;
+      }
       if (isGithubRepoInput(githubRepoInput?.value)) {
         activateSourceTab("github");
       }
@@ -2198,23 +2256,27 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
 
     function buildReviewRequest() {
       const instructions = agentInstructionsInput?.value.trim() || "";
-      const previewUrl = previewUrlInput?.value.trim() || "";
+      const previewUrl = normalizeWebUrl(previewUrlInput?.value.trim() || "");
       const githubRepo = githubRepoInput?.value.trim() || "";
 
-      if (looksLikeHttpUrl(previewUrl)) {
-        return { source: "url", previewUrl, instructions };
+      if (previewUrlInput && previewUrl !== previewUrlInput.value.trim()) {
+        previewUrlInput.value = previewUrl;
       }
 
+      // Respect the active source tab — do not let a stale preview URL override GitHub.
       if (activeSource === "github") {
         if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo) or switch to Preview URL.");
-        if (looksLikeHttpUrl(githubRepo) && !isGithubRepoInput(githubRepo)) {
-          return { source: "url", previewUrl: githubRepo, instructions };
+        if (looksLikeWebAddress(githubRepo) && !isGithubRepoInput(githubRepo)) {
+          return { source: "url", previewUrl: normalizeWebUrl(githubRepo), instructions };
         }
         return { source: "github", githubRepo, instructions };
       }
 
       if (activeSource === "url") {
         if (!previewUrl) throw new Error("Enter a web URL or switch to GitHub.");
+        if (!looksLikeHttpUrl(previewUrl)) {
+          throw new Error("Enter a website address like cursor.com or https://cursor.com.");
+        }
         return { source: "url", previewUrl, instructions };
       }
 
@@ -2300,6 +2362,15 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
 
     function esc(s) {
       return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    function userFacingErrorMessage(value) {
+      if (value == null) return "Something went wrong.";
+      const text = value instanceof Error ? (value.message || String(value)) : String(value);
+      const stackAt = text.search(/\\n\\s+at\\s+\\S/);
+      const trimmed = (stackAt === -1 ? text : text.slice(0, stackAt)).trim();
+      const firstLine = trimmed.split("\\n").map((line) => line.trim()).find(Boolean) || "";
+      return firstLine.replace(/^Error:\\s*/i, "") || "Something went wrong.";
     }
 
     function renderReadable(payload) {
@@ -2575,7 +2646,10 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       updateNarrateButton();
     }
 
-    function showFailure(message) {
+    function showFailure(message, options) {
+      const opts = options || {};
+      const title = opts.title || "Something went wrong";
+      const hint = opts.hint;
       lastPayload = null;
       stopNarration();
       pipeline.hidden = true;
@@ -2590,9 +2664,9 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       outputReadable.style.display = "";
       outputReadable.innerHTML = '<div class="welcome review-failure">'
         + '<div class="welcome-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg></div>'
-        + '<h3>Could not scan this site</h3>'
-        + '<p>' + esc(String(message || "This website could not be read.")) + '</p>'
-        + '<span class="review-summary">No scores were generated. Try a different URL or paste a GitHub repo instead.</span>'
+        + '<h3>' + esc(title) + '</h3>'
+        + '<p>' + esc(userFacingErrorMessage(message)) + '</p>'
+        + (hint ? '<span class="review-summary">' + esc(hint) + '</span>' : '')
         + '</div>';
       updateNarrateButton();
     }
@@ -2602,8 +2676,16 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         headers: { "content-type": "application/json" },
         ...options
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || payload.error || "Request failed");
+      const raw = await response.text();
+      let payload = null;
+      try {
+        payload = raw ? JSON.parse(raw) : null;
+      } catch {
+        throw new Error(userFacingErrorMessage(raw.slice(0, 240) || ("Request failed (" + response.status + ")")));
+      }
+      if (!response.ok) {
+        throw new Error(userFacingErrorMessage(payload?.message || payload?.error || ("Request failed (" + response.status + ")")));
+      }
       return payload;
     }
 
@@ -2702,13 +2784,17 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
       for (const run of payload.runs.slice(0, 12)) {
         const verdict = verdictOf(run.payload);
         const verdictCls = verdict === "pass" ? "pass" : verdict === "fail" ? "fail" : "stored";
+        const gradedScore = run.payload?.currentScore;
+        const verdictLabel = gradedScore != null
+          ? gradedScore + "/100 · " + verdict
+          : verdict;
         const button = document.createElement("button");
         button.type = "button";
         button.className = "run" + (run.id === selectedRunId ? " selected" : "");
         button.innerHTML =
           '<span class="run-icon">' + (RUN_ICONS[run.kind] || RUN_ICONS.verify) + '</span>'
           + '<span class="run-kind">' + esc(RUN_LABELS[run.kind] || run.kind) + '</span>'
-          + '<span class="verdict ' + verdictCls + '">' + esc(verdict) + '</span>'
+          + '<span class="verdict ' + verdictCls + '">' + esc(verdictLabel) + '</span>'
           + '<span class="run-meta">' + esc(relativeTime(run.createdAt)) + ' · ' + esc(run.id) + '</span>';
         button.addEventListener("click", () => {
           selectedRunId = run.id;
@@ -2755,7 +2841,12 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
         renderPayload(payload);
         await refreshRuns();
       } catch (error) {
-        showFailure(error.message || "Request failed");
+        showFailure(error, {
+          title: action === "studio-review" ? "Review failed" : "Request failed",
+          hint: action === "studio-review"
+            ? "No scores were generated. Try cursor.com or https://yoursite.com, or paste a GitHub repo (owner/repo)."
+            : ""
+        });
       } finally {
         trigger.disabled = false;
       }
@@ -3003,18 +3094,26 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
     updateNarrateButton();
 
     async function boot() {
+      const urlError = urlParams.get("error");
+      if (urlError) {
+        showFailure(decodeURIComponent(urlError), { title: "Sign-in failed" });
+        urlParams.delete("error");
+        const cleaned = urlParams.toString();
+        const nextUrl = window.location.pathname + (cleaned ? "?" + cleaned : "");
+        window.history.replaceState(null, "", nextUrl);
+      }
       try {
         await refreshRuns();
-        showWelcome();
+        if (!urlError) showWelcome();
         updateSourceBadge();
       } catch (error) {
-        const msg = error.message || String(error);
+        const msg = userFacingErrorMessage(error);
         if (msg.includes("unauthorized") || msg.includes("Sign in")) {
           window.location.href = "/login?returnTo=%2Fstudio";
           return;
         }
         runList.innerHTML = '<div class="empty"><span><b>Could not load runs.</b><br>' + esc(msg) + '</span></div>';
-        showRaw(msg);
+        showFailure(msg, { title: "Could not load studio" });
       }
     }
 
@@ -3022,6 +3121,15 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl) {
   </script>
 </body>
 </html>`;
+}
+
+function userFacingErrorMessage(value) {
+  if (value == null) return "Something went wrong.";
+  const text = value instanceof Error ? (value.message || String(value)) : String(value);
+  const stackAt = text.search(/\n\s+at\s+\S/);
+  const trimmed = (stackAt === -1 ? text : text.slice(0, stackAt)).trim();
+  const firstLine = trimmed.split("\n").map((line) => line.trim()).find(Boolean) ?? "";
+  return firstLine.replace(/^Error:\s*/i, "") || "Something went wrong.";
 }
 
 function escapeHtml(value) {

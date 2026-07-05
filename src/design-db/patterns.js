@@ -693,6 +693,12 @@ export function renderPage(content, profile, options = {}) {
   const archetype = options.archetype ?? null;
   const patterns = options.patterns ?? [];
   const patternIds = new Set(patterns.map((pattern) => pattern.id));
+  const pageFeatures = (content.features ?? []).filter((feature) =>
+    !/sign up|get started|learn more/i.test(feature.title ?? "")
+  );
+  const pageContent = pageFeatures.length === (content.features ?? []).length
+    ? content
+    : { ...content, features: pageFeatures };
   const heroVariant = (() => {
     if (patternIds.has("hero-split-product")) return "split";
     if ((content.features?.length ?? 0) >= 3 && !patternIds.has("hero-editorial-lead")) return "split";
@@ -736,12 +742,12 @@ ${content.stats.map((stat) => `      <div class="${revealClass}">
   </section>` });
   }
 
-  if (content.features?.length && heroVariant !== "bento" && !useBentoFeatures) {
-    const brand = escapeHtml(content.brand || "Product");
-    if (useIconRows) {
+  if (pageContent.features?.length && heroVariant !== "bento") {
+    const brand = escapeHtml(pageContent.brand || "Product");
+    if (useIconRows && heroVariant !== "split") {
       sections.push({
         key: "features",
-        html: renderIconRowFeatures(content, {
+        html: renderIconRowFeatures(pageContent, {
           revealClass,
           showSectionKickers: flags.showSectionKickers
         })
@@ -753,10 +759,10 @@ ${content.stats.map((stat) => `      <div class="${revealClass}">
       sections.push({ key: "features", html: `  <section class="section" id="features">
     <div class="container">
       <div class="section-head centered ${revealClass}">
-${kickerHtml}        <h2>${escapeHtml(content.featuresHeading || "Everything you need, nothing you don't")}</h2>
+${kickerHtml}        <h2>${escapeHtml(pageContent.featuresHeading || "Everything you need, nothing you don't")}</h2>
       </div>
       <div class="card-grid">
-${content.features.map((feature) => `        <article class="card ${revealClass}">
+${pageContent.features.map((feature) => `        <article class="card ${revealClass}">
           ${flags.showFeatureIcons
     ? `<div class="card-accent" aria-hidden="true"></div>`
     : ""}

@@ -14,7 +14,7 @@ import {
 import { serveMorph } from "../src/server.js";
 import { landingHtml } from "../src/landing.js";
 import { extractContent, findEntryHtml, transformSite } from "../src/transform.js";
-import { assessCaptureQuality, assessScanReadiness, fetchPageForTransform } from "../src/preview.js";
+import { assessCaptureQuality, assessScanReadiness, fetchPageForTransform, normalizePreviewUrlInput } from "../src/preview.js";
 import { enrichContent, researchSite } from "../src/site-research.js";
 import { captureSiteSnapshot, mergeCapturedIntoContent } from "../src/site-capture.js";
 import { assessUiQuality, databaseSummary, selectProfile, selectArchetype, catalogSummary, matchReferenceSites, buildRetrievalPlan, sourceIndexSummary, extractVisualPreferences, planTransform, alignProfileToPreferences } from "../src/design-db/index.js";
@@ -643,6 +643,27 @@ test("findEntryHtml prefers the shallowest index.html after a url capture", asyn
   }
 });
 
+test("findEntryHtml ignores template partials and prefers real pages", async () => {
+  const checkout = await mkdtemp(path.join(os.tmpdir(), "morph-entry-"));
+  try {
+    await mkdir(path.join(checkout, "_includes"), { recursive: true });
+    await writeFile(
+      path.join(checkout, "_includes", "analytics.html"),
+      "<script>ga('send', 'pageview');</script>"
+    );
+    await writeFile(
+      path.join(checkout, "index.html"),
+      "<!DOCTYPE html><html><head><title>Acme</title></head><body><h1>Acme</h1><p>Real landing page copy.</p></body></html>"
+    );
+
+    const entry = await findEntryHtml(checkout);
+    assert.equal(entry, path.join(checkout, "index.html"));
+  } finally {
+    const { rm } = await import("node:fs/promises");
+    await rm(checkout, { recursive: true, force: true });
+  }
+});
+
 test("design intelligence database exposes profiles and heuristics", () => {
   const summary = databaseSummary();
   assert.equal(summary.profiles >= 16, true);
@@ -989,6 +1010,13 @@ test("transform re-renders an ugly site into a passing design-database page", as
   assert.equal(outputCss.includes("--primary"), true);
   assert.equal(outputCss.includes("focus-visible"), true);
   assert.equal(outputCss.includes("@media"), true);
+});
+
+test("normalizePreviewUrlInput adds https for bare domains", () => {
+  assert.equal(normalizePreviewUrlInput("cursor.com"), "https://cursor.com");
+  assert.equal(normalizePreviewUrlInput("https://cursor.com"), "https://cursor.com");
+  assert.equal(normalizePreviewUrlInput("arnavsri993/morph"), "arnavsri993/morph");
+  assert.equal(normalizePreviewUrlInput("localhost:4177/demo"), "https://localhost:4177/demo");
 });
 
 test("assessCaptureQuality rejects bot-check pages", () => {

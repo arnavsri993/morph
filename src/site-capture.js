@@ -107,6 +107,7 @@ export function mergeCapturedIntoContent(content, capture) {
     if (titleKey && heroKeys.has(titleKey)) continue;
 
     if (block.kind === "feature" && block.heading) {
+      if (/sign up|get started|learn more/i.test(block.heading)) continue;
       if (featureTitles.has(titleKey)) continue;
       features.push({ title: block.heading, body: block.body || block.items?.[0] || "" });
       featureTitles.add(titleKey);

@@ -3,15 +3,32 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+export function normalizePreviewUrlInput(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw) || /^file:\/\//i.test(raw)) return raw;
+  // GitHub owner/repo shorthand — not a web address.
+  if (/^[\w.-]+\/[\w.-]+(\/.*)?$/.test(raw) && !/\.[a-z]{2,}/i.test(raw.split("/")[0])) {
+    return raw;
+  }
+  if (/\.[a-z]{2,}(\/|$|:|\?|#)/i.test(raw) || /^localhost\b/i.test(raw)) {
+    return `https://${raw.replace(/^\/+/, "")}`;
+  }
+  return raw;
+}
+
 function parsePreviewUrl(url) {
-  const target = String(url ?? "").trim();
+  const target = normalizePreviewUrlInput(url);
   if (!target) return null;
+  if (!/^https?:\/\//i.test(target) && !/^file:\/\//i.test(target)) {
+    throw new Error("Enter a valid website address (for example https://cursor.com).");
+  }
 
   let parsed;
   try {
     parsed = new URL(target);
   } catch {
-    throw new Error("Preview URL must be a valid http, https, or file URL.");
+    throw new Error("Enter a valid website address (for example https://cursor.com).");
   }
   if (!["http:", "https:", "file:"].includes(parsed.protocol)) {
     throw new Error("Preview URL must use http, https, or file.");

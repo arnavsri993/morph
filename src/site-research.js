@@ -149,7 +149,7 @@ export function enrichContent(content, research) {
     const stats = extractStatsFromResearch(research);
     if (stats.length) enriched.stats = stats;
   }
-  if (research.pricing?.length) {
+  if (research.pricing?.length && !(enriched.pricingTiers?.length >= 2)) {
     enriched.pricingTiers = research.pricing;
   }
   if (!enriched.cta?.headline) {

@@ -1,8 +1,8 @@
 {
   "schemaVersion": "morph.report.v1",
-  "runId": "verify-20260705085505-2e65a1",
-  "generatedAt": "2026-07-05T08:55:05.884Z",
-  "durationMs": 5,
+  "runId": "verify-20260705094927-d5407c",
+  "generatedAt": "2026-07-05T09:49:27.470Z",
+  "durationMs": 6,
   "workspace": {
     "id": "morph-demo-workspace",
     "name": "morph Demo Workspace",
