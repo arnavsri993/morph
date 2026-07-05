@@ -278,10 +278,10 @@ test("landing page is served at / and the studio dashboard at /studio", async ()
     assert.equal(studio.includes("Connect GitHub"), true);
     assert.equal(studio.includes("Agent instructions"), true);
     assert.equal(studio.includes("Preview URL"), true);
+    assert.equal(studio.includes("Paste UI code"), true);
+    assert.equal(studio.includes("Load broken demo"), true);
     assert.equal(studio.includes("morph"), true);
     assert.equal(studio.includes("Narrate review"), false);
-    assert.equal(studio.includes("Load broken demo"), false);
-    assert.equal(studio.includes("Paste UI code"), false);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -457,22 +457,20 @@ test("stripe checkout stays stubbed until configured and webhooks verify signatu
   }
 });
 
-test("studio review accepts preview url and agent instructions", async () => {
+test("studio review scores preview url and shows current vs possible", async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-inputs-"));
-  const fixtureRoot = path.join(tempRoot, "acme-saas");
-  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
+  const siteDir = path.join(tempRoot, "agent-site");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/codex-landing"), siteDir);
+  const previewUrl = `file://${path.join(siteDir, "index.html")}`;
 
   const configPath = path.join(tempRoot, "morph.config.json");
   await writeFile(configPath, `${JSON.stringify({
     projectName: "Acme Studio Inputs",
     projectId: "acme-studio-inputs",
-    projectRoot: "acme-saas",
+    projectRoot: "fixtures/acme-saas",
     morphDir: ".morph",
     tokenFiles: ["design-system/tokens.css"],
     scan: ["src/**/*.tsx"],
-    componentImports: {
-      Button: "src/components/Button.tsx"
-    },
     gate: {
       minScore: 95
     }
@@ -487,17 +485,24 @@ test("studio review accepts preview url and agent instructions", async () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         source: "url",
-        previewUrl: "https://example.com/billing",
-        instructions: "Review the agent billing screen for token drift."
+        previewUrl,
+        instructions: "Review the agent landing page for UI quality."
       })
     });
     assert.equal(response.status, 201);
     const payload = await response.json();
-    assert.equal(payload.run.payload.source, "url");
-    assert.equal(payload.run.payload.previewUrl, "https://example.com/billing");
-    assert.equal(payload.run.payload.instructions, "Review the agent billing screen for token drift.");
-    assert.equal(payload.run.payload.preview?.url, "https://example.com/billing");
-    assert.equal(payload.run.payload.finalVerdict, "pass");
+    const review = payload.run.payload;
+    assert.equal(review.source, "url");
+    assert.equal(review.previewUrl, previewUrl);
+    assert.equal(review.instructions, "Review the agent landing page for UI quality.");
+    assert.equal(review.engine, "design_db_transform");
+    assert.equal(review.before.score < 40, true);
+    assert.equal(review.after.score >= 95, true);
+    assert.equal(review.currentScore, review.before.score);
+    assert.equal(review.possibleScore, review.after.score);
+    assert.equal(review.finalVerdict, "fail");
+    assert.equal(review.redesignPasses, true);
+    assert.equal(review.transformedPreviewPath, "/transformed/index.html");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -534,15 +539,15 @@ test("studio review rejects requests without github repo or preview url", async 
   }
 });
 
-test("studio review repairs an isolated copy without mutating source fixture", async () => {
-  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-"));
+test("studio review repairs pasted agent ui code", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-paste-"));
   const fixtureRoot = path.join(tempRoot, "acme-saas");
-  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas-clean"), fixtureRoot);
 
   const configPath = path.join(tempRoot, "morph.config.json");
   await writeFile(configPath, `${JSON.stringify({
-    projectName: "Acme Studio",
-    projectId: "acme-studio",
+    projectName: "Acme Studio Paste",
+    projectId: "acme-studio-paste",
     projectRoot: "acme-saas",
     morphDir: ".morph",
     tokenFiles: ["design-system/tokens.css"],
@@ -555,8 +560,53 @@ test("studio review repairs an isolated copy without mutating source fixture", a
     }
   }, null, 2)}\n`);
 
-  const driftedFile = path.join(fixtureRoot, "src/routes/settings/billing.tsx");
-  const sourceBefore = await readFile(driftedFile, "utf8");
+  const driftedFile = path.join(repoRoot, "fixtures/acme-saas/src/routes/settings/billing.tsx");
+  const sourceCode = await readFile(driftedFile, "utf8");
+  const config = await loadConfig(configPath, tempRoot);
+  const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
+
+  try {
+    const response = await fetch(`${url}/api/studio/review`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        source: "paste",
+        sourceCode,
+        targetFile: "src/routes/settings/billing.tsx"
+      })
+    });
+    assert.equal(response.status, 201);
+    const payload = await response.json();
+    assert.equal(payload.run.payload.source, "paste");
+    assert.equal(payload.run.payload.before.verdict, "fail");
+    assert.equal(payload.run.payload.finalVerdict, "pass");
+    assert.equal(payload.run.payload.codeReview.changed, true);
+    assert.match(payload.run.payload.codeReview.after, /Button variant="primary"/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("studio review scores url site without mutating source fixture", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-"));
+  const siteDir = path.join(tempRoot, "agent-site");
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/codex-landing"), siteDir);
+  const previewUrl = `file://${path.join(siteDir, "index.html")}`;
+  const sourceBefore = await readFile(path.join(siteDir, "index.html"), "utf8");
+
+  const configPath = path.join(tempRoot, "morph.config.json");
+  await writeFile(configPath, `${JSON.stringify({
+    projectName: "Acme Studio",
+    projectId: "acme-studio",
+    projectRoot: "fixtures/acme-saas",
+    morphDir: ".morph",
+    tokenFiles: ["design-system/tokens.css"],
+    scan: ["src/**/*.tsx"],
+    gate: {
+      minScore: 95
+    }
+  }, null, 2)}\n`);
+
   const config = await loadConfig(configPath, tempRoot);
   const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
 
@@ -566,7 +616,7 @@ test("studio review repairs an isolated copy without mutating source fixture", a
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         source: "url",
-        previewUrl: "https://example.com/billing"
+        previewUrl
       })
     });
     assert.equal(response.status, 201);
@@ -574,14 +624,12 @@ test("studio review repairs an isolated copy without mutating source fixture", a
 
     assert.equal(payload.run.kind, "studio-review");
     assert.equal(payload.run.payload.before.verdict, "fail");
-    assert.equal(payload.run.payload.finalVerdict, "pass");
+    assert.equal(payload.run.payload.finalVerdict, "fail");
+    assert.equal(payload.run.payload.redesignPasses, true);
     assert.equal(payload.run.payload.isolated, true);
 
-    const sourceAfter = await readFile(driftedFile, "utf8");
+    const sourceAfter = await readFile(path.join(siteDir, "index.html"), "utf8");
     assert.equal(sourceAfter, sourceBefore);
-
-    const sourceReport = await createReport(config);
-    assert.equal(sourceReport.verdict, "fail");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -770,7 +818,8 @@ test("studio github review clones the repo, transforms it, and serves the result
 
     assert.equal(review.engine, "design_db_transform");
     assert.equal(review.before.verdict, "fail");
-    assert.equal(review.finalVerdict, "pass");
+    assert.equal(review.finalVerdict, "fail");
+    assert.equal(review.redesignPasses, true);
     assert.equal(review.transform.profile.id, "halcyon-blue");
     assert.equal(review.transformedPreviewPath, "/transformed/index.html");
     assert.equal(review.codeReview.changed, true);

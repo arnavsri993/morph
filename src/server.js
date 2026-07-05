@@ -23,7 +23,7 @@ import {
   writeBillingState
 } from "./billing.js";
 import { landingHtml } from "./landing.js";
-import { capturePreviewUrl } from "./preview.js";
+import { fetchPageForTransform } from "./preview.js";
 import { transformSite } from "./transform.js";
 import { cloneRepo } from "./github.js";
 
@@ -113,7 +113,7 @@ export async function serveMorph(config, options = {}) {
       }
 
       if (request.method === "GET" && (url.pathname === "/studio" || url.pathname === "/studio/")) {
-        return sendHtml(response, dashboardHtml(config, session));
+        return sendHtml(response, await dashboardHtml(config, session));
       }
 
       if (request.method === "GET" && url.pathname === "/api/health") {
@@ -279,6 +279,8 @@ export async function serveMorph(config, options = {}) {
           previewUrl: body.previewUrl,
           githubRepo: body.githubRepo,
           instructions: body.instructions,
+          sourceCode: body.sourceCode,
+          targetFile: body.targetFile,
           referenceImage: body.referenceImage,
           generateReference: body.generateReference
         });
@@ -378,29 +380,41 @@ const DEFAULT_REVIEW_FILE = "src/routes/settings/billing.tsx";
 
 async function runStudioReview(config, options = {}) {
   const instructions = String(options.instructions ?? "").trim();
-  const { source, previewUrl, githubRepo } = resolveStudioSource(options);
+  const sourceCode = String(options.sourceCode ?? "").trim();
+  const targetFile = normalizeReviewTargetFile(options.targetFile);
+  let source = String(options.source ?? "").trim();
+  if (!source && sourceCode) source = "paste";
 
-  if (source === "github") {
-    return runGithubTransformReview(config, {
-      githubRepo,
-      instructions,
-      referenceImage: options.referenceImage,
-      generateReference: options.generateReference
-    });
-  }
-
-  let preview = null;
-  if (source === "url") {
-    preview = await capturePreviewUrl(previewUrl);
+  if (source === "paste" || source === "fixture") {
+    if (source === "paste" && !sourceCode) {
+      throw new HttpError(400, "missing_source_code", "Paste the agent UI source code before running a review.");
+    }
+  } else {
+    const resolved = resolveStudioSource(options);
+    if (resolved.source === "github" || resolved.source === "url") {
+      return runTransformReview(config, {
+        source: resolved.source,
+        githubRepo: resolved.githubRepo,
+        previewUrl: resolved.previewUrl,
+        instructions,
+        referenceImage: options.referenceImage,
+        generateReference: options.generateReference
+      });
+    }
+    source = resolved.source;
   }
 
   const studioRoot = path.join(config.configDir, ".studio-run");
   const studioProjectRoot = path.join(studioRoot, "project");
   const studioConfigPath = path.join(studioRoot, "morph.config.json");
-  const targetFile = DEFAULT_REVIEW_FILE;
 
   await mkdir(studioRoot, { recursive: true });
   await copyFixtureForDemo(config.projectRoot, studioProjectRoot);
+
+  if (source === "paste") {
+    await mkdir(path.dirname(path.join(studioProjectRoot, targetFile)), { recursive: true });
+    await writeFile(path.join(studioProjectRoot, targetFile), `${sourceCode}\n`);
+  }
 
   await writeFile(studioConfigPath, `${JSON.stringify({
     projectName: `${config.projectName} Studio Review`,
@@ -426,16 +440,13 @@ async function runStudioReview(config, options = {}) {
   const codeAfter = await readFile(reviewFilePath, "utf8");
 
   const userJourney = [];
+  if (source === "paste") {
+    userJourney.push(`Scan pasted agent UI in ${targetFile}.`);
+  } else if (source === "fixture") {
+    userJourney.push(`Scan seeded agent drift in ${targetFile}.`);
+  }
   if (instructions) {
     userJourney.push(`Apply agent instructions: ${instructions.length > 140 ? `${instructions.slice(0, 140)}…` : instructions}`);
-  }
-  if (source === "github") {
-    userJourney.push(`Review agent branch from GitHub repo ${githubRepo}.`);
-  }
-  if (preview?.status === "captured") {
-    userJourney.push("Capture live UI with Playwright.", "Compare the captured surface against design-system grammar.");
-  } else if (preview?.status === "playwright_not_installed") {
-    userJourney.push("Preview URL recorded; install Playwright to capture the live UI.");
   }
   userJourney.push(
     "Inspect the agent-generated UI.",
@@ -451,10 +462,13 @@ async function runStudioReview(config, options = {}) {
     project: config.projectName,
     isolated: true,
     source,
+    engine: "design_system_repair",
     instructions: instructions || null,
-    githubRepo: source === "github" ? githubRepo : null,
-    previewUrl: source === "url" ? previewUrl : null,
-    preview,
+    githubRepo: null,
+    previewUrl: null,
+    preview: null,
+    currentScore: before.score,
+    possibleScore: after.score,
     targetFile,
     codeReview: {
       file: targetFile,
@@ -482,16 +496,31 @@ async function runStudioReview(config, options = {}) {
   };
 }
 
-async function runGithubTransformReview(config, { githubRepo, instructions, referenceImage, generateReference }) {
+async function runTransformReview(config, {
+  source,
+  githubRepo = null,
+  previewUrl = null,
+  instructions,
+  referenceImage,
+  generateReference
+}) {
   const studioRoot = path.join(config.configDir, ".studio-run");
   const checkoutRoot = path.join(studioRoot, "checkout");
   const transformedRoot = path.join(studioRoot, "transformed");
   await mkdir(studioRoot, { recursive: true });
 
-  try {
-    await cloneRepo(githubRepo, checkoutRoot);
-  } catch (error) {
-    throw new HttpError(422, "github_clone_failed", `Could not clone ${githubRepo}: ${error.message}`);
+  let preview = null;
+  if (source === "github") {
+    try {
+      await cloneRepo(githubRepo, checkoutRoot);
+    } catch (error) {
+      throw new HttpError(422, "github_clone_failed", `Could not clone ${githubRepo}: ${error.message}`);
+    }
+  } else {
+    preview = await fetchPageForTransform(previewUrl, checkoutRoot);
+    if (preview.status !== "captured") {
+      throw new HttpError(422, "url_fetch_failed", preview.error || "Could not fetch the preview URL.");
+    }
   }
 
   let transform;
@@ -508,18 +537,37 @@ async function runGithubTransformReview(config, { githubRepo, instructions, refe
 
   const before = heuristicsAsReport(transform.before, transform.codeReview.file, config);
   const after = heuristicsAsReport(transform.after, "index.html", config);
+  const userJourney = source === "github"
+    ? [
+        `Clone agent repo ${githubRepo} (shallow).`,
+        `Score the current UI: ${before.score}/100.`,
+        "Extract the site's content: brand, navigation, hero copy, features, CTAs.",
+        `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
+        "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
+        `Possible score after redesign: ${after.score}/100. Preview at /transformed/index.html.`
+      ]
+    : [
+        `Fetch live site at ${previewUrl}.`,
+        `Score the current UI: ${before.score}/100.`,
+        "Extract the site's content: brand, navigation, hero copy, features, CTAs.",
+        `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
+        "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
+        `Possible score after redesign: ${after.score}/100. Preview at /transformed/index.html.`
+      ];
 
   return {
     schemaVersion: "morph.studio-review.v1",
     generatedAt: new Date().toISOString(),
     project: config.projectName,
     isolated: true,
-    source: "github",
+    source,
     engine: "design_db_transform",
     instructions: instructions || null,
-    githubRepo,
-    previewUrl: null,
-    preview: null,
+    githubRepo: source === "github" ? githubRepo : null,
+    previewUrl: source === "url" ? previewUrl : null,
+    preview,
+    currentScore: before.score,
+    possibleScore: after.score,
     targetFile: transform.codeReview.file,
     codeReview: transform.codeReview,
     transform: {
@@ -530,14 +578,7 @@ async function runGithubTransformReview(config, { githubRepo, instructions, refe
       outputFiles: transform.output.files
     },
     transformedPreviewPath: "/transformed/index.html",
-    userJourney: [
-      `Clone agent repo ${githubRepo} (shallow).`,
-      `Score the incoming UI against ${transform.designDatabase.heuristics} design-quality heuristics: ${transform.before.score}/100.`,
-      "Extract the site's content: brand, navigation, hero copy, features, CTAs.",
-      `Select the best-matching profile from the design intelligence database: ${transform.profile.name} (${transform.profile.inspiration}).`,
-      "Re-render the site with the profile's full design system: type scale, palette, spacing rhythm, components, motion, responsive rules.",
-      `Verify the transformed UI: ${transform.after.score}/100. Preview it at /transformed/index.html.`
-    ],
+    userJourney,
     before,
     repair: {
       runId: null,
@@ -547,9 +588,11 @@ async function runGithubTransformReview(config, { githubRepo, instructions, refe
       risk: "full_rerender_from_design_database"
     },
     after,
-    finalVerdict: after.verdict,
-    passed: after.verdict === "pass",
-    ciSummary: transform.summary
+    redesignVerdict: after.verdict,
+    redesignPasses: after.verdict === "pass",
+    finalVerdict: before.verdict,
+    passed: before.verdict === "pass",
+    ciSummary: `Current UI ${before.score}/100${before.verdict === "pass" ? " passes" : " fails"} the gate. After redesign: ${after.score}/100. ${transform.summary}`
   };
 }
 
@@ -617,14 +660,18 @@ function normalizeGithubRepo(value) {
   return raw.replace(/^\/+|\/+$/g, "").replace(/\.git$/, "");
 }
 
+function normalizeReviewTargetFile(value) {
+  const candidate = String(value ?? DEFAULT_REVIEW_FILE).trim().replace(/^\/+/, "");
+  if (!candidate || candidate.includes("..")) {
+    throw new HttpError(400, "invalid_target_file", "Target file must be a relative path inside the project.");
+  }
+  return candidate;
+}
+
 function resolveStudioSource(options) {
   const previewUrl = String(options.previewUrl ?? "").trim();
   const githubRepo = normalizeGithubRepo(options.githubRepo);
   let source = String(options.source ?? "").trim();
-
-  if (source === "paste" || source === "fixture") {
-    throw new HttpError(400, "missing_project_source", "Connect a GitHub repo or provide a preview URL before running a review.");
-  }
 
   if (!source) {
     if (previewUrl && githubRepo) {
@@ -781,11 +828,25 @@ function publicConfig(config, runtimeAuth, billing) {
 }
 
 
-function dashboardHtml(config, session) {
+async function dashboardHtml(config, session) {
   const workspaceName = escapeHtml(config.workspace?.name ?? "Local Workspace");
   const projectName = escapeHtml(config.projectName ?? "Project");
   const githubConnected = session?.provider === "github";
   const githubLabel = githubConnected ? escapeHtml(session.name || session.email || "GitHub account") : "";
+  let demoDriftSource = "";
+  const demoCandidates = [
+    path.join(config.configDir, "fixtures/acme-saas/src/routes/settings/billing.tsx"),
+    path.join(config.projectRoot, DEFAULT_REVIEW_FILE)
+  ];
+  for (const candidate of demoCandidates) {
+    try {
+      demoDriftSource = await readFile(candidate, "utf8");
+      break;
+    } catch {
+      // try next demo source
+    }
+  }
+  const demoDriftJson = JSON.stringify(demoDriftSource);
   const userBlock = session
     ? `<div class="user-chip"><span class="user-avatar" aria-hidden="true">${escapeHtml((session.name || session.email || "?").slice(0, 1).toUpperCase())}</span><span class="user-name">${escapeHtml(session.name || session.email)}</span></div><a class="top-link" href="/auth/logout">Sign out</a>`
     : `<a class="top-link" href="/login?returnTo=%2Fstudio">Log in</a>`;
@@ -1634,27 +1695,32 @@ function dashboardHtml(config, session) {
       <section class="page-head" id="overview">
         <div class="eyebrow"><span class="eyebrow-dot"></span> Morph Studio</div>
         <h1><span class="title-gradient">Review agent UI</span><br>before it ships.</h1>
-        <p class="lede">Connect a repo or preview URL, describe what the agent built, and get a deterministic drift scan with repairs and a merge gate verdict.</p>
-        <div class="actions">
-          <button class="btn btn-primary" data-action="studio-review" id="runReviewBtn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-            Run full review
-          </button>
-        </div>
+        <p class="lede">Paste agent-generated UI code, run a full review, and watch morph catch drift, apply deterministic fixes, and return a passing merge gate with before/after proof.</p>
       </section>
 
       <section class="setup-panel spotlight" aria-label="Project source and agent instructions">
         <div class="setup-head">
-          <h2>Project source</h2>
-          <p>Point morph at the agent output you want reviewed.</p>
-          <span class="source-badge" id="sourceBadge">local project</span>
+          <h2>Agent UI input</h2>
+          <p>Paste the UI your agent shipped — or use the pre-loaded broken demo. morph scans it, auto-fixes drift, and proves the branch is safe to review.</p>
+          <span class="source-badge" id="sourceBadge">paste ui</span>
         </div>
         <div class="panel-tabs" role="tablist" aria-label="Project source">
-          <button type="button" class="active" data-source-tab="github" role="tab" aria-selected="true">GitHub</button>
+          <button type="button" class="active" data-source-tab="paste" role="tab" aria-selected="true">Paste UI code</button>
+          <button type="button" data-source-tab="github" role="tab" aria-selected="false">GitHub</button>
           <button type="button" data-source-tab="url" role="tab" aria-selected="false">Preview URL</button>
         </div>
         <div class="setup-stack">
-          <div class="source-pane" data-source-pane="github">
+          <div class="source-pane" data-source-pane="paste">
+            <div class="code-editor">
+              <div class="code-toolbar">
+                <label for="sourceCode">Agent UI source · <code>${DEFAULT_REVIEW_FILE}</code></label>
+                <button type="button" class="btn btn-ghost" id="loadDemoDrift" style="min-height:36px;padding:0 14px;font-size:13px">Load broken demo</button>
+              </div>
+              <textarea id="sourceCode" name="sourceCode" spellcheck="false" placeholder="Paste the TSX/JSX your agent generated…"></textarea>
+              <p class="source-note">The broken demo is pre-loaded. Click <strong>Run full review</strong> to scan, repair, and gate the UI in one shot.</p>
+            </div>
+          </div>
+          <div class="source-pane" data-source-pane="github" hidden>
             <div class="github-connect">
               <div>
                 <strong id="githubStatusLabel">${githubConnected ? "GitHub connected" : "Connect GitHub"}</strong>
@@ -1668,14 +1734,14 @@ function dashboardHtml(config, session) {
               <span>Repository</span>
               <input id="githubRepo" name="githubRepo" type="text" required autocomplete="off" placeholder="owner/repo">
             </label>
-            <p class="source-note">morph clones the repo, scores UI drift, and can re-render with a frontier design profile at <code>/transformed</code>.</p>
+            <p class="source-note">morph clones the repo, scores the current UI, and shows the possible score after a full redesign at <code>/transformed</code>.</p>
           </div>
           <div class="source-pane" data-source-pane="url" hidden>
             <form class="auth-form" id="previewForm" onsubmit="return false">
               <label for="previewUrl">Live preview URL</label>
               <input id="previewUrl" name="previewUrl" type="url" inputmode="url" autocomplete="url" required placeholder="https://your-app.vercel.app/page">
             </form>
-            <p class="source-note">morph captures a Playwright screenshot and attaches it to the review receipt.</p>
+            <p class="source-note">morph fetches your live site, scores the current UI, and shows the possible score after a full redesign at <code>/transformed</code>.</p>
             <div class="preview-frame" id="previewFrame" hidden>
               <img id="previewImage" alt="Playwright preview capture">
               <div class="preview-meta" id="previewMeta"></div>
@@ -1686,22 +1752,28 @@ function dashboardHtml(config, session) {
             <label for="agentInstructions">Agent instructions</label>
             <textarea id="agentInstructions" name="instructions" placeholder="What did the agent build? What should morph focus on — token drift, components, focus states, layout?"></textarea>
           </div>
+          <div class="actions">
+            <button class="btn btn-primary" data-action="studio-review" id="runReviewBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+              Run full review
+            </button>
+          </div>
         </div>
       </section>
 
       <section class="stats" aria-label="Review metrics">
-        <div class="stat spotlight"><span class="stat-label">Review score</span><span class="stat-value" id="score">–</span><span class="stat-sub">out of 100 · gate ≥ 95</span></div>
-        <div class="stat spotlight"><span class="stat-label">Merge gate</span><span class="stat-value" id="gate">–</span><span class="stat-sub">block_on_any_drift</span></div>
-        <div class="stat spotlight"><span class="stat-label">Fixes applied</span><span class="stat-value" id="fixes">–</span><span class="stat-sub">deterministic patches</span></div>
-        <div class="stat spotlight"><span class="stat-label">Runs stored</span><span class="stat-value" id="runs">0</span><span class="stat-sub">.morph/runs receipts</span></div>
+        <div class="stat spotlight"><span class="stat-label">Current score</span><span class="stat-value" id="score">–</span><span class="stat-sub">your site today · gate ≥ 95</span></div>
+        <div class="stat spotlight"><span class="stat-label">After redesign</span><span class="stat-value" id="possibleScore">–</span><span class="stat-sub">possible with morph</span></div>
+        <div class="stat spotlight"><span class="stat-label">Merge gate</span><span class="stat-value" id="gate">–</span><span class="stat-sub">based on current score</span></div>
+        <div class="stat spotlight"><span class="stat-label">Issues found</span><span class="stat-value" id="fixes">–</span><span class="stat-sub">in current UI</span></div>
       </section>
 
       <section class="pipeline spotlight" id="pipeline" hidden aria-label="Latest review pipeline">
-        <div class="pipe-stage"><span class="pipe-k">Before</span><span class="pipe-v" id="pipeBefore">–</span></div>
+        <div class="pipe-stage"><span class="pipe-k">Current</span><span class="pipe-v" id="pipeBefore">–</span></div>
         <span class="pipe-arrow" aria-hidden="true">→</span>
-        <div class="pipe-stage"><span class="pipe-k">Repair</span><span class="pipe-v warn" id="pipeFixes">–</span></div>
+        <div class="pipe-stage"><span class="pipe-k">Redesign</span><span class="pipe-v warn" id="pipeFixes">–</span></div>
         <span class="pipe-arrow" aria-hidden="true">→</span>
-        <div class="pipe-stage"><span class="pipe-k">After</span><span class="pipe-v" id="pipeAfter">–</span></div>
+        <div class="pipe-stage"><span class="pipe-k">Possible</span><span class="pipe-v" id="pipeAfter">–</span></div>
         <span class="pipe-summary" id="pipeSummary"></span>
       </section>
 
@@ -1728,7 +1800,7 @@ function dashboardHtml(config, session) {
 
       <p class="foot-note">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>Full reviews repair an isolated <code>.studio-run</code> copy. A GitHub repo or preview URL is required.</span>
+        <span>GitHub and Preview URL score your actual site (current → possible after redesign). Paste UI code runs design-system repair on component source.</span>
       </p>
     </main>
   </div>
@@ -1737,7 +1809,7 @@ function dashboardHtml(config, session) {
     const outputReadable = document.querySelector("#outputReadable");
     const runList = document.querySelector("#runList");
     const score = document.querySelector("#score");
-    const runs = document.querySelector("#runs");
+    const possibleScore = document.querySelector("#possibleScore");
     const gate = document.querySelector("#gate");
     const fixes = document.querySelector("#fixes");
     const reviewState = document.querySelector("#reviewState");
@@ -1749,6 +1821,8 @@ function dashboardHtml(config, session) {
     const pipeSummary = document.querySelector("#pipeSummary");
     const previewUrlInput = document.querySelector("#previewUrl");
     const githubRepoInput = document.querySelector("#githubRepo");
+    const sourceCodeInput = document.querySelector("#sourceCode");
+    const loadDemoDriftBtn = document.querySelector("#loadDemoDrift");
     const agentInstructionsInput = document.querySelector("#agentInstructions");
     const previewFrame = document.querySelector("#previewFrame");
     const previewImage = document.querySelector("#previewImage");
@@ -1756,7 +1830,20 @@ function dashboardHtml(config, session) {
     const previewPlaceholder = document.querySelector("#previewPlaceholder");
     const sourceBadge = document.querySelector("#sourceBadge");
 
-    let activeSource = "github";
+    const DEMO_DRIFT = ${demoDriftJson};
+    const REVIEW_TARGET_FILE = ${JSON.stringify(DEFAULT_REVIEW_FILE)};
+
+    let activeSource = "paste";
+
+    function loadDemoDrift() {
+      if (!sourceCodeInput || !DEMO_DRIFT) return;
+      sourceCodeInput.value = DEMO_DRIFT;
+      updateSourceBadge();
+    }
+
+    loadDemoDriftBtn?.addEventListener("click", loadDemoDrift);
+    sourceCodeInput?.addEventListener("input", updateSourceBadge);
+    if (sourceCodeInput && DEMO_DRIFT) sourceCodeInput.value = DEMO_DRIFT;
 
     document.querySelectorAll("[data-source-tab]").forEach((tabButton) => {
       tabButton.addEventListener("click", () => {
@@ -1775,7 +1862,10 @@ function dashboardHtml(config, session) {
 
     function updateSourceBadge() {
       if (!sourceBadge) return;
-      if (activeSource === "url") {
+      if (activeSource === "paste") {
+        const lines = sourceCodeInput?.value.trim().split("\\n").length || 0;
+        sourceBadge.textContent = lines ? "paste ui · " + lines + " lines" : "paste ui required";
+      } else if (activeSource === "url") {
         const url = previewUrlInput?.value.trim();
         sourceBadge.textContent = url ? "preview url · " + url : "preview url required";
       } else {
@@ -1789,13 +1879,18 @@ function dashboardHtml(config, session) {
 
     function buildReviewRequest() {
       const instructions = agentInstructionsInput?.value.trim() || "";
+      if (activeSource === "paste") {
+        const sourceCode = sourceCodeInput?.value.trim() || "";
+        if (!sourceCode) throw new Error("Paste your agent UI code or click Load broken demo.");
+        return { source: "paste", sourceCode, targetFile: REVIEW_TARGET_FILE, instructions };
+      }
       if (activeSource === "url") {
         const previewUrl = previewUrlInput?.value.trim() || "";
-        if (!previewUrl) throw new Error("Enter a preview URL.");
+        if (!previewUrl) throw new Error("Enter a preview URL or switch to Paste UI code.");
         return { source: "url", previewUrl, instructions };
       }
       const githubRepo = githubRepoInput?.value.trim() || "";
-      if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo).");
+      if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo) or switch to Paste UI code.");
       return { source: "github", githubRepo, instructions };
     }
 
@@ -1914,20 +2009,25 @@ function dashboardHtml(config, session) {
       if (p.targetFile) {
         html += '<div style="margin-bottom:8px;font-size:12px;color:var(--muted)"><strong style="color:var(--ink)">File:</strong> ' + esc(p.targetFile) + '</div>';
       }
-      // Pipeline strip: Before → Repair → After
+      // Pipeline strip: Current → Redesign → Possible
       html += '<div style="display:flex;gap:8px;align-items:center;font-size:12px;flex-wrap:wrap">';
-      html += pipelineStep("Before", before?.verdict, before?.score);
+      html += pipelineStep("Current", before?.score);
       html += '<span style="color:var(--muted)">→</span>';
-      html += '<span style="color:var(--muted)">' + esc(String(repair?.replacements ?? 0)) + ' fixes applied</span>';
+      html += '<span style="color:var(--muted)">' + esc(p.engine === "design_db_transform"
+        ? (p.transform?.profile?.name || "Redesign")
+        : String(repair?.replacements ?? 0) + " fixes") + '</span>';
       html += '<span style="color:var(--muted)">→</span>';
-      html += pipelineStep("After", after?.verdict, after?.score);
+      html += pipelineStep("Possible", after?.score);
+      if (p.redesignPasses && p.finalVerdict !== "pass") {
+        html += '<span style="color:var(--ok);font-size:11px;margin-left:4px">would pass after redesign</span>';
+      }
       html += '</div>';
       html += '</div>';
 
       // Before section (open by default when there are issues)
       const hasIssues = Array.isArray(before?.issues) && before.issues.length > 0;
       html += '<details' + (hasIssues ? " open" : "") + '>';
-      html += '<summary>Before review <span class="preview">' + badge(before?.verdict || "?", before?.verdict === "pass" ? "pass" : "fail") + ' &nbsp;' + esc(String(before?.score ?? "?")) + '/100</span></summary>';
+      html += '<summary>Current UI <span class="preview">' + badge(before?.verdict || "?", before?.verdict === "pass" ? "pass" : "fail") + ' &nbsp;' + esc(String(before?.score ?? "?")) + '/100</span></summary>';
       html += '<div class="detail-body">' + renderReportBody(before) + '</div></details>';
 
       // Repair section
@@ -1935,7 +2035,7 @@ function dashboardHtml(config, session) {
       html += '<div class="detail-body">' + renderRepairBody(repair) + '</div></details>';
 
       // After section
-      html += '<details><summary>After repair <span class="preview">' + badge(after?.verdict || "?", after?.verdict === "pass" ? "pass" : "fail") + ' &nbsp;' + esc(String(after?.score ?? "?")) + '/100</span></summary>';
+      html += '<details><summary>After redesign <span class="preview">' + badge(after?.verdict || "?", after?.verdict === "pass" ? "pass" : "fail") + ' &nbsp;' + esc(String(after?.score ?? "?")) + '/100</span></summary>';
       html += '<div class="detail-body">' + renderReportBody(after) + '</div></details>';
 
       // User journey
@@ -1966,9 +2066,10 @@ function dashboardHtml(config, session) {
       return html;
     }
 
-    function pipelineStep(label, verdict, score) {
-      const cls = verdict === "pass" ? "pass" : "fail";
-      return '<span>' + esc(label) + ': ' + badge(verdict || "?", cls) + ' <strong>' + esc(String(score ?? "?")) + '</strong>/100</span>';
+    function pipelineStep(label, score) {
+      const n = Number(score);
+      const cls = n >= 95 ? "pass" : "fail";
+      return '<span>' + esc(label) + ': ' + badge(n >= 95 ? "pass" : "fail", cls) + ' <strong>' + esc(String(score ?? "?")) + '</strong>/100</span>';
     }
 
     // ── Report body (shared by before/after and plain verify runs) ────────────
@@ -2100,7 +2201,7 @@ function dashboardHtml(config, session) {
       outputReadable.innerHTML = '<div class="welcome">'
         + '<div class="welcome-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>'
         + '<h3>Ready to review</h3>'
-        + '<p>Connect a source, add instructions, then run a full review to see your receipt here.</p>'
+        + '<p>The broken demo UI is already loaded. Click <strong>Run full review</strong> to scan it, auto-fix every drift issue, and see the before/after code and merge gate.</p>'
         + '</div>';
     }
 
@@ -2138,14 +2239,19 @@ function dashboardHtml(config, session) {
     function renderPipeline(runPayload) {
       const before = runPayload?.before;
       const after = runPayload?.after;
-      const repl = runPayload?.repair?.replacements;
+      const isTransform = runPayload?.engine === "design_db_transform";
+      const issueCount = isTransform
+        ? (before?.issues?.length ?? runPayload?.repair?.replacements ?? 0)
+        : (runPayload?.repair?.replacements ?? 0);
       if (!before || !after) { pipeline.hidden = true; return; }
       pipeline.hidden = false;
-      pipeBefore.textContent = (before.verdict || "?").toUpperCase() + " " + (before.score ?? "?") + "/100";
-      pipeBefore.className = "pipe-v " + (before.verdict === "pass" ? "ok" : "bad");
-      pipeAfter.textContent = (after.verdict || "?").toUpperCase() + " " + (after.score ?? "?") + "/100";
-      pipeAfter.className = "pipe-v " + (after.verdict === "pass" ? "ok" : "bad");
-      pipeFixes.textContent = (repl ?? 0) + " fixes";
+      pipeBefore.textContent = (before.score ?? "?") + "/100";
+      pipeBefore.className = "pipe-v " + (Number(before.score) >= 95 ? "ok" : "bad");
+      pipeAfter.textContent = (after.score ?? "?") + "/100";
+      pipeAfter.className = "pipe-v " + (Number(after.score) >= 95 ? "ok" : "bad");
+      pipeFixes.textContent = isTransform
+        ? (runPayload?.transform?.profile?.name || "design profile")
+        : (issueCount + " fixes");
       pipeSummary.textContent = runPayload.ciSummary || "";
     }
 
@@ -2153,20 +2259,36 @@ function dashboardHtml(config, session) {
       lastPayload = payload;
       applyOutputMode(payload);
       const runPayload = payload.run?.payload;
-      const report = runPayload?.after || runPayload;
-      if (report?.score !== undefined) score.textContent = report.score;
-      score.className = "stat-value" + (Number(report?.score) >= 95 ? " ok" : report?.score !== undefined ? " bad" : "");
-      const finalVerdict = runPayload?.finalVerdict || report?.verdict;
+      const before = runPayload?.before;
+      const after = runPayload?.after;
+      const current = before?.score ?? runPayload?.currentScore;
+      const possible = after?.score ?? runPayload?.possibleScore;
+      if (current !== undefined) {
+        score.textContent = current;
+        score.className = "stat-value" + (Number(current) >= 95 ? " ok" : " bad");
+      }
+      if (possible !== undefined) {
+        possibleScore.textContent = possible;
+        possibleScore.className = "stat-value" + (Number(possible) >= 95 ? " ok" : possible !== undefined ? " warn" : "");
+      } else {
+        possibleScore.textContent = "–";
+        possibleScore.className = "stat-value";
+      }
+      const finalVerdict = runPayload?.finalVerdict || before?.verdict;
       if (finalVerdict) {
         gate.textContent = finalVerdict === "pass" ? "Open" : "Blocked";
         gate.className = "stat-value " + (finalVerdict === "pass" ? "ok" : "bad");
       }
-      const replacements = runPayload?.repair?.replacements ?? (runPayload?.schemaVersion?.includes("repair") ? runPayload.replacements : undefined);
-      if (replacements !== undefined) fixes.textContent = replacements;
+      const issueCount = before?.issues?.length ?? runPayload?.repair?.replacements;
+      if (issueCount !== undefined) fixes.textContent = issueCount;
       renderPipeline(runPayload);
       if (runPayload?.preview) renderPreviewCapture(runPayload.preview);
       if (finalVerdict) {
-        setState(finalVerdict === "pass" ? "Gate open" : "Needs review", finalVerdict === "pass" ? "ok" : "warn");
+        const redesignHint = runPayload?.redesignPasses && finalVerdict !== "pass" ? " · would pass after redesign" : "";
+        setState(
+          finalVerdict === "pass" ? "Gate open" : ("Needs review" + redesignHint),
+          finalVerdict === "pass" ? "ok" : "warn"
+        );
       }
     }
 
@@ -2189,7 +2311,6 @@ function dashboardHtml(config, session) {
 
     async function refreshRuns() {
       const payload = await api("/api/runs");
-      runs.textContent = payload.runs.length;
       if (!payload.runs.length) {
         runList.innerHTML = '<div class="empty">'
           + '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 2v6h6"/></svg>'
@@ -2272,7 +2393,7 @@ function dashboardHtml(config, session) {
         await refreshRuns();
         showWelcome();
         updateSourceBadge();
-        setState("Ready — choose a source and run review", "ok");
+        setState("Ready — run full review", "ok");
       } catch (error) {
         const msg = error.message || String(error);
         if (msg.includes("unauthorized") || msg.includes("Sign in")) {
