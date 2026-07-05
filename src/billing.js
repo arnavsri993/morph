@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { brandLink, LOGO_URL } from "./brand.js";
+import { brandLink, brandStyles, headLinks } from "./brand.js";
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
@@ -748,10 +748,7 @@ export function billingPageHtml(options = {}) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Billing · morph</title>
   <meta name="theme-color" content="#050507">
-  <link rel="icon" href="${LOGO_URL}" type="image/png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  ${headLinks()}
   <style>
     :root {
       color-scheme: dark;
@@ -810,16 +807,7 @@ export function billingPageHtml(options = {}) {
       outline-offset: 3px;
       border-radius: 8px;
     }
-    .brand-mini {
-      display: inline-flex;
-      align-items: center;
-      text-decoration: none;
-    }
-    .brand-mini .logo {
-      display: block;
-      height: 24px;
-      width: auto;
-    }
+    ${brandStyles()}
     ${billingStyles()}
   </style>
 </head>

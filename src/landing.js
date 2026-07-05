@@ -1,4 +1,4 @@
-import { brandLink, LOGO_URL } from "./brand.js";
+import { brandLink, brandStyles, headLinks } from "./brand.js";
 
 const REPO_URL = "https://github.com/arnavsri993/morph";
 
@@ -23,10 +23,7 @@ export function landingHtml(config, session) {
   <meta property="og:description" content="AI writes the UI. Morph makes it belong.">
   <meta property="og:type" content="website">
   <meta name="theme-color" content="#09090b">
-  <link rel="icon" href="${LOGO_URL}" type="image/png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  ${headLinks()}
   <style>
     :root {
       color-scheme: dark;
@@ -127,17 +124,7 @@ export function landingHtml(config, session) {
       gap: 20px;
       min-height: 64px;
     }
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      transition: opacity 0.18s;
-    }
-    .brand:hover { opacity: 0.88; }
-    .logo {
-      display: block;
-      height: 28px;
-      width: auto;
-    }
+    ${brandStyles()}
     .nav-links { display: flex; align-items: center; gap: 2px; }
     .nav-link {
       color: var(--muted);

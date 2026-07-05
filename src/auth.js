@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { brandLink, LOGO_URL } from "./brand.js";
+import { brandLink, brandStyles, headLinks } from "./brand.js";
 
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -421,10 +421,7 @@ MORPH_AUTH_MODE=oauth</pre>
   <title>Log in · morph</title>
   <meta name="theme-color" content="#050507">
   <meta name="description" content="Sign in to Morph Studio — review agent UI, run repair loops, and store merge gate receipts.">
-  <link rel="icon" href="${LOGO_URL}" type="image/png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  ${headLinks()}
   <style>
     :root {
       color-scheme: dark;
@@ -562,22 +559,13 @@ MORPH_AUTH_MODE=oauth</pre>
       pointer-events: none;
     }
     .card > * { position: relative; z-index: 1; }
+    ${brandStyles()}
     .brand {
-      display: inline-flex;
-      align-items: center;
       margin-bottom: clamp(24px, 5vw, 36px);
-      color: inherit;
-      text-decoration: none;
       width: fit-content;
       transition: opacity 0.2s var(--ease);
     }
-    .brand:hover { opacity: 0.88; }
     .brand:focus-visible { border-radius: 12px; }
-    .logo {
-      display: block;
-      height: 32px;
-      width: auto;
-    }
     .card-head { margin-bottom: clamp(24px, 4vw, 32px); }
     h1 {
       margin: 0 0 10px;

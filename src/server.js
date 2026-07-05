@@ -26,7 +26,7 @@ import {
   readBillingState,
   writeBillingState
 } from "./billing.js";
-import { brandLink, LOGO_URL } from "./brand.js";
+import { brandLink, brandStyles, headLinks } from "./brand.js";
 import { landingHtml } from "./landing.js";
 import { fetchPageForTransform } from "./preview.js";
 import { transformSite } from "./transform.js";
@@ -960,10 +960,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>morph Studio</title>
   <meta name="theme-color" content="#05060b">
-  <link rel="icon" href="${LOGO_URL}" type="image/png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  ${headLinks()}
   <style>
     :root {
       color-scheme: dark;
@@ -1080,18 +1077,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
     }
     .nav-left { display: flex; align-items: center; gap: 32px; min-width: 0; }
-    .brand {
-      display: flex;
-      align-items: center;
-      text-decoration: none;
-      color: var(--ink);
-      flex: none;
-    }
-    .logo {
-      display: block;
-      height: 28px;
-      width: auto;
-    }
+    ${brandStyles()}
     .nav-links { display: flex; align-items: center; gap: 4px; }
     .nav-link {
       color: var(--muted);
