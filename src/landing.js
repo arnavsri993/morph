@@ -1228,7 +1228,6 @@ npm run serve">Copy</button>
             <p>Studio turns the stressful "is this AI code safe to merge?" moment into a guided before/after review with narration, receipts, and a one-click repair loop.</p>
           </div>
           <ul class="journey-list reveal" style="transition-delay:.08s">
-            <li><span class="jn">1</span><span><b>Narrate review</b> — hear the design critique out loud</span></li>
             <li><span class="jn">2</span><span><b>Inspect agent UI</b> — token-level findings with severity</span></li>
             <li><span class="jn">3</span><span><b>Generate fix plan</b> — deterministic patches, previewed</span></li>
             <li><span class="jn">4</span><span><b>Run full review</b> — repair an isolated copy, re-verify</span></li>

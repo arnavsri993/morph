@@ -1063,7 +1063,6 @@ function dashboardHtml(config, session) {
           <button data-action="verify">Inspect agent UI</button>
           <button data-action="repair">Generate fix plan</button>
           <button data-action="studio-review">Apply fix</button>
-          <button data-speak="true">Narrate review</button>
         </div>
         <div class="bar-actions" style="justify-content: flex-start; margin: 14px 0 0;">
           <span class="pill">Score: <strong id="score">–</strong></span>
