@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { brandLink, brandStyles, headLinks } from "./brand.js";
+import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
 
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -559,13 +559,8 @@ MORPH_AUTH_MODE=oauth</pre>
       pointer-events: none;
     }
     .card > * { position: relative; z-index: 1; }
+    ${headerBarStyles()}
     ${brandStyles()}
-    .brand {
-      margin-bottom: clamp(24px, 5vw, 36px);
-      width: fit-content;
-      transition: opacity 0.2s var(--ease);
-    }
-    .brand:focus-visible { border-radius: 12px; }
     .card-head { margin-bottom: clamp(24px, 4vw, 32px); }
     h1 {
       margin: 0 0 10px;
@@ -795,9 +790,13 @@ MORPH_AUTH_MODE=oauth</pre>
     <div class="grid-bg"></div>
     <div class="vignette"></div>
   </div>
+  <header class="site-header">
+    <div class="shell site-header-inner">
+      ${brandLink("/")}
+    </div>
+  </header>
   <div class="card-wrap">
     <main class="card" id="loginCard" aria-labelledby="loginTitle">
-      ${brandLink("/", { height: 32 })}
       <header class="card-head">
         <h1 id="loginTitle">Welcome back</h1>
         <p class="sub">Sign in to open Studio — review agent UI, run repair loops, and store merge gate receipts.</p>

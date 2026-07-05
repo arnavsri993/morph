@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { brandLink, brandStyles, headLinks } from "./brand.js";
+import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
@@ -787,22 +787,16 @@ export function billingPageHtml(options = {}) {
       margin: 0 auto;
       padding: clamp(28px, 5vw, 56px) clamp(20px, 4vw, 40px) 80px;
     }
-    .top-nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: clamp(28px, 5vw, 44px);
-    }
-    .top-nav a {
+    ${headerBarStyles()}
+    .header-back {
       color: var(--faint);
       text-decoration: none;
       font-size: 14px;
       font-weight: 500;
       transition: color 0.2s ease;
     }
-    .top-nav a:hover { color: var(--ink); }
-    .top-nav a:focus-visible {
+    .header-back:hover { color: var(--ink); }
+    .header-back:focus-visible {
       outline: 2px solid var(--cyan);
       outline-offset: 3px;
       border-radius: 8px;
@@ -813,11 +807,13 @@ export function billingPageHtml(options = {}) {
 </head>
 <body>
   <div class="backdrop" aria-hidden="true"></div>
+  <header class="site-header">
+    <div class="shell site-header-inner">
+      ${brandLink("/studio", { className: "brand-mini", height: 40 })}
+      <a class="header-back" href="/studio">← Back to Studio</a>
+    </div>
+  </header>
   <div class="page">
-    <nav class="top-nav" aria-label="Billing navigation">
-      ${brandLink("/studio", { className: "brand-mini", height: 24 })}
-      <a href="/studio">← Back to Studio</a>
-    </nav>
     ${panel}
   </div>
 </body>

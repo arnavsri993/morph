@@ -26,7 +26,7 @@ import {
   readBillingState,
   writeBillingState
 } from "./billing.js";
-import { brandLink, brandStyles, headLinks } from "./brand.js";
+import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
 import { landingHtml } from "./landing.js";
 import { fetchPageForTransform } from "./preview.js";
 import { transformSite } from "./transform.js";
@@ -1059,22 +1059,14 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       opacity: 0.35;
     }
 
-    /* ── Top nav ───────────────────────────────────────────────────── */
+    ${headerBarStyles()}
     .nav {
-      position: sticky;
-      top: 0;
-      z-index: 40;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 24px;
-      min-height: 64px;
+      min-height: 72px;
       padding: 0 var(--page-pad);
-      border-bottom: 1px solid var(--line);
-      background: rgba(6, 6, 8, 0.82);
-      -webkit-backdrop-filter: blur(24px) saturate(1.5);
-      backdrop-filter: blur(24px) saturate(1.5);
-      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
     }
     .nav-left { display: flex; align-items: center; gap: 32px; min-width: 0; }
     ${brandStyles()}
@@ -1936,7 +1928,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       .stat-value { font-size: 44px; }
     }
     @media (max-width: 768px) {
-      .nav { min-height: 56px; gap: 12px; }
+      .nav { min-height: 64px; gap: 12px; }
       .nav-left { gap: 16px; }
       .state-chip { display: none; }
       .page-head { gap: 24px; }
@@ -1971,7 +1963,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     <div class="grid-bg"></div>
   </div>
 
-  <header class="nav">
+  <header class="site-header nav">
     <div class="nav-left">
       ${brandLink("/")}
       <nav class="nav-links" aria-label="Studio sections">

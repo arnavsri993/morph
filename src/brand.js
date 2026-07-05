@@ -1,6 +1,7 @@
 export const LOGO_URL = "/assets/logo.png";
 export const ICON_URL = "/assets/icon.png";
-export const DEFAULT_LOGO_HEIGHT = 28;
+export const HEADER_BG = "#000000";
+export const DEFAULT_LOGO_HEIGHT = 44;
 
 /** Shared favicon + font preloads for site chrome pages. */
 export function headLinks() {
@@ -8,6 +9,28 @@ export function headLinks() {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">`;
+}
+
+/** Solid black header bar matching the logo background. */
+export function headerBarStyles() {
+  return `
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: ${HEADER_BG};
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .site-header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 72px;
+      width: min(1080px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 0 clamp(20px, 4vw, 24px);
+    }`;
 }
 
 /** Shared brand/logo styles — set --logo-height on :root to resize per page. */

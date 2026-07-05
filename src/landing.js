@@ -1,4 +1,4 @@
-import { brandLink, brandStyles, headLinks } from "./brand.js";
+import { brandLink, brandStyles, headLinks, headerBarStyles } from "./brand.js";
 
 const REPO_URL = "https://github.com/arnavsri993/morph";
 
@@ -103,27 +103,7 @@ export function landingHtml(config, session) {
       margin: 0 auto;
     }
 
-    /* Nav */
-    .nav {
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      border-bottom: 1px solid transparent;
-      transition: background 0.25s var(--ease), border-color 0.25s var(--ease);
-    }
-    .nav.scrolled {
-      background: rgba(9, 9, 11, 0.82);
-      border-bottom-color: var(--border);
-      backdrop-filter: blur(20px) saturate(1.4);
-      -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    }
-    .nav-inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      min-height: 64px;
-    }
+    ${headerBarStyles()}
     ${brandStyles()}
     .nav-links { display: flex; align-items: center; gap: 2px; }
     .nav-link {
@@ -149,8 +129,8 @@ export function landingHtml(config, session) {
     }
     .mobile-menu {
       display: none;
-      border-top: 1px solid var(--border);
-      background: rgba(9, 9, 11, 0.96);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      background: #000000;
       backdrop-filter: blur(20px);
       padding: 12px 24px 20px;
     }
@@ -850,8 +830,8 @@ export function landingHtml(config, session) {
     <div class="grid-bg"></div>
   </div>
 
-  <header class="nav" id="siteHeader">
-    <div class="shell nav-inner">
+  <header class="site-header" id="siteHeader">
+    <div class="shell site-header-inner">
       ${brandLink("#top")}
       <nav class="nav-links" aria-label="Primary">
         <a class="nav-link" href="#product">Product</a>
@@ -1115,13 +1095,6 @@ export function landingHtml(config, session) {
 
       var year = document.getElementById("year");
       if (year) year.textContent = String(new Date().getFullYear());
-
-      var header = document.getElementById("siteHeader");
-      function updateHeader() {
-        if (header) header.classList.toggle("scrolled", window.scrollY > 8);
-      }
-      window.addEventListener("scroll", updateHeader, { passive: true });
-      updateHeader();
 
       var toggle = document.getElementById("navToggle");
       var menu = document.getElementById("mobileMenu");
