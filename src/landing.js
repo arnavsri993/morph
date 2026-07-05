@@ -771,18 +771,50 @@ export function landingHtml(config, session) {
     .price-card li::before { content: "·"; color: var(--brand); font-weight: 700; margin-right: 8px; }
     .price-card .btn { width: 100%; }
 
-    footer { border-top: 1px solid var(--border); padding: 40px 0 32px; }
-    .foot {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      flex-wrap: wrap;
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 46px 0 34px;
+      background: rgba(9, 9, 11, 0.72);
     }
-    .foot p { margin: 0; color: var(--faint); font-size: 13px; }
-    .foot-links { display: flex; gap: 20px; flex-wrap: wrap; }
-    .foot-links a { color: var(--muted); font-size: 13px; transition: color 0.18s; }
-    .foot-links a:hover { color: var(--text); }
+    .foot-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr 1fr 1fr;
+      gap: 26px;
+      margin-bottom: 32px;
+    }
+    .foot-brand p {
+      color: var(--muted);
+      max-width: 330px;
+      margin: 12px 0 0;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    .foot-col h4 {
+      margin: 0 0 11px;
+      color: var(--faint);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .foot-col a {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 4px 0;
+      transition: color 0.18s;
+    }
+    .foot-col a:hover { color: var(--text); }
+    .foot-bottom {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      color: var(--faint);
+      font-size: 12px;
+    }
 
     /* Scroll reveal */
     .reveal {
@@ -807,6 +839,7 @@ export function landingHtml(config, session) {
         border-bottom: 1px solid var(--border);
         padding: 16px 20px;
       }
+      .foot-grid { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 768px) {
       .shell { width: min(var(--max), calc(100vw - 32px)); }
@@ -815,6 +848,7 @@ export function landingHtml(config, session) {
       .mobile-menu.open { display: block; }
       .cta-band { flex-direction: column; align-items: flex-start; }
       .hero-actions .btn-lg { flex: 1 1 100%; }
+      .foot-grid { grid-template-columns: 1fr; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -1078,13 +1112,37 @@ export function landingHtml(config, session) {
   </main>
 
   <footer>
-    <div class="shell foot">
-      ${brandLink("#top")}
-      <p>© <span id="year">2026</span> Morph · MIT licensed</p>
-      <div class="foot-links">
-        <a href="${REPO_URL}" target="_blank" rel="noreferrer">GitHub</a>
-        <a href="/api/health">API</a>
-        <a href="/login?returnTo=%2Fstudio">Log in</a>
+    <div class="shell">
+      <div class="foot-grid">
+        <div class="foot-brand">
+          ${brandLink("#top")}
+          <p>CI for agent-written frontend. Detect drift, explain violations, repair deterministically, and open the merge gate.</p>
+        </div>
+        <div class="foot-col">
+          <h4>Product</h4>
+          <a href="#product">Product</a>
+          <a href="#demo">Demo</a>
+          <a href="#studio">Studio</a>
+          <a href="/studio">Launch Studio</a>
+        </div>
+        <div class="foot-col">
+          <h4>Resources</h4>
+          <a href="#docs">Docs</a>
+          <a href="${REPO_URL}" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="${REPO_URL}/blob/main/DEMO.md" target="_blank" rel="noreferrer">Demo runbook</a>
+          <a href="${REPO_URL}/blob/main/docs/product-architecture.md" target="_blank" rel="noreferrer">Architecture</a>
+        </div>
+        <div class="foot-col">
+          <h4>Account</h4>
+          <a href="/login?returnTo=%2Fstudio">Log in</a>
+          <a href="/studio">Launch Studio</a>
+          <a href="/api/health">API status</a>
+          <a href="#pricing">Pricing</a>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>© <span id="year">2026</span> Morph · MIT licensed</span>
+        <span>Built for serious agent frontend review.</span>
       </div>
     </div>
   </footer>

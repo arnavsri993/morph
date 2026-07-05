@@ -184,7 +184,10 @@ export function createAuthManager(config, runtimeAuth) {
     const configured = process.env.MORPH_APP_URL?.trim();
     if (configured) return configured.replace(/\/$/, "");
     const requestHost = request.headers.host?.trim();
-    if (requestHost) return `http://${requestHost}`;
+    if (requestHost) {
+      const proto = request.headers["x-forwarded-proto"]?.split(",")[0]?.trim() || "http";
+      return `${proto}://${requestHost}`;
+    }
     return `http://${host}:${port}`;
   }
 

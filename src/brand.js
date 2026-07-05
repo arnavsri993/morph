@@ -1,7 +1,7 @@
 export const LOGO_URL = "/assets/logo.png";
 export const ICON_URL = "/assets/icon.png";
 export const HEADER_BG = "#000000";
-export const DEFAULT_LOGO_HEIGHT = 44;
+export const DEFAULT_LOGO_HEIGHT = 64;
 
 /** Shared favicon + font preloads for site chrome pages. */
 export function headLinks() {

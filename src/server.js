@@ -32,7 +32,7 @@ import { fetchPageForTransform } from "./preview.js";
 import { transformSite } from "./transform.js";
 import { cloneRepo } from "./github.js";
 
-export async function serveMorph(config, options = {}) {
+export async function createMorphHandler(config, options = {}) {
   if (options.loadEnv !== false) {
     await loadEnvFile(options.cwd ?? process.cwd());
   }
@@ -52,7 +52,7 @@ export async function serveMorph(config, options = {}) {
   const auth = createAuthManager(config, runtimeAuth);
   const billing = createBillingManager(config, runtimeBilling);
 
-  const server = createServer(async (request, response) => {
+  return async (request, response) => {
     let url;
     try {
       if (!request.url) return sendJson(response, 400, { error: "missing_url" });
@@ -299,8 +299,6 @@ export async function serveMorph(config, options = {}) {
           githubRepo: body.githubRepo,
           githubToken: session?.githubToken ?? null,
           instructions: body.instructions,
-          sourceCode: body.sourceCode,
-          targetFile: body.targetFile,
           referenceImage: body.referenceImage,
           generateReference: body.generateReference
         });
@@ -390,8 +388,14 @@ export async function serveMorph(config, options = {}) {
         message: error.message
       });
     }
-  });
+  };
+}
 
+export async function serveMorph(config, options = {}) {
+  const handler = await createMorphHandler(config, options);
+  const host = options.host ?? config.server?.host ?? "127.0.0.1";
+  const port = Number(options.port ?? config.server?.port ?? 4177);
+  const server = createServer(handler);
   await new Promise((resolve) => server.listen(port, host, resolve));
   const address = server.address();
   const actualPort = typeof address === "object" && address ? address.port : port;
@@ -405,16 +409,10 @@ const DEFAULT_REVIEW_FILE = "src/routes/settings/billing.tsx";
 
 async function runStudioReview(config, options = {}) {
   const instructions = String(options.instructions ?? "").trim();
-  const sourceCode = String(options.sourceCode ?? "").trim();
   const targetFile = normalizeReviewTargetFile(options.targetFile);
   let source = String(options.source ?? "").trim();
-  if (!source && sourceCode) source = "paste";
 
-  if (source === "paste" || source === "fixture") {
-    if (source === "paste" && !sourceCode) {
-      throw new HttpError(400, "missing_source_code", "Paste the agent UI source code before running a review.");
-    }
-  } else {
+  if (source !== "fixture") {
     const resolved = resolveStudioSource(options);
     if (resolved.source === "github" || resolved.source === "url") {
       return runTransformReview(config, {
@@ -436,11 +434,6 @@ async function runStudioReview(config, options = {}) {
 
   await mkdir(studioRoot, { recursive: true });
   await copyFixtureForDemo(config.projectRoot, studioProjectRoot);
-
-  if (source === "paste") {
-    await mkdir(path.dirname(path.join(studioProjectRoot, targetFile)), { recursive: true });
-    await writeFile(path.join(studioProjectRoot, targetFile), `${sourceCode}\n`);
-  }
 
   await writeFile(studioConfigPath, `${JSON.stringify({
     projectName: `${config.projectName} Studio Review`,
@@ -466,9 +459,7 @@ async function runStudioReview(config, options = {}) {
   const codeAfter = await readFile(reviewFilePath, "utf8");
 
   const userJourney = [];
-  if (source === "paste") {
-    userJourney.push(`Scan pasted agent UI in ${targetFile}.`);
-  } else if (source === "fixture") {
+  if (source === "fixture") {
     userJourney.push(`Scan seeded agent drift in ${targetFile}.`);
   }
   if (instructions) {
@@ -924,8 +915,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     checkoutConfigured: billing.isCheckoutConfigured(),
     webhookConfigured: billing.isWebhookConfigured()
   });
-  const workspaceName = escapeHtml(config.workspace?.name ?? "Local Workspace");
-  const projectName = escapeHtml(config.projectName ?? "Project");
   const githubConnected = session?.provider === "github";
   const githubLabel = githubConnected ? escapeHtml(session.name || session.email || "GitHub account") : "";
   const githubConfigured = isGithubConfigured(runtimeAuth);
@@ -936,20 +925,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     githubConfigured,
     appUrl: safeAppUrl
   });
-  let demoDriftSource = "";
-  const demoCandidates = [
-    path.join(config.configDir, "fixtures/acme-saas/src/routes/settings/billing.tsx"),
-    path.join(config.projectRoot, DEFAULT_REVIEW_FILE)
-  ];
-  for (const candidate of demoCandidates) {
-    try {
-      demoDriftSource = await readFile(candidate, "utf8");
-      break;
-    } catch {
-      // try next demo source
-    }
-  }
-  const demoDriftJson = JSON.stringify(demoDriftSource);
   const userBlock = session
     ? `<div class="user-chip"><span class="user-avatar" aria-hidden="true">${escapeHtml((session.name || session.email || "?").slice(0, 1).toUpperCase())}</span><span class="user-name">${escapeHtml(session.name || session.email)}</span></div><a class="top-link" href="/auth/logout">Sign out</a>`
     : `<a class="top-link" href="/login?returnTo=%2Fstudio">Log in</a>`;
@@ -1088,37 +1063,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.22);
     }
     .nav-right { display: flex; align-items: center; gap: 16px; flex: none; }
-    .project-pill {
-      display: none;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 14px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      font-size: 13px;
-      color: var(--muted);
-      background: rgba(255, 255, 255, 0.03);
-    }
-    .project-pill b { color: var(--ink); font-weight: 600; }
-    .state-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 6px 14px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--muted);
-      white-space: nowrap;
-      background: rgba(255, 255, 255, 0.03);
-    }
-    .state-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); transition: background 0.2s ease, box-shadow 0.2s ease; }
-    .state-chip[data-state="ok"] .state-dot { background: var(--ok); box-shadow: 0 0 12px rgba(74, 222, 128, 0.7); }
-    .state-chip[data-state="warn"] .state-dot { background: var(--warn); box-shadow: 0 0 12px rgba(251, 191, 36, 0.6); }
-    .state-chip[data-state="busy"] .state-dot { background: var(--cyan); box-shadow: 0 0 12px rgba(34, 211, 238, 0.7); animation: pulse 1.2s ease-in-out infinite; }
-    .state-chip[data-state="bad"] .state-dot { background: var(--bad); box-shadow: 0 0 12px rgba(248, 113, 113, 0.7); }
-    @keyframes pulse { 50% { opacity: 0.35; } }
     .user-chip { display: flex; align-items: center; gap: 10px; }
     .user-avatar {
       width: 32px; height: 32px;
@@ -1661,7 +1605,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     .setup-panel:hover::before { opacity: 1; }
     .setup-head { margin-bottom: 32px; position: relative; display: grid; gap: 12px; }
     .setup-head .source-badge { justify-self: start; margin-top: 4px; }
-    .project-pill .sep { opacity: 0.35; }
     .setup-head h2 { margin: 0 0 10px; font-size: 22px; letter-spacing: -0.02em; }
     .setup-head p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
     .setup-stack { display: grid; gap: 40px; position: relative; }
@@ -1914,9 +1857,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     .gate-row { margin-bottom: 12px; font-size: 12.5px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
     .patch-title { font-size: 12px; font-weight: 600; display: block; margin-bottom: 6px; color: var(--ink); }
 
-    @media (min-width: 900px) {
-      .project-pill { display: inline-flex; }
-    }
     @media (min-width: 1280px) {
       .content { max-width: 1280px; }
       .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
@@ -1930,7 +1870,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     @media (max-width: 768px) {
       .nav { min-height: 64px; gap: 12px; }
       .nav-left { gap: 16px; }
-      .state-chip { display: none; }
       .page-head { gap: 24px; }
       h1 { font-size: clamp(28px, 8vw, 36px); }
       .lede { font-size: 15px; }
@@ -1973,8 +1912,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       </nav>
     </div>
     <div class="nav-right">
-      <span class="project-pill"><span>${workspaceName}</span><span class="sep">/</span><b>${projectName}</b></span>
-      <span class="state-chip" id="stateChip" data-state="idle"><span class="state-dot"></span><span id="reviewState">Idle</span></span>
       ${userBlock}
     </div>
   </header>
@@ -1984,32 +1921,21 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       <section class="page-head" id="overview">
         <div class="eyebrow"><span class="eyebrow-dot"></span> Morph Studio</div>
         <h1><span class="title-gradient">Review agent UI</span><br>before it ships.</h1>
-        <p class="lede">Paste agent-generated UI code, run a full review, and watch morph catch drift, apply deterministic fixes, and return a passing merge gate with before/after proof.</p>
+        <p class="lede">Connect a GitHub repo or preview URL, run a full review, and watch morph score your site, apply a redesign, and return a passing merge gate with before/after proof.</p>
       </section>
 
       <section class="setup-panel spotlight" aria-label="Project source and agent instructions">
         <div class="setup-head">
-          <h2>Agent UI input</h2>
-          <p>Paste the UI your agent shipped — or use the pre-loaded broken demo. morph scans it, auto-fixes drift, and proves the branch is safe to review.</p>
-          <span class="source-badge" id="sourceBadge">paste ui</span>
+          <h2>Project source</h2>
+          <p>Point morph at your repo or live preview. It scores the current UI, shows the possible score after redesign, and proves the branch is safe to review.</p>
+          <span class="source-badge" id="sourceBadge">github repo required</span>
         </div>
         <div class="panel-tabs" role="tablist" aria-label="Project source">
-          <button type="button" class="active" data-source-tab="paste" role="tab" aria-selected="true">Paste UI code</button>
-          <button type="button" data-source-tab="github" role="tab" aria-selected="false">GitHub</button>
+          <button type="button" class="active" data-source-tab="github" role="tab" aria-selected="true">GitHub</button>
           <button type="button" data-source-tab="url" role="tab" aria-selected="false">Preview URL</button>
         </div>
         <div class="setup-stack">
-          <div class="source-pane" data-source-pane="paste">
-            <div class="code-editor">
-              <div class="code-toolbar">
-                <label for="sourceCode">Agent UI source · <code>${DEFAULT_REVIEW_FILE}</code></label>
-                <button type="button" class="btn btn-ghost" id="loadDemoDrift" style="min-height:36px;padding:0 14px;font-size:13px">Load broken demo</button>
-              </div>
-              <textarea id="sourceCode" name="sourceCode" spellcheck="false" placeholder="Paste the TSX/JSX your agent generated…"></textarea>
-              <p class="source-note">The broken demo is pre-loaded. Click <strong>Run full review</strong> to scan, repair, and gate the UI in one shot.</p>
-            </div>
-          </div>
-          <div class="source-pane" data-source-pane="github" hidden>
+          <div class="source-pane" data-source-pane="github">
             ${githubConnectBlock}
             <label class="auth-form" for="githubRepo">
               <span>Repository</span>
@@ -2083,7 +2009,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
 
       <p class="foot-note">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>GitHub and Preview URL score your actual site (current → possible after redesign). Paste UI code runs design-system repair on component source.</span>
+        <span>GitHub and Preview URL score your actual site (current → possible after redesign).</span>
       </p>
     </main>
   </div>
@@ -2095,8 +2021,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     const possibleScore = document.querySelector("#possibleScore");
     const gate = document.querySelector("#gate");
     const fixes = document.querySelector("#fixes");
-    const reviewState = document.querySelector("#reviewState");
-    const stateChip = document.querySelector("#stateChip");
     const pipeline = document.querySelector("#pipeline");
     const pipeBefore = document.querySelector("#pipeBefore");
     const pipeFixes = document.querySelector("#pipeFixes");
@@ -2104,8 +2028,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     const pipeSummary = document.querySelector("#pipeSummary");
     const previewUrlInput = document.querySelector("#previewUrl");
     const githubRepoInput = document.querySelector("#githubRepo");
-    const sourceCodeInput = document.querySelector("#sourceCode");
-    const loadDemoDriftBtn = document.querySelector("#loadDemoDrift");
     const agentInstructionsInput = document.querySelector("#agentInstructions");
     const previewFrame = document.querySelector("#previewFrame");
     const previewImage = document.querySelector("#previewImage");
@@ -2113,20 +2035,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
     const previewPlaceholder = document.querySelector("#previewPlaceholder");
     const sourceBadge = document.querySelector("#sourceBadge");
 
-    const DEMO_DRIFT = ${demoDriftJson};
-    const REVIEW_TARGET_FILE = ${JSON.stringify(DEFAULT_REVIEW_FILE)};
-
-    let activeSource = "paste";
-
-    function loadDemoDrift() {
-      if (!sourceCodeInput || !DEMO_DRIFT) return;
-      sourceCodeInput.value = DEMO_DRIFT;
-      updateSourceBadge();
-    }
-
-    loadDemoDriftBtn?.addEventListener("click", loadDemoDrift);
-    sourceCodeInput?.addEventListener("input", updateSourceBadge);
-    if (sourceCodeInput && DEMO_DRIFT) sourceCodeInput.value = DEMO_DRIFT;
+    let activeSource = "github";
 
     function activateSourceTab(sourceName) {
       activeSource = sourceName;
@@ -2143,12 +2052,12 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
 
     document.querySelectorAll("[data-source-tab]").forEach((tabButton) => {
       tabButton.addEventListener("click", () => {
-        activateSourceTab(tabButton.dataset.sourceTab || "paste");
+        activateSourceTab(tabButton.dataset.sourceTab || "github");
       });
     });
 
     const initialSource = new URLSearchParams(window.location.search).get("source");
-    if (initialSource === "github" || initialSource === "url" || initialSource === "paste") {
+    if (initialSource === "github" || initialSource === "url") {
       activateSourceTab(initialSource);
     }
 
@@ -2180,10 +2089,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
 
     function updateSourceBadge() {
       if (!sourceBadge) return;
-      if (activeSource === "paste") {
-        const lines = sourceCodeInput?.value.trim().split("\\n").length || 0;
-        sourceBadge.textContent = lines ? "paste ui · " + lines + " lines" : "paste ui required";
-      } else if (activeSource === "url") {
+      if (activeSource === "url") {
         const url = previewUrlInput?.value.trim();
         sourceBadge.textContent = url ? "preview url · " + url : "preview url required";
       } else {
@@ -2197,18 +2103,13 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
 
     function buildReviewRequest() {
       const instructions = agentInstructionsInput?.value.trim() || "";
-      if (activeSource === "paste") {
-        const sourceCode = sourceCodeInput?.value.trim() || "";
-        if (!sourceCode) throw new Error("Paste your agent UI code or click Load broken demo.");
-        return { source: "paste", sourceCode, targetFile: REVIEW_TARGET_FILE, instructions };
-      }
       if (activeSource === "url") {
         const previewUrl = previewUrlInput?.value.trim() || "";
-        if (!previewUrl) throw new Error("Enter a preview URL or switch to Paste UI code.");
+        if (!previewUrl) throw new Error("Enter a preview URL or switch to GitHub.");
         return { source: "url", previewUrl, instructions };
       }
       const githubRepo = githubRepoInput?.value.trim() || "";
-      if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo) or switch to Paste UI code.");
+      if (!githubRepo) throw new Error("Enter a GitHub repository (owner/repo) or switch to Preview URL.");
       return { source: "github", githubRepo, instructions };
     }
 
@@ -2531,7 +2432,7 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       outputReadable.innerHTML = '<div class="welcome">'
         + '<div class="welcome-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>'
         + '<h3>Ready to review</h3>'
-        + '<p>The broken demo UI is already loaded. Click <strong>Run full review</strong> to scan it, auto-fix every drift issue, and see the before/after code and merge gate.</p>'
+        + '<p>Connect a GitHub repo or enter a preview URL, then click <strong>Run full review</strong> to score your site, see the redesign delta, and get the merge gate.</p>'
         + '</div>';
     }
 
@@ -2543,11 +2444,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || payload.error || "Request failed");
       return payload;
-    }
-
-    function setState(label, kind) {
-      reviewState.textContent = label;
-      stateChip.dataset.state = kind || "idle";
     }
 
     function verdictOf(runPayload) {
@@ -2613,13 +2509,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       if (issueCount !== undefined) fixes.textContent = issueCount;
       renderPipeline(runPayload);
       if (runPayload?.preview) renderPreviewCapture(runPayload.preview);
-      if (finalVerdict) {
-        const redesignHint = runPayload?.redesignPasses && finalVerdict !== "pass" ? " · would pass after redesign" : "";
-        setState(
-          finalVerdict === "pass" ? "Gate open" : ("Needs review" + redesignHint),
-          finalVerdict === "pass" ? "ok" : "warn"
-        );
-      }
     }
 
     const RUN_ICONS = {
@@ -2742,7 +2631,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
       } else {
         showRaw("Running " + action + "…");
       }
-      setState("Running review…", "busy");
       trigger.disabled = true;
       try {
         const route = action === "studio-review"
@@ -2757,7 +2645,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
         await refreshRuns();
       } catch (error) {
         showRaw(error.stack || error.message);
-        setState("Error", "bad");
       } finally {
         trigger.disabled = false;
       }
@@ -2780,7 +2667,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
         if (billingQuery === "success" || billingQuery === "saved") {
           document.querySelector("#billing")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }
-        setState("Ready — run full review", "ok");
       } catch (error) {
         const msg = error.message || String(error);
         if (msg.includes("unauthorized") || msg.includes("Sign in")) {
@@ -2789,7 +2675,6 @@ async function dashboardHtml(config, session, runtimeAuth, appUrl, billing) {
         }
         runList.innerHTML = '<div class="empty"><span><b>Could not load runs.</b><br>' + esc(msg) + '</span></div>';
         showRaw(msg);
-        setState("Error", "bad");
       }
     }
 

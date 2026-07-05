@@ -279,8 +279,8 @@ test("landing page is served at / and the studio dashboard at /studio", async ()
     assert.equal(studio.includes("Save credentials"), true);
     assert.equal(studio.includes("Agent instructions"), true);
     assert.equal(studio.includes("Preview URL"), true);
-    assert.equal(studio.includes("Paste UI code"), true);
-    assert.equal(studio.includes("Load broken demo"), true);
+    assert.equal(studio.includes("Paste UI code"), false);
+    assert.equal(studio.includes("Load broken demo"), false);
     assert.equal(studio.includes("morph"), true);
     assert.equal(studio.includes("Narrate review"), false);
   } finally {
@@ -590,15 +590,15 @@ test("studio review rejects requests without github repo or preview url", async 
   }
 });
 
-test("studio review repairs pasted agent ui code", async () => {
-  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-paste-"));
+test("studio review repairs fixture agent drift", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "morph-studio-fixture-"));
   const fixtureRoot = path.join(tempRoot, "acme-saas");
-  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas-clean"), fixtureRoot);
+  await copyFixtureForDemo(path.join(repoRoot, "fixtures/acme-saas"), fixtureRoot);
 
   const configPath = path.join(tempRoot, "morph.config.json");
   await writeFile(configPath, `${JSON.stringify({
-    projectName: "Acme Studio Paste",
-    projectId: "acme-studio-paste",
+    projectName: "Acme Studio Fixture",
+    projectId: "acme-studio-fixture",
     projectRoot: "acme-saas",
     morphDir: ".morph",
     tokenFiles: ["design-system/tokens.css"],
@@ -611,8 +611,6 @@ test("studio review repairs pasted agent ui code", async () => {
     }
   }, null, 2)}\n`);
 
-  const driftedFile = path.join(repoRoot, "fixtures/acme-saas/src/routes/settings/billing.tsx");
-  const sourceCode = await readFile(driftedFile, "utf8");
   const config = await loadConfig(configPath, tempRoot);
   const { server, url } = await serveMorph(config, { host: "127.0.0.1", port: 0, loadEnv: false });
 
@@ -621,14 +619,13 @@ test("studio review repairs pasted agent ui code", async () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        source: "paste",
-        sourceCode,
+        source: "fixture",
         targetFile: "src/routes/settings/billing.tsx"
       })
     });
     assert.equal(response.status, 201);
     const payload = await response.json();
-    assert.equal(payload.run.payload.source, "paste");
+    assert.equal(payload.run.payload.source, "fixture");
     assert.equal(payload.run.payload.before.verdict, "fail");
     assert.equal(payload.run.payload.finalVerdict, "pass");
     assert.equal(payload.run.payload.codeReview.changed, true);

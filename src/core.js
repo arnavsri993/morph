@@ -37,10 +37,8 @@ const SEVERITY_FAMILY_CAP = {
 
 const REPEAT_DEDUCTION_FACTORS = [1, 0.6, 0.35];
 
-export async function loadConfig(configPath, cwd = process.cwd()) {
-  const absoluteConfigPath = path.resolve(cwd, configPath);
-  const raw = await readFile(absoluteConfigPath, "utf8");
-  const parsed = JSON.parse(raw);
+export function parseConfig(parsed, configPath) {
+  const absoluteConfigPath = path.resolve(configPath);
   const configDir = path.dirname(absoluteConfigPath);
   const projectRoot = path.resolve(configDir, parsed.projectRoot);
 
@@ -57,6 +55,13 @@ export async function loadConfig(configPath, cwd = process.cwd()) {
       return path.resolve(projectRoot, relativePath);
     }
   };
+}
+
+export async function loadConfig(configPath, cwd = process.cwd()) {
+  const absoluteConfigPath = path.resolve(cwd, configPath);
+  const raw = await readFile(absoluteConfigPath, "utf8");
+  const parsed = JSON.parse(raw);
+  return parseConfig(parsed, absoluteConfigPath);
 }
 
 export async function createReport(config, options = {}) {

@@ -6,4 +6,7 @@
 morph-output/
 node_modules/
 .env
+.vercel/
 .DS_Store
+.vercel
+.env*

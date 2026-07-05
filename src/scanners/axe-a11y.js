@@ -1,7 +1,13 @@
 import { readFile } from "node:fs/promises";
-import axe from "axe-core";
-import { JSDOM } from "jsdom";
 import { morphIssue } from "./issue.js";
+
+async function loadAxeRuntime() {
+  const [{ JSDOM }, axe] = await Promise.all([
+    import("jsdom"),
+    import("axe-core")
+  ]);
+  return { JSDOM, axe: axe.default ?? axe };
+}
 
 const IMPACT_SEVERITY = {
   critical: "high",
@@ -11,9 +17,12 @@ const IMPACT_SEVERITY = {
 };
 
 export async function scanHtmlWithAxe(files) {
+  const htmlFiles = files.filter((file) => file.relative.endsWith(".html"));
+  if (!htmlFiles.length) return [];
+
+  const { JSDOM, axe } = await loadAxeRuntime();
   const issues = [];
-  for (const file of files) {
-    if (!file.relative.endsWith(".html")) continue;
+  for (const file of htmlFiles) {
     let html = "";
     try {
       html = await readFile(file.absolute, "utf8");

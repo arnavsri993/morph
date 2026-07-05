@@ -809,7 +809,7 @@ export function billingPageHtml(options = {}) {
   <div class="backdrop" aria-hidden="true"></div>
   <header class="site-header">
     <div class="shell site-header-inner">
-      ${brandLink("/studio", { className: "brand-mini", height: 40 })}
+      ${brandLink("/studio", { className: "brand-mini", height: 58 })}
       <a class="header-back" href="/studio">← Back to Studio</a>
     </div>
   </header>
